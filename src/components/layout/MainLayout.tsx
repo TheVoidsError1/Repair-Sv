@@ -1,12 +1,14 @@
 import { ReactNode } from "react";
 import { AppSidebar } from "./AppSidebar";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface MainLayoutProps {
   children: ReactNode;
-  language?: "en" | "th";
 }
 
-export function MainLayout({ children, language = "en" }: MainLayoutProps) {
+export function MainLayout({ children }: MainLayoutProps) {
+  const { language } = useLanguage();
+  
   return (
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar language={language} />

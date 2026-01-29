@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Language } from "@/lib/translations";
 
 const navItems = [
   {
@@ -55,10 +56,10 @@ const navItems = [
 ];
 
 interface AppSidebarProps {
-  language?: "en" | "th";
+  language?: Language;
 }
 
-export function AppSidebar({ language = "en" }: AppSidebarProps) {
+export function AppSidebar({ language = "th" }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();

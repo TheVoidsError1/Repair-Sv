@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +32,8 @@ import {
   UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useState } from "react";
 
 const users = [
   {
@@ -70,7 +71,7 @@ const users = [
 ];
 
 const Settings = () => {
-  const [language, setLanguage] = useState("en");
+  const { t, language, setLanguage } = useLanguage();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -81,31 +82,29 @@ const Settings = () => {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
 
   return (
-    <MainLayout language={language as "en" | "th"}>
+    <MainLayout>
       <div className="page-header">
-        <h1 className="page-title">Settings</h1>
-        <p className="page-description">
-          Manage your system settings, users, and preferences.
-        </p>
+        <h1 className="page-title">{t("settings")}</h1>
+        <p className="page-description">{t("settingsDescription")}</p>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
           <TabsTrigger value="users" className="gap-2">
             <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Users</span>
+            <span className="hidden sm:inline">{t("users")}</span>
           </TabsTrigger>
           <TabsTrigger value="language" className="gap-2">
             <Globe className="w-4 h-4" />
-            <span className="hidden sm:inline">Language</span>
+            <span className="hidden sm:inline">{t("language")}</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
-            <span className="hidden sm:inline">Notifications</span>
+            <span className="hidden sm:inline">{t("notifications")}</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Shield className="w-4 h-4" />
-            <span className="hidden sm:inline">Security</span>
+            <span className="hidden sm:inline">{t("security")}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -114,66 +113,53 @@ const Settings = () => {
           <div className="bg-card rounded-xl border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  User Management
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage staff accounts and permissions
-                </p>
+                <h3 className="text-lg font-semibold text-foreground">{t("userManagement")}</h3>
+                <p className="text-sm text-muted-foreground">{t("manageStaffAccounts")}</p>
               </div>
               <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
                     <Plus className="w-4 h-4" />
-                    Add User
+                    {t("addUser")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add New User</DialogTitle>
-                    <DialogDescription>
-                      Create a new staff account
-                    </DialogDescription>
+                    <DialogTitle>{t("addNewUser")}</DialogTitle>
+                    <DialogDescription>{t("createNewStaffAccount")}</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input id="name" placeholder="Enter full name" />
+                      <Label htmlFor="name">{t("fullName")}</Label>
+                      <Input id="name" placeholder={t("enterFullName")} />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="Enter email" />
+                      <Label htmlFor="email">{t("email")}</Label>
+                      <Input id="email" type="email" placeholder={t("enterEmail")} />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="role">Role</Label>
+                      <Label htmlFor="role">{t("role")}</Label>
                       <Select>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
+                          <SelectValue placeholder={t("selectRole")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="staff">Staff</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="staff">{t("staff")}</SelectItem>
+                          <SelectItem value="owner">{t("owner")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Enter password"
-                      />
+                      <Label htmlFor="password">{t("password")}</Label>
+                      <Input id="password" type="password" placeholder={t("enterPassword")} />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsUserDialogOpen(false)}
-                    >
-                      Cancel
+                    <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                      {t("cancel")}
                     </Button>
                     <Button onClick={() => setIsUserDialogOpen(false)}>
-                      Create User
+                      {t("createUser")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -195,30 +181,24 @@ const Settings = () => {
                         <span
                           className={cn(
                             "status-badge text-xs",
-                            user.role === "owner"
-                              ? "status-in-progress"
-                              : "status-completed"
+                            user.role === "owner" ? "status-in-progress" : "status-completed"
                           )}
                         >
-                          {user.role === "owner" ? "Owner" : "Staff"}
+                          {user.role === "owner" ? t("owner") : t("staff")}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {user.email}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right hidden sm:block">
-                      <p className="text-sm text-muted-foreground">Last login</p>
+                      <p className="text-sm text-muted-foreground">{t("lastLogin")}</p>
                       <p className="text-sm text-foreground">{user.lastLogin}</p>
                     </div>
                     <div
                       className={cn(
                         "w-2 h-2 rounded-full",
-                        user.status === "active"
-                          ? "bg-status-completed"
-                          : "bg-muted-foreground"
+                        user.status === "active" ? "bg-status-completed" : "bg-muted-foreground"
                       )}
                     />
                     <div className="flex gap-1">
@@ -244,22 +224,22 @@ const Settings = () => {
         <TabsContent value="language" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
-              Language Settings
+              {t("languageSettings")}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Choose your preferred language for the interface
+              {t("choosePreferredLanguage")}
             </p>
             <div className="grid gap-4 max-w-md">
               <div className="grid gap-2">
-                <Label>Display Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
+                <Label>{t("displayLanguage")}</Label>
+                <Select value={language} onValueChange={(value) => setLanguage(value as "en" | "th")}>
                   <SelectTrigger>
                     <Globe className="w-4 h-4 mr-2" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="th">ไทย (Thai)</SelectItem>
+                    <SelectItem value="en">{t("english")}</SelectItem>
+                    <SelectItem value="th">{t("thai")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -271,18 +251,16 @@ const Settings = () => {
         <TabsContent value="notifications" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
-              Notification Preferences
+              {t("notificationPreferences")}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Configure how you receive notifications
+              {t("configureNotifications")}
             </p>
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-foreground">Email Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications via email
-                  </p>
+                  <p className="font-medium text-foreground">{t("emailNotifications")}</p>
+                  <p className="text-sm text-muted-foreground">{t("receiveViaEmail")}</p>
                 </div>
                 <Switch
                   checked={notifications.email}
@@ -293,10 +271,8 @@ const Settings = () => {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-foreground">Push Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Receive browser push notifications
-                  </p>
+                  <p className="font-medium text-foreground">{t("pushNotifications")}</p>
+                  <p className="text-sm text-muted-foreground">{t("receivePushNotifications")}</p>
                 </div>
                 <Switch
                   checked={notifications.push}
@@ -306,16 +282,12 @@ const Settings = () => {
                 />
               </div>
               <div className="border-t border-border pt-6">
-                <p className="font-medium text-foreground mb-4">
-                  Notification Types
-                </p>
+                <p className="font-medium text-foreground mb-4">{t("notificationTypes")}</p>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-foreground">Low Stock Alerts</p>
-                      <p className="text-xs text-muted-foreground">
-                        When inventory falls below minimum
-                      </p>
+                      <p className="text-sm text-foreground">{t("lowStockAlertsNotif")}</p>
+                      <p className="text-xs text-muted-foreground">{t("whenInventoryFallsBelow")}</p>
                     </div>
                     <Switch
                       checked={notifications.lowStock}
@@ -326,10 +298,8 @@ const Settings = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-foreground">New Repair Orders</p>
-                      <p className="text-xs text-muted-foreground">
-                        When a new repair is created
-                      </p>
+                      <p className="text-sm text-foreground">{t("newRepairOrders")}</p>
+                      <p className="text-xs text-muted-foreground">{t("whenNewRepairCreated")}</p>
                     </div>
                     <Switch
                       checked={notifications.newRepair}
@@ -340,18 +310,13 @@ const Settings = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-foreground">Warranty Expiry</p>
-                      <p className="text-xs text-muted-foreground">
-                        Before warranty period ends
-                      </p>
+                      <p className="text-sm text-foreground">{t("warrantyExpiry")}</p>
+                      <p className="text-xs text-muted-foreground">{t("beforeWarrantyEnds")}</p>
                     </div>
                     <Switch
                       checked={notifications.warrantyExpiry}
                       onCheckedChange={(checked) =>
-                        setNotifications({
-                          ...notifications,
-                          warrantyExpiry: checked,
-                        })
+                        setNotifications({ ...notifications, warrantyExpiry: checked })
                       }
                     />
                   </div>
@@ -365,41 +330,41 @@ const Settings = () => {
         <TabsContent value="security" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
-              Security Settings
+              {t("securitySettings")}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Manage your account security
+              {t("manageAccountSecurity")}
             </p>
             <div className="space-y-6 max-w-md">
               <div className="grid gap-2">
-                <Label htmlFor="current-password">Current Password</Label>
+                <Label htmlFor="current-password">{t("currentPassword")}</Label>
                 <Input id="current-password" type="password" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password">{t("newPassword")}</Label>
                 <Input id="new-password" type="password" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Label htmlFor="confirm-password">{t("confirmNewPassword")}</Label>
                 <Input id="confirm-password" type="password" />
               </div>
               <Button className="gap-2">
                 <Lock className="w-4 h-4" />
-                Update Password
+                {t("updatePassword")}
               </Button>
             </div>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
-              Two-Factor Authentication
+              {t("twoFactorAuth")}
             </h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Add an extra layer of security to your account
+              {t("addExtraLayerSecurity")}
             </p>
             <Button variant="outline" className="gap-2">
               <Shield className="w-4 h-4" />
-              Enable 2FA
+              {t("enable2FA")}
             </Button>
           </div>
         </TabsContent>

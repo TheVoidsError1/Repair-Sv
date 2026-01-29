@@ -7,8 +7,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-const data = [
+const dataEn = [
   { name: "Mon", revenue: 4200, repairs: 12 },
   { name: "Tue", revenue: 3800, repairs: 10 },
   { name: "Wed", revenue: 5100, repairs: 15 },
@@ -18,12 +19,27 @@ const data = [
   { name: "Sun", revenue: 3200, repairs: 8 },
 ];
 
+const dataTh = [
+  { name: "จ.", revenue: 4200, repairs: 12 },
+  { name: "อ.", revenue: 3800, repairs: 10 },
+  { name: "พ.", revenue: 5100, repairs: 15 },
+  { name: "พฤ.", revenue: 4600, repairs: 13 },
+  { name: "ศ.", revenue: 6200, repairs: 18 },
+  { name: "ส.", revenue: 7800, repairs: 22 },
+  { name: "อา.", revenue: 3200, repairs: 8 },
+];
+
 export function RevenueChart() {
+  const { t, language } = useLanguage();
+  const data = language === "th" ? dataTh : dataEn;
+
   return (
     <div className="bg-card rounded-xl border border-border p-6 animate-fade-in">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-foreground">Weekly Revenue</h3>
-        <p className="text-sm text-muted-foreground">Revenue overview for this week</p>
+        <h3 className="text-lg font-semibold text-foreground">{t("weeklyRevenue")}</h3>
+        <p className="text-sm text-muted-foreground">
+          {language === "th" ? "ภาพรวมรายได้สัปดาห์นี้" : "Revenue overview for this week"}
+        </p>
       </div>
       <div className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -56,7 +72,7 @@ export function RevenueChart() {
                 borderRadius: "8px",
                 boxShadow: "0 4px 6px -1px hsl(222 47% 11% / 0.1)",
               }}
-              formatter={(value: number) => [`฿${value}`, "Revenue"]}
+              formatter={(value: number) => [`฿${value}`, language === "th" ? "รายได้" : "Revenue"]}
             />
             <Area
               type="monotone"

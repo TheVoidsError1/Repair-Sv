@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const repairs = [
   {
@@ -35,6 +36,7 @@ const repairs = [
     phone: "081-234-5678",
     device: "iPhone 14 Pro",
     issue: "Screen Replacement",
+    issueTh: "เปลี่ยนหน้าจอ",
     status: "in-progress",
     technician: "Tom",
     createdAt: "2024-01-15",
@@ -46,8 +48,10 @@ const repairs = [
     phone: "082-345-6789",
     device: "Samsung Galaxy S23",
     issue: "Battery Replacement",
+    issueTh: "เปลี่ยนแบตเตอรี่",
     status: "pending",
     technician: "Unassigned",
+    technicianTh: "ยังไม่มอบหมาย",
     createdAt: "2024-01-15",
     estimatedCost: 1200,
   },
@@ -57,6 +61,7 @@ const repairs = [
     phone: "083-456-7890",
     device: "Google Pixel 7",
     issue: "Water Damage Repair",
+    issueTh: "ซ่อมเสียหายจากน้ำ",
     status: "completed",
     technician: "Anna",
     createdAt: "2024-01-14",
@@ -68,6 +73,7 @@ const repairs = [
     phone: "084-567-8901",
     device: "iPhone 13",
     issue: "Back Glass Repair",
+    issueTh: "ซ่อมกระจกหลัง",
     status: "completed",
     technician: "Tom",
     createdAt: "2024-01-14",
@@ -79,6 +85,7 @@ const repairs = [
     phone: "085-678-9012",
     device: "OnePlus 11",
     issue: "Charging Port Replacement",
+    issueTh: "เปลี่ยนพอร์ตชาร์จ",
     status: "cancelled",
     technician: "Anna",
     createdAt: "2024-01-13",
@@ -90,8 +97,10 @@ const repairs = [
     phone: "086-789-0123",
     device: "iPhone 15 Pro Max",
     issue: "Speaker Not Working",
+    issueTh: "ลำโพงไม่ทำงาน",
     status: "pending",
     technician: "Unassigned",
+    technicianTh: "ยังไม่มอบหมาย",
     createdAt: "2024-01-15",
     estimatedCost: 1500,
   },
@@ -104,17 +113,18 @@ const statusStyles: Record<string, string> = {
   cancelled: "status-cancelled",
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "Pending",
-  "in-progress": "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
-
 const Repairs = () => {
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const statusLabels: Record<string, string> = {
+    pending: t("pending"),
+    "in-progress": t("inProgress"),
+    completed: t("completed"),
+    cancelled: t("cancelled"),
+  };
 
   const filteredRepairs = repairs.filter((repair) => {
     const matchesSearch =
@@ -131,65 +141,58 @@ const Repairs = () => {
       <div className="page-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="page-title">Repair Management</h1>
-            <p className="page-description">
-              Manage all repair orders, track progress, and assign technicians.
-            </p>
+            <h1 className="page-title">{t("repairManagement")}</h1>
+            <p className="page-description">{t("repairDescription")}</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="w-4 h-4" />
-                New Repair Order
+                {t("newRepairOrder")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Create New Repair Order</DialogTitle>
-                <DialogDescription>
-                  Enter customer and device details to create a new repair order.
-                </DialogDescription>
+                <DialogTitle>{t("createNewRepairOrder")}</DialogTitle>
+                <DialogDescription>{t("enterCustomerDeviceDetails")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="customer">Customer Name</Label>
-                  <Input id="customer" placeholder="Enter customer name" />
+                  <Label htmlFor="customer">{t("customerName")}</Label>
+                  <Input id="customer" placeholder={t("enterCustomerName")} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" placeholder="Enter phone number" />
+                  <Label htmlFor="phone">{t("phoneNumber")}</Label>
+                  <Input id="phone" placeholder={t("enterPhoneNumber")} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="device">Device</Label>
+                  <Label htmlFor="device">{t("device")}</Label>
                   <Input id="device" placeholder="e.g., iPhone 14 Pro" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="issue">Issue Description</Label>
-                  <Textarea
-                    id="issue"
-                    placeholder="Describe the repair issue..."
-                  />
+                  <Label htmlFor="issue">{t("issueDescription")}</Label>
+                  <Textarea id="issue" placeholder={t("describeRepairIssue")} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="technician">Assign Technician</Label>
+                  <Label htmlFor="technician">{t("assignTechnician")}</Label>
                   <Select>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select technician" />
+                      <SelectValue placeholder={t("selectTechnician")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tom">Tom</SelectItem>
                       <SelectItem value="anna">Anna</SelectItem>
-                      <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                      <SelectItem value="unassigned">{t("leaveUnassigned")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  {t("cancel")}
                 </Button>
                 <Button onClick={() => setIsDialogOpen(false)}>
-                  Create Order
+                  {t("createOrder")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -202,7 +205,7 @@ const Repairs = () => {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by ID, customer, or device..."
+            placeholder={t("searchByIdCustomerDevice")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -211,14 +214,14 @@ const Repairs = () => {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder={t("filterByStatus")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="in-progress">In Progress</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="all">{t("allStatus")}</SelectItem>
+            <SelectItem value="pending">{t("pending")}</SelectItem>
+            <SelectItem value="in-progress">{t("inProgress")}</SelectItem>
+            <SelectItem value="completed">{t("completed")}</SelectItem>
+            <SelectItem value="cancelled">{t("cancelled")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -229,14 +232,14 @@ const Repairs = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Order ID</th>
-                <th>Customer</th>
-                <th>Device</th>
-                <th>Issue</th>
-                <th>Technician</th>
-                <th>Est. Cost</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{t("orderId")}</th>
+                <th>{t("customer")}</th>
+                <th>{t("device")}</th>
+                <th>{t("issue")}</th>
+                <th>{t("technician")}</th>
+                <th>{t("estCost")}</th>
+                <th>{t("status")}</th>
+                <th>{t("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -245,22 +248,20 @@ const Repairs = () => {
                   <td className="font-medium text-foreground">{repair.id}</td>
                   <td>
                     <div>
-                      <p className="font-medium text-foreground">
-                        {repair.customer}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {repair.phone}
-                      </p>
+                      <p className="font-medium text-foreground">{repair.customer}</p>
+                      <p className="text-xs text-muted-foreground">{repair.phone}</p>
                     </div>
                   </td>
                   <td>{repair.device}</td>
-                  <td>{repair.issue}</td>
-                  <td>{repair.technician}</td>
+                  <td>{language === "th" ? repair.issueTh : repair.issue}</td>
+                  <td>
+                    {repair.technician === "Unassigned"
+                      ? language === "th" ? "ยังไม่มอบหมาย" : repair.technician
+                      : repair.technician}
+                  </td>
                   <td>฿{repair.estimatedCost.toLocaleString()}</td>
                   <td>
-                    <span
-                      className={`status-badge ${statusStyles[repair.status]}`}
-                    >
+                    <span className={`status-badge ${statusStyles[repair.status]}`}>
                       {statusLabels[repair.status]}
                     </span>
                   </td>
@@ -274,11 +275,11 @@ const Repairs = () => {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem className="gap-2">
                           <Eye className="w-4 h-4" />
-                          View Details
+                          {t("viewDetails")}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="gap-2">
                           <Edit className="w-4 h-4" />
-                          Edit Order
+                          {t("editOrder")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
