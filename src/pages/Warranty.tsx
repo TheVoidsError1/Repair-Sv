@@ -29,6 +29,7 @@ import {
   XCircle,
   Eye,
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const claims = [
   {
@@ -37,7 +38,9 @@ const claims = [
     customer: "John Doe",
     device: "iPhone 14 Pro",
     originalRepair: "Screen Replacement",
+    originalRepairTh: "เปลี่ยนหน้าจอ",
     claimReason: "Screen flickering after 2 weeks",
+    claimReasonTh: "หน้าจอกระพริบหลังจาก 2 สัปดาห์",
     status: "pending",
     claimDate: "2024-01-15",
     warrantyEnd: "2024-04-15",
@@ -48,7 +51,9 @@ const claims = [
     customer: "Mike Johnson",
     device: "Google Pixel 7",
     originalRepair: "Water Damage Repair",
+    originalRepairTh: "ซ่อมเสียหายจากน้ำ",
     claimReason: "Device not charging properly",
+    claimReasonTh: "อุปกรณ์ชาร์จไม่เข้า",
     status: "approved",
     claimDate: "2024-01-14",
     warrantyEnd: "2024-04-14",
@@ -59,7 +64,9 @@ const claims = [
     customer: "Lisa Anderson",
     device: "Samsung Galaxy S22",
     originalRepair: "Battery Replacement",
+    originalRepairTh: "เปลี่ยนแบตเตอรี่",
     claimReason: "Battery drains too fast",
+    claimReasonTh: "แบตเตอรี่หมดเร็วเกินไป",
     status: "in-progress",
     claimDate: "2024-01-13",
     warrantyEnd: "2024-04-13",
@@ -70,7 +77,9 @@ const claims = [
     customer: "Robert Taylor",
     device: "iPhone 12",
     originalRepair: "Back Glass Repair",
+    originalRepairTh: "ซ่อมกระจกหลัง",
     claimReason: "Glass cracked again",
+    claimReasonTh: "กระจกแตกอีกครั้ง",
     status: "rejected",
     claimDate: "2024-01-12",
     warrantyEnd: "2024-04-12",
@@ -84,13 +93,6 @@ const statusStyles: Record<string, string> = {
   rejected: "status-cancelled",
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "Pending Review",
-  "in-progress": "Under Inspection",
-  approved: "Approved",
-  rejected: "Rejected",
-};
-
 const statusIcons: Record<string, React.ReactNode> = {
   pending: <Clock className="w-4 h-4" />,
   "in-progress": <ShieldCheck className="w-4 h-4" />,
@@ -99,9 +101,17 @@ const statusIcons: Record<string, React.ReactNode> = {
 };
 
 const Warranty = () => {
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const statusLabels: Record<string, string> = {
+    pending: t("pendingReview"),
+    "in-progress": t("underInspection"),
+    approved: t("approved"),
+    rejected: t("rejected"),
+  };
 
   const filteredClaims = claims.filter((claim) => {
     const matchesSearch =
@@ -122,44 +132,37 @@ const Warranty = () => {
       <div className="page-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="page-title">Warranty Claims</h1>
-            <p className="page-description">
-              Manage warranty claims and process customer requests.
-            </p>
+            <h1 className="page-title">{t("warrantyClaims")}</h1>
+            <p className="page-description">{t("warrantyDescription")}</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="w-4 h-4" />
-                New Claim
+                {t("newClaim")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Create Warranty Claim</DialogTitle>
-                <DialogDescription>
-                  Submit a new warranty claim for a previous repair.
-                </DialogDescription>
+                <DialogTitle>{t("createWarrantyClaim")}</DialogTitle>
+                <DialogDescription>{t("submitNewWarrantyClaim")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="repairId">Original Repair ID</Label>
+                  <Label htmlFor="repairId">{t("originalRepairId")}</Label>
                   <Input id="repairId" placeholder="e.g., REP-001" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="claimReason">Claim Reason</Label>
-                  <Textarea
-                    id="claimReason"
-                    placeholder="Describe the issue..."
-                  />
+                  <Label htmlFor="claimReason">{t("claimReason")}</Label>
+                  <Textarea id="claimReason" placeholder={t("describeIssue")} />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  {t("cancel")}
                 </Button>
                 <Button onClick={() => setIsDialogOpen(false)}>
-                  Submit Claim
+                  {t("submitClaim")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -175,10 +178,8 @@ const Warranty = () => {
               <Clock className="w-5 h-5 text-status-pending" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="text-xl font-semibold text-foreground">
-                {pendingCount}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("pending")}</p>
+              <p className="text-xl font-semibold text-foreground">{pendingCount}</p>
             </div>
           </div>
         </div>
@@ -188,10 +189,8 @@ const Warranty = () => {
               <CheckCircle className="w-5 h-5 text-status-completed" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Approved</p>
-              <p className="text-xl font-semibold text-foreground">
-                {approvedCount}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("approved")}</p>
+              <p className="text-xl font-semibold text-foreground">{approvedCount}</p>
             </div>
           </div>
         </div>
@@ -201,10 +200,8 @@ const Warranty = () => {
               <XCircle className="w-5 h-5 text-status-cancelled" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Rejected</p>
-              <p className="text-xl font-semibold text-foreground">
-                {rejectedCount}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("rejected")}</p>
+              <p className="text-xl font-semibold text-foreground">{rejectedCount}</p>
             </div>
           </div>
         </div>
@@ -215,7 +212,7 @@ const Warranty = () => {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search claims..."
+            placeholder={t("searchClaims")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -223,14 +220,14 @@ const Warranty = () => {
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t("status")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="in-progress">Under Inspection</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="all">{t("allStatus")}</SelectItem>
+            <SelectItem value="pending">{t("pending")}</SelectItem>
+            <SelectItem value="in-progress">{t("underInspection")}</SelectItem>
+            <SelectItem value="approved">{t("approved")}</SelectItem>
+            <SelectItem value="rejected">{t("rejected")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -241,13 +238,13 @@ const Warranty = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Claim ID</th>
-                <th>Customer</th>
-                <th>Device</th>
-                <th>Original Repair</th>
-                <th>Claim Reason</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{t("claimId")}</th>
+                <th>{t("customer")}</th>
+                <th>{t("device")}</th>
+                <th>{t("originalRepair")}</th>
+                <th>{t("claimReason")}</th>
+                <th>{t("status")}</th>
+                <th>{t("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -256,15 +253,15 @@ const Warranty = () => {
                   <td>
                     <div>
                       <p className="font-medium text-foreground">{claim.id}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {claim.repairId}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{claim.repairId}</p>
                     </div>
                   </td>
                   <td>{claim.customer}</td>
                   <td>{claim.device}</td>
-                  <td>{claim.originalRepair}</td>
-                  <td className="max-w-[200px] truncate">{claim.claimReason}</td>
+                  <td>{language === "th" ? claim.originalRepairTh : claim.originalRepair}</td>
+                  <td className="max-w-[200px] truncate">
+                    {language === "th" ? claim.claimReasonTh : claim.claimReason}
+                  </td>
                   <td>
                     <span
                       className={`status-badge ${statusStyles[claim.status]} flex items-center gap-1`}
@@ -276,7 +273,7 @@ const Warranty = () => {
                   <td>
                     <Button variant="ghost" size="sm" className="gap-1">
                       <Eye className="w-4 h-4" />
-                      View
+                      {t("view")}
                     </Button>
                   </td>
                 </tr>

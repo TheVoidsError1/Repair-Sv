@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,21 +30,15 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const revenueData = [
-  { month: "Jan", income: 125000, expenses: 45000 },
-  { month: "Feb", income: 132000, expenses: 48000 },
-  { month: "Mar", income: 141000, expenses: 52000 },
-  { month: "Apr", income: 128000, expenses: 46000 },
-  { month: "May", income: 156000, expenses: 55000 },
-  { month: "Jun", income: 168000, expenses: 58000 },
-];
-
-const expenseBreakdown = [
-  { name: "Parts Cost", value: 45, color: "hsl(217, 91%, 60%)" },
-  { name: "Labor", value: 25, color: "hsl(142, 71%, 45%)" },
-  { name: "Utilities", value: 15, color: "hsl(45, 93%, 47%)" },
-  { name: "Other", value: 15, color: "hsl(280, 65%, 60%)" },
+  { month: "Jan", monthTh: "ม.ค.", income: 125000, expenses: 45000 },
+  { month: "Feb", monthTh: "ก.พ.", income: 132000, expenses: 48000 },
+  { month: "Mar", monthTh: "มี.ค.", income: 141000, expenses: 52000 },
+  { month: "Apr", monthTh: "เม.ย.", income: 128000, expenses: 46000 },
+  { month: "May", monthTh: "พ.ค.", income: 156000, expenses: 55000 },
+  { month: "Jun", monthTh: "มิ.ย.", income: 168000, expenses: 58000 },
 ];
 
 const transactions = [
@@ -53,46 +46,69 @@ const transactions = [
     id: "TXN-001",
     type: "income",
     description: "Repair Payment - REP-001",
+    descriptionTh: "ชำระค่าซ่อม - REP-001",
     amount: 4500,
     date: "2024-01-15",
     method: "Cash",
+    methodTh: "เงินสด",
   },
   {
     id: "TXN-002",
     type: "income",
     description: "Repair Payment - REP-002",
+    descriptionTh: "ชำระค่าซ่อม - REP-002",
     amount: 1200,
     date: "2024-01-15",
     method: "Credit Card",
+    methodTh: "บัตรเครดิต",
   },
   {
     id: "TXN-003",
     type: "expense",
     description: "iPhone 14 Screens (5 units)",
+    descriptionTh: "หน้าจอ iPhone 14 (5 ชิ้น)",
     amount: 17500,
     date: "2024-01-14",
     method: "Transfer",
+    methodTh: "โอนเงิน",
   },
   {
     id: "TXN-004",
     type: "income",
     description: "Repair Payment - REP-003",
+    descriptionTh: "ชำระค่าซ่อม - REP-003",
     amount: 3200,
     date: "2024-01-14",
     method: "Cash",
+    methodTh: "เงินสด",
   },
   {
     id: "TXN-005",
     type: "expense",
     description: "Monthly Utilities",
+    descriptionTh: "ค่าสาธารณูปโภครายเดือน",
     amount: 4500,
     date: "2024-01-14",
     method: "Transfer",
+    methodTh: "โอนเงิน",
   },
 ];
 
 const Finance = () => {
+  const { t, language } = useLanguage();
   const [timeRange, setTimeRange] = useState("6m");
+
+  const expenseBreakdown = [
+    { name: t("partsCost"), value: 45, color: "hsl(217, 91%, 60%)" },
+    { name: t("labor"), value: 25, color: "hsl(142, 71%, 45%)" },
+    { name: t("utilities"), value: 15, color: "hsl(45, 93%, 47%)" },
+    { name: t("other"), value: 15, color: "hsl(280, 65%, 60%)" },
+  ];
+
+  const chartData = revenueData.map(d => ({
+    ...d,
+    name: language === "th" ? d.monthTh : d.month
+  }));
 
   const totalIncome = revenueData.reduce((sum, d) => sum + d.income, 0);
   const totalExpenses = revenueData.reduce((sum, d) => sum + d.expenses, 0);
@@ -103,10 +119,8 @@ const Finance = () => {
       <div className="page-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="page-title">Finance & Warehouse</h1>
-            <p className="page-description">
-              Track revenue, expenses, and manage financial reports.
-            </p>
+            <h1 className="page-title">{t("financeWarehouse")}</h1>
+            <p className="page-description">{t("financeDescription")}</p>
           </div>
           <div className="flex gap-2">
             <Select value={timeRange} onValueChange={setTimeRange}>
@@ -115,15 +129,15 @@ const Finance = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1m">Last Month</SelectItem>
-                <SelectItem value="3m">Last 3 Months</SelectItem>
-                <SelectItem value="6m">Last 6 Months</SelectItem>
-                <SelectItem value="1y">Last Year</SelectItem>
+                <SelectItem value="1m">{t("lastMonth")}</SelectItem>
+                <SelectItem value="3m">{t("last3Months")}</SelectItem>
+                <SelectItem value="6m">{t("last6Months")}</SelectItem>
+                <SelectItem value="1y">{t("lastYear")}</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" className="gap-2">
               <Download className="w-4 h-4" />
-              Export
+              {t("export")}
             </Button>
           </div>
         </div>
@@ -134,7 +148,7 @@ const Finance = () => {
         <div className="stat-card">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Income</p>
+              <p className="text-sm text-muted-foreground">{t("totalIncome")}</p>
               <p className="text-2xl font-semibold mt-1 text-foreground">
                 ฿{totalIncome.toLocaleString()}
               </p>
@@ -151,7 +165,7 @@ const Finance = () => {
         <div className="stat-card">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Expenses</p>
+              <p className="text-sm text-muted-foreground">{t("totalExpenses")}</p>
               <p className="text-2xl font-semibold mt-1 text-foreground">
                 ฿{totalExpenses.toLocaleString()}
               </p>
@@ -168,7 +182,7 @@ const Finance = () => {
         <div className="stat-card">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Net Profit</p>
+              <p className="text-sm text-muted-foreground">{t("netProfit")}</p>
               <p className="text-2xl font-semibold mt-1 text-foreground">
                 ฿{netProfit.toLocaleString()}
               </p>
@@ -188,40 +202,24 @@ const Finance = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 bg-card rounded-xl border border-border p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Income vs Expenses
+            {t("incomeVsExpenses")}
           </h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
+              <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="hsl(142, 71%, 45%)"
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="hsl(142, 71%, 45%)"
-                      stopOpacity={0}
-                    />
+                    <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="hsl(0, 84%, 60%)"
-                      stopOpacity={0.3}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="hsl(0, 84%, 60%)"
-                      stopOpacity={0}
-                    />
+                    <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 32%, 91%)" />
                 <XAxis
-                  dataKey="month"
+                  dataKey="name"
                   stroke="hsl(215, 16%, 47%)"
                   fontSize={12}
                   tickLine={false}
@@ -240,10 +238,7 @@ const Finance = () => {
                     border: "1px solid hsl(214, 32%, 91%)",
                     borderRadius: "8px",
                   }}
-                  formatter={(value: number) => [
-                    `฿${value.toLocaleString()}`,
-                    "",
-                  ]}
+                  formatter={(value: number) => [`฿${value.toLocaleString()}`, ""]}
                 />
                 <Area
                   type="monotone"
@@ -252,7 +247,7 @@ const Finance = () => {
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorIncome)"
-                  name="Income"
+                  name={t("income")}
                 />
                 <Area
                   type="monotone"
@@ -261,7 +256,7 @@ const Finance = () => {
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorExpenses)"
-                  name="Expenses"
+                  name={t("expenses")}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -270,7 +265,7 @@ const Finance = () => {
 
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Expense Breakdown
+            {t("expenseBreakdown")}
           </h3>
           <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -307,13 +302,9 @@ const Finance = () => {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className="text-sm text-muted-foreground">
-                    {item.name}
-                  </span>
+                  <span className="text-sm text-muted-foreground">{item.name}</span>
                 </div>
-                <span className="text-sm font-medium text-foreground">
-                  {item.value}%
-                </span>
+                <span className="text-sm font-medium text-foreground">{item.value}%</span>
               </div>
             ))}
           </div>
@@ -325,12 +316,12 @@ const Finance = () => {
         <Tabs defaultValue="all" className="w-full">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h3 className="text-lg font-semibold text-foreground">
-              Recent Transactions
+              {t("recentTransactions")}
             </h3>
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="income">Income</TabsTrigger>
-              <TabsTrigger value="expense">Expenses</TabsTrigger>
+              <TabsTrigger value="all">{t("all")}</TabsTrigger>
+              <TabsTrigger value="income">{t("income")}</TabsTrigger>
+              <TabsTrigger value="expense">{t("expenses")}</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="all" className="mt-0">
@@ -338,18 +329,18 @@ const Finance = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Transaction ID</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Method</th>
+                    <th>{t("transactionId")}</th>
+                    <th>{t("description")}</th>
+                    <th>{t("amount")}</th>
+                    <th>{t("date")}</th>
+                    <th>{t("method")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((txn) => (
                     <tr key={txn.id}>
                       <td className="font-medium text-foreground">{txn.id}</td>
-                      <td>{txn.description}</td>
+                      <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
                       <td
                         className={
                           txn.type === "income"
@@ -357,11 +348,10 @@ const Finance = () => {
                             : "text-status-cancelled font-medium"
                         }
                       >
-                        {txn.type === "income" ? "+" : "-"}฿
-                        {txn.amount.toLocaleString()}
+                        {txn.type === "income" ? "+" : "-"}฿{txn.amount.toLocaleString()}
                       </td>
                       <td>{txn.date}</td>
-                      <td>{txn.method}</td>
+                      <td>{language === "th" ? txn.methodTh : txn.method}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,11 +363,11 @@ const Finance = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Transaction ID</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Method</th>
+                    <th>{t("transactionId")}</th>
+                    <th>{t("description")}</th>
+                    <th>{t("amount")}</th>
+                    <th>{t("date")}</th>
+                    <th>{t("method")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -386,12 +376,12 @@ const Finance = () => {
                     .map((txn) => (
                       <tr key={txn.id}>
                         <td className="font-medium text-foreground">{txn.id}</td>
-                        <td>{txn.description}</td>
+                        <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
                         <td className="text-status-completed font-medium">
                           +฿{txn.amount.toLocaleString()}
                         </td>
                         <td>{txn.date}</td>
-                        <td>{txn.method}</td>
+                        <td>{language === "th" ? txn.methodTh : txn.method}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -403,11 +393,11 @@ const Finance = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Transaction ID</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Method</th>
+                    <th>{t("transactionId")}</th>
+                    <th>{t("description")}</th>
+                    <th>{t("amount")}</th>
+                    <th>{t("date")}</th>
+                    <th>{t("method")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -416,12 +406,12 @@ const Finance = () => {
                     .map((txn) => (
                       <tr key={txn.id}>
                         <td className="font-medium text-foreground">{txn.id}</td>
-                        <td>{txn.description}</td>
+                        <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
                         <td className="text-status-cancelled font-medium">
                           -฿{txn.amount.toLocaleString()}
                         </td>
                         <td>{txn.date}</td>
-                        <td>{txn.method}</td>
+                        <td>{language === "th" ? txn.methodTh : txn.method}</td>
                       </tr>
                     ))}
                 </tbody>

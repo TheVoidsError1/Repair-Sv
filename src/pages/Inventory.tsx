@@ -21,12 +21,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Package, AlertTriangle, Edit, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const parts = [
   {
     id: "PART-001",
     name: "iPhone 14 Pro Screen",
+    nameTh: "หน้าจอ iPhone 14 Pro",
     category: "Screens",
+    categoryTh: "หน้าจอ",
     stock: 2,
     minStock: 5,
     cost: 3500,
@@ -35,7 +38,9 @@ const parts = [
   {
     id: "PART-002",
     name: "iPhone 14 Battery",
+    nameTh: "แบตเตอรี่ iPhone 14",
     category: "Batteries",
+    categoryTh: "แบตเตอรี่",
     stock: 15,
     minStock: 10,
     cost: 800,
@@ -44,7 +49,9 @@ const parts = [
   {
     id: "PART-003",
     name: "Samsung S23 Screen",
+    nameTh: "หน้าจอ Samsung S23",
     category: "Screens",
+    categoryTh: "หน้าจอ",
     stock: 5,
     minStock: 5,
     cost: 4200,
@@ -53,7 +60,9 @@ const parts = [
   {
     id: "PART-004",
     name: "Samsung S23 Battery",
+    nameTh: "แบตเตอรี่ Samsung S23",
     category: "Batteries",
+    categoryTh: "แบตเตอรี่",
     stock: 3,
     minStock: 5,
     cost: 700,
@@ -62,7 +71,9 @@ const parts = [
   {
     id: "PART-005",
     name: "USB-C Charging Port",
+    nameTh: "พอร์ตชาร์จ USB-C",
     category: "Ports",
+    categoryTh: "พอร์ต",
     stock: 8,
     minStock: 10,
     cost: 150,
@@ -71,7 +82,9 @@ const parts = [
   {
     id: "PART-006",
     name: "iPhone 13 Back Glass",
+    nameTh: "กระจกหลัง iPhone 13",
     category: "Glass",
+    categoryTh: "กระจก",
     stock: 12,
     minStock: 8,
     cost: 600,
@@ -80,7 +93,9 @@ const parts = [
   {
     id: "PART-007",
     name: "Pixel 7 Screen",
+    nameTh: "หน้าจอ Pixel 7",
     category: "Screens",
+    categoryTh: "หน้าจอ",
     stock: 6,
     minStock: 5,
     cost: 3200,
@@ -89,7 +104,9 @@ const parts = [
   {
     id: "PART-008",
     name: "Lightning Charging Port",
+    nameTh: "พอร์ตชาร์จ Lightning",
     category: "Ports",
+    categoryTh: "พอร์ต",
     stock: 20,
     minStock: 15,
     cost: 180,
@@ -97,19 +114,27 @@ const parts = [
   },
 ];
 
-const categories = ["All", "Screens", "Batteries", "Ports", "Glass"];
+const categoriesEn = ["All", "Screens", "Batteries", "Ports", "Glass"];
+const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบตเตอรี่", "พอร์ต", "กระจก"];
 
 const Inventory = () => {
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const categories = language === "th" ? categoriesTh : categoriesEn;
+
   const filteredParts = parts.filter((part) => {
+    const searchName = language === "th" ? part.nameTh : part.name;
     const matchesSearch =
-      part.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      searchName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       part.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory =
-      categoryFilter === "All" || part.category === categoryFilter;
+      categoryFilter === "All" || 
+      categoryFilter === "ทั้งหมด" || 
+      part.category === categoryFilter ||
+      part.categoryTh === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -121,35 +146,31 @@ const Inventory = () => {
       <div className="page-header">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="page-title">Spare Parts Inventory</h1>
-            <p className="page-description">
-              Manage your spare parts stock and track inventory levels.
-            </p>
+            <h1 className="page-title">{t("sparePartsInventory")}</h1>
+            <p className="page-description">{t("inventoryDescription")}</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="w-4 h-4" />
-                Add New Part
+                {t("addNewPart")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Add New Spare Part</DialogTitle>
-                <DialogDescription>
-                  Enter the details of the new spare part.
-                </DialogDescription>
+                <DialogTitle>{t("addNewSparePart")}</DialogTitle>
+                <DialogDescription>{t("enterPartDetails")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="partName">Part Name</Label>
+                  <Label htmlFor="partName">{t("partName")}</Label>
                   <Input id="partName" placeholder="e.g., iPhone 14 Screen" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="category">{t("category")}</Label>
                   <Select>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={t("selectCategory")} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.slice(1).map((cat) => (
@@ -162,30 +183,30 @@ const Inventory = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="stock">Initial Stock</Label>
+                    <Label htmlFor="stock">{t("initialStock")}</Label>
                     <Input id="stock" type="number" placeholder="0" />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="minStock">Min Stock Level</Label>
+                    <Label htmlFor="minStock">{t("minStockLevel")}</Label>
                     <Input id="minStock" type="number" placeholder="5" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="cost">Cost Price (฿)</Label>
+                    <Label htmlFor="cost">{t("costPrice")} (฿)</Label>
                     <Input id="cost" type="number" placeholder="0" />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="sellPrice">Sell Price (฿)</Label>
+                    <Label htmlFor="sellPrice">{t("sellPrice")} (฿)</Label>
                     <Input id="sellPrice" type="number" placeholder="0" />
                   </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
+                  {t("cancel")}
                 </Button>
-                <Button onClick={() => setIsDialogOpen(false)}>Add Part</Button>
+                <Button onClick={() => setIsDialogOpen(false)}>{t("addPart")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -200,7 +221,7 @@ const Inventory = () => {
               <Package className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Items</p>
+              <p className="text-sm text-muted-foreground">{t("totalItems")}</p>
               <p className="text-xl font-semibold text-foreground">{parts.length}</p>
             </div>
           </div>
@@ -211,7 +232,7 @@ const Inventory = () => {
               <AlertTriangle className="w-5 h-5 text-status-pending" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Low Stock Items</p>
+              <p className="text-sm text-muted-foreground">{t("lowStockItems")}</p>
               <p className="text-xl font-semibold text-foreground">{lowStockCount}</p>
             </div>
           </div>
@@ -222,7 +243,7 @@ const Inventory = () => {
               <Package className="w-5 h-5 text-status-completed" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Inventory Value</p>
+              <p className="text-sm text-muted-foreground">{t("inventoryValue")}</p>
               <p className="text-xl font-semibold text-foreground">
                 ฿{totalValue.toLocaleString()}
               </p>
@@ -236,7 +257,7 @@ const Inventory = () => {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search parts..."
+            placeholder={t("searchParts")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -244,7 +265,7 @@ const Inventory = () => {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Category" />
+            <SelectValue placeholder={t("category")} />
           </SelectTrigger>
           <SelectContent>
             {categories.map((cat) => (
@@ -274,28 +295,30 @@ const Inventory = () => {
                 </span>
                 {isLowStock && (
                   <span className="status-badge status-cancelled text-xs">
-                    Low Stock
+                    {t("lowStock")}
                   </span>
                 )}
               </div>
-              <h3 className="font-medium text-foreground mb-1">{part.name}</h3>
+              <h3 className="font-medium text-foreground mb-1">
+                {language === "th" ? part.nameTh : part.name}
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {part.category}
+                {language === "th" ? part.categoryTh : part.category}
               </p>
               <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                 <div>
-                  <p className="text-muted-foreground">Stock</p>
+                  <p className="text-muted-foreground">{t("stock")}</p>
                   <p
                     className={cn(
                       "font-semibold",
                       isLowStock ? "text-status-cancelled" : "text-foreground"
                     )}
                   >
-                    {part.stock} units
+                    {part.stock} {t("units")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Sell Price</p>
+                  <p className="text-muted-foreground">{t("sellPrice")}</p>
                   <p className="font-semibold text-foreground">
                     ฿{part.sellPrice.toLocaleString()}
                   </p>
@@ -304,7 +327,7 @@ const Inventory = () => {
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1 gap-1">
                   <Edit className="w-3 h-3" />
-                  Edit
+                  {t("edit")}
                 </Button>
                 <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
                   <Trash2 className="w-3 h-3" />
