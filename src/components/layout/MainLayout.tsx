@@ -1,9 +1,8 @@
-import { ReactNode, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AppSidebar } from "./AppSidebar";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, LogOut, Menu } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { AppSidebar } from "./AppSidebar";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -11,7 +10,6 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { language } = useLanguage();
-  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -25,7 +23,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         setMobileOpen={setMobileOpen}
       />
       <main className="flex-1 min-h-0 overflow-auto flex flex-col">
-        {/* Header - ย่อ และ ออกจากระบบ */}
+        {/* Header - ย่อเมนู */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 lg:px-8 py-3 bg-background/95 backdrop-blur border-b border-border">
           <div className="flex items-center gap-2">
             <Button
@@ -50,15 +48,6 @@ export function MainLayout({ children }: MainLayoutProps) {
               )}
             </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/login")}
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            {language === "th" ? "ออกจากระบบ" : "Log out"}
-          </Button>
         </header>
         <div className="flex-1 p-4 lg:p-8">
           {children}
