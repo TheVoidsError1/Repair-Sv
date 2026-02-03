@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { RepairOrderData } from "./RepairBill";
 
 const repairs = [
   {
@@ -113,11 +115,43 @@ const statusStyles: Record<string, string> = {
   cancelled: "status-cancelled",
 };
 
+const initialFormData = {
+  customer: "",
+  phone: "",
+  model: "",
+  color: "",
+  screenLockCode: "",
+  problemSymptoms: "",
+  deposit: "",
+  estimatedPrice: "",
+  repairSummaryPrice: "",
+};
+
 const Repairs = () => {
   const { t, language } = useLanguage();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState(initialFormData);
+
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateOrder = () => {
+    const orderData: RepairOrderData = {
+      ...formData,
+      dateOfReport: new Date().toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+    };
+    setIsDialogOpen(false);
+    setFormData(initialFormData);
+    navigate("/repairs/bill", { state: orderData });
+  };
 
   const statusLabels: Record<string, string> = {
     pending: t("pending"),
@@ -151,47 +185,117 @@ const Repairs = () => {
                 {t("newRepairOrder")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>{t("createNewRepairOrder")}</DialogTitle>
-                <DialogDescription>{t("enterCustomerDeviceDetails")}</DialogDescription>
+            <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="flex flex-row items-start justify-between gap-4">
+                <div className="space-y-1.5">
+                  <DialogTitle>{t("createNewRepairOrder")}</DialogTitle>
+                  <DialogDescription>{t("enterCustomerDeviceDetails")}</DialogDescription>
+                </div>
+                <div className=" shrink-0 text-right">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("dateOfRepairReport")}
+                  </p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {new Date().toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-4 py-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="customer">{t("customerName")}</Label>
-                  <Input id="customer" placeholder={t("enterCustomerName")} />
+                  <Input
+                    id="customer"
+                    placeholder={t("enterCustomerName")}
+                    value={formData.customer}
+                    onChange={(e) => handleInputChange("customer", e.target.value)}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="phone">{t("phoneNumber")}</Label>
-                  <Input id="phone" placeholder={t("enterPhoneNumber")} />
+                  <Input
+                    id="phone"
+                    placeholder={t("enterPhoneNumber")}
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="device">{t("device")}</Label>
-                  <Input id="device" placeholder="e.g., iPhone 14 Pro" />
+                  <Label htmlFor="model">{t("model")}</Label>
+                  <Input
+                    id="model"
+                    placeholder={t("enterModel")}
+                    value={formData.model}
+                    onChange={(e) => handleInputChange("model", e.target.value)}
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="issue">{t("issueDescription")}</Label>
-                  <Textarea id="issue" placeholder={t("describeRepairIssue")} />
+                  <Label htmlFor="color">{t("color")}</Label>
+                  <Input
+                    id="color"
+                    placeholder={t("enterColor")}
+                    value={formData.color}
+                    onChange={(e) => handleInputChange("color", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="screenLockCode">{t("screenLockCode")}</Label>
+                  <Input
+                    id="screenLockCode"
+                    placeholder={t("enterScreenLockCode")}
+                    value={formData.screenLockCode}
+                    onChange={(e) => handleInputChange("screenLockCode", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="issue">{t("problemSymptoms")}</Label>
+                  <Textarea
+                    id="issue"
+                    placeholder={t("enterProblemSymptoms")}
+                    className="min-h-[80px]"
+                    value={formData.problemSymptoms}
+                    onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="technician">{t("assignTechnician")}</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("selectTechnician")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tom">Tom</SelectItem>
-                      <SelectItem value="anna">Anna</SelectItem>
-                      <SelectItem value="unassigned">{t("leaveUnassigned")}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="deposit">{t("deposit")}</Label>
+                  <Input
+                    id="deposit"
+                    type="number"
+                    placeholder={t("enterDeposit")}
+                    value={formData.deposit}
+                    onChange={(e) => handleInputChange("deposit", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="estimatedPrice">{t("estimatedPriceBaht")}</Label>
+                  <Input
+                    id="estimatedPrice"
+                    type="number"
+                    placeholder={t("enterEstimatedPrice")}
+                    value={formData.estimatedPrice}
+                    onChange={(e) => handleInputChange("estimatedPrice", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="repairSummaryPrice">{t("repairSummaryPrice")}</Label>
+                  <Input
+                    id="repairSummaryPrice"
+                    type="number"
+                    placeholder={t("enterRepairSummaryPrice")}
+                    value={formData.repairSummaryPrice}
+                    onChange={(e) => handleInputChange("repairSummaryPrice", e.target.value)}
+                  />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   {t("cancel")}
                 </Button>
-                <Button onClick={() => setIsDialogOpen(false)}>
+                <Button onClick={handleCreateOrder}>
                   {t("createOrder")}
                 </Button>
               </DialogFooter>

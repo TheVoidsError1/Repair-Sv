@@ -193,3 +193,65 @@
     @apply text-muted-foreground mt-1;
   }
 }
+
+@media print {
+  @page {
+    /* พิมพ์แนวนอน */
+    size: A4 landscape;
+    /* เว้นขอบรอบกระดาษให้ดูสวยงาม */
+    margin: 8mm;
+  }
+
+  /* เอา margin เริ่มต้นของ body ออก ให้ใช้ margin จาก @page แทน */
+  body {
+    margin: 0;
+  }
+
+  /* ตัด padding ของ content หลักออกเวลา print */
+  main > .flex-1 {
+    padding: 0 !important;
+  }
+
+  /* ให้หน้าบิลกว้างเต็มพื้นที่พิมพ์ แต่ยังเหลือขอบซ้าย-ขวาจาก @page */
+  .repair-bill-page {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* แบ่งซ้าย-ขวา: สำเนาลูกค้า | สำเนาร้าน */
+  .repair-bill-print-wrapper {
+    display: flex !important;
+    flex-direction: row;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    gap: 6mm;
+    height: calc(210mm - 16mm);
+  }
+
+  .repair-bill-single {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    max-width: none;
+    box-sizing: border-box;
+    border-radius: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 11px;
+  }
+
+  .repair-bill-cut-line {
+    display: block !important;
+    text-align: center;
+    font-size: 10px;
+    color: #666;
+    padding: 4mm 0;
+    border-top: 1px dashed #999;
+    border-bottom: 1px dashed #999;
+    margin: 4mm 0;
+  }
+}
