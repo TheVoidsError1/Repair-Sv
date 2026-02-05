@@ -1,18 +1,18 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Repairs from "./pages/Repairs";
-import RepairBill from "./pages/RepairBill";
-import Inventory from "./pages/Inventory";
-import Warranty from "./pages/Warranty";
 import Finance from "./pages/Finance";
-import Settings from "./pages/Settings";
+import Inventory from "./pages/Inventory";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import RepairBill from "./pages/RepairBill";
+import Repairs from "./pages/Repairs";
+import Settings from "./pages/Settings";
+import Warranty from "./pages/Warranty";
 
 const queryClient = new QueryClient();
 
