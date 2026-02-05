@@ -15,6 +15,8 @@ export interface RepairOrderData {
   estimatedPrice: string;
   repairSummaryPrice: string;
   dateOfReport: string;
+  timeOfReport?: string;
+  scheduledPickupTime?: string;
 }
 
 interface BillContentProps {
@@ -43,11 +45,21 @@ const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) => (
 
       <div className="text-right space-y-1">
         <p className="text-base font-bold leading-none">ใบรับซ่อม</p>
-        <div className="flex items-center justify-end gap-2 text-xs">
-          <span>วันที่</span>
-          <div className="border-b border-gray-500 min-w-[90px] text-[11px] text-right">
-            {data.dateOfReport || "_____/_____/______"}
+        <div className="flex flex-col items-end gap-1 text-xs">
+          <div className="flex items-center gap-2">
+            <span>วันที่</span>
+            <div className="border-b border-gray-500 min-w-[90px] text-[11px] text-right">
+              {data.dateOfReport || "_____/_____/______"}
+            </div>
           </div>
+          {data.timeOfReport && (
+            <div className="flex items-center gap-2">
+              <span>เวลาแจ้งซ่อม</span>
+              <div className="border-b border-gray-500 min-w-[70px] text-[11px] text-right">
+                {data.timeOfReport}
+              </div>
+            </div>
+          )}
         </div>
         <p className="text-[10px] text-gray-600 mt-0.5">({copyLabel})</p>
       </div>
@@ -118,6 +130,22 @@ const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) => (
           </span>
         </div>
       </div>
+
+      {data.scheduledPickupTime && (
+        <div className="flex gap-4 items-center">
+          <span className="text-xs">นัดรับเครื่อง</span>
+          <div className="flex-1 border-b border-gray-400 min-h-[18px] text-[11px] px-1">
+            {(() => {
+              try {
+                const d = new Date(data.scheduledPickupTime);
+                return isNaN(d.getTime()) ? data.scheduledPickupTime : d.toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+              } catch {
+                return data.scheduledPickupTime;
+              }
+            })()}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 items-center">
         <span>ประเมินราคา</span>
