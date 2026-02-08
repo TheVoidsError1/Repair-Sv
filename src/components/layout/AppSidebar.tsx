@@ -8,9 +8,6 @@ import {
 } from "@/config/sidebarConfig";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Wrench,
@@ -24,8 +21,8 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Language } from "@/lib/translations";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 /** หน้าแรก = แดชบอร์ด (ไม่ใช้หน้าเลือกหมวดกับการ์ด) */
 const SUBJECTS_PATH = "/";
@@ -42,6 +39,25 @@ export function AppSidebar({ language = "th" }: AppSidebarProps) {
   const subjectsMode = isSubjectsMode(location.pathname);
   const currentSubjectId = getSubjectIdFromPath(location.pathname);
   const currentSubject = currentSubjectId ? SUBJECTS_CONFIG[currentSubjectId] : null;
+
+  // Navigation items for main sidebar
+  const navItems = SUBJECT_ORDER.map((subjectId) => {
+    const subject = SUBJECTS_CONFIG[subjectId];
+    return {
+      href: subject.basePath,
+      icon: subject.icon,
+      title: subject.titleEn,
+      titleTh: subject.titleTh,
+    };
+  });
+
+  // Check if a route is active
+  const isActive = (href: string) => {
+    if (href === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname === href || location.pathname.startsWith(href + "/");
+  };
 
   const SidebarContent = () => (
     <>
@@ -60,7 +76,7 @@ export function AppSidebar({ language = "th" }: AppSidebarProps) {
             </span>
           </div>
         )}
-      </Link>
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">

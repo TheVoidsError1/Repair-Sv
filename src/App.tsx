@@ -7,13 +7,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Repairs from "./pages/Repairs";
+import RepairNew from "./pages/RepairNew";
+import RepairBill from "./pages/RepairBill";
 import Inventory from "./pages/Inventory";
 import Warranty from "./pages/Warranty";
 import Finance from "./pages/Finance";
-import Inventory from "./pages/Inventory";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +36,6 @@ const App = () => (
             <Route path="/finance" element={<Finance />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/login" element={<Login />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           </RepairsProvider>
