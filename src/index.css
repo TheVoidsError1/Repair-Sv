@@ -158,11 +158,44 @@
   }
 
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors;
   }
 
   .sidebar-link.active {
-    @apply bg-sidebar-accent text-sidebar-primary font-medium;
+    @apply text-sidebar-primary font-medium;
+  }
+
+  /* เมื่อเปิด dropdown คลังข้อมูล: ซ่อนไอคอนลูกศร scrollbar (เลื่อนได้ปกติ) */
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar {
+    width: 8px;
+  }
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: hsl(var(--sidebar-border));
+  }
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--sidebar-muted));
+  }
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-button,
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-button:vertical:start,
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-button:vertical:end,
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-button:horizontal:start,
+  .sidebar-nav-scroll.sidebar-nav-dropdown-open::-webkit-scrollbar-button:horizontal:end {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    max-height: 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    clip: rect(0, 0, 0, 0) !important;
   }
 
   .data-table {

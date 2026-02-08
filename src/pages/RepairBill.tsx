@@ -1,7 +1,10 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowLeft, Printer } from "lucide-react";
+import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
+import { ArrowLeft, FileText, Plus, Printer } from "lucide-react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 export interface RepairOrderData {
@@ -25,6 +28,26 @@ interface BillContentProps {
   copyLabel: string;
   t: (key: string) => string;
   footerText: string;
+}
+
+/** แมปงานซ่อมจากรายการ → ข้อมูลสำหรับใบรับซ่อม */
+function repairItemToBillData(item: RepairItem, language: "th" | "en"): RepairOrderData {
+  const problemText = language === "th" ? item.issueTh : item.issue;
+  const cost = String(item.estimatedCost);
+  return {
+    customer: item.customer,
+    phone: item.phone,
+    model: item.device,
+    color: "",
+    screenLockCode: "",
+    problemSymptoms: problemText,
+    deposit: "",
+    estimatedPrice: cost,
+    repairSummaryPrice: cost,
+    dateOfReport: item.createdAt,
+    timeOfReport: undefined,
+    scheduledPickupTime: undefined,
+  };
 }
 
 const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) => (
@@ -207,7 +230,11 @@ const RepairBill = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
-  const data = location.state as RepairOrderData | null;
+  const { repairs } = useRepairs();
+  const dataFromNav = location.state as RepairOrderData | null | undefined;
+  const [selectedBillData, setSelectedBillData] = useState<RepairOrderData | null>(null);
+
+  const displayData = dataFromNav ?? selectedBillData;
 
   const handlePrint = () => {
     window.print();
@@ -218,52 +245,151 @@ const RepairBill = () => {
     return isNaN(num) ? "-" : `฿${num.toLocaleString()}`;
   };
 
-  const footerText =
-    language === "th"
-      ? ""
-      : "";
+  const footerText = language === "th" ? "" : "";
 
-  if (!data) {
+  const handleCreateNewBill = () => {
+    navigate("/repairs/new");
+  };
+
+  const handleSelectRepair = (item: RepairItem) => {
+    setSelectedBillData(repairItemToBillData(item, language));
+  };
+
+  const handleBackToList = () => {
+    setSelectedBillData(null);
+  };
+
+  // โหมดรายการ: เลือกงานซ่อมเพื่อออกบิล
+  if (!displayData) {
     return (
       <MainLayout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-          <p className="text-muted-foreground">
-            {language === "th" ? "ไม่พบข้อมูลคำสั่งซ่อม" : "No repair order data found"}
-          </p>
-          <Button variant="outline" onClick={() => navigate("/repairs")} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            {t("backToRepairs")}
-          </Button>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="page-title">{t("repairBill")}</h1>
+              <p className="page-description">
+                {language === "th"
+                  ? "เลือกงานซ่อมจากรายการด้านล่างเพื่อออกใบรับซ่อม หรือสร้างใบรับซ่อมใหม่"
+                  : "Select a repair to issue a receipt, or create a new one."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate("/repairs")} className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                {t("backToRepairs")}
+              </Button>
+              <Button onClick={handleCreateNewBill} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {language === "th" ? "สร้างใบรับซ่อมใหม่" : "New receipt"}
+              </Button>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="w-5 h-5" />
+                {language === "th" ? "รายการงานซ่อม" : "Repair list"}
+              </CardTitle>
+              <CardDescription>
+                {language === "th"
+                  ? "กดปุ่มออกบิลที่แถวที่ต้องการเพื่อดูและพิมพ์ใบรับซ่อม"
+                  : "Click Issue bill on a row to view and print the receipt."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {repairs.length === 0 ? (
+                <p className="text-muted-foreground py-8 text-center">
+                  {language === "th" ? "ยังไม่มีงานซ่อมในระบบ" : "No repairs in the system."}
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border">
+                        <th className="text-left p-3 font-medium">{t("orderId")}</th>
+                        <th className="text-left p-3 font-medium">{t("customer")}</th>
+                        <th className="text-left p-3 font-medium">{t("device")}</th>
+                        <th className="text-left p-3 font-medium">{t("issue")}</th>
+                        <th className="text-right p-3 font-medium">{t("estCost")}</th>
+                        <th className="text-right p-3 font-medium w-28">
+                          {language === "th" ? "ออกบิล" : "Bill"}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repairs.map((item) => (
+                        <tr
+                          key={item.id}
+                          className="border-b border-border last:border-0 hover:bg-muted/30"
+                        >
+                          <td className="p-3 font-mono text-muted-foreground">{item.id}</td>
+                          <td className="p-3">{item.customer}</td>
+                          <td className="p-3">{item.device}</td>
+                          <td className="p-3">
+                            {language === "th" ? item.issueTh : item.issue}
+                          </td>
+                          <td className="p-3 text-right">
+                            ฿{item.estimatedCost.toLocaleString()}
+                          </td>
+                          <td className="p-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="gap-1"
+                              onClick={() => handleSelectRepair(item)}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              {language === "th" ? "ออกบิล" : "Bill"}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
   }
 
+  // โหมดแสดงใบรับซ่อม + พิมพ์
   return (
     <MainLayout>
       <div className="max-w-6xl mx-auto repair-bill-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 print:hidden">
-          <Button variant="outline" onClick={() => navigate("/repairs")} className="gap-2 w-fit">
-            <ArrowLeft className="w-4 h-4" />
-            {t("backToRepairs")}
-          </Button>
+          <div className="flex gap-2">
+            {selectedBillData ? (
+              <Button variant="outline" onClick={handleBackToList} className="gap-2 w-fit">
+                <ArrowLeft className="w-4 h-4" />
+                {language === "th" ? "กลับรายการ" : "Back to list"}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => navigate("/repairs")} className="gap-2 w-fit">
+                <ArrowLeft className="w-4 h-4" />
+                {t("backToRepairs")}
+              </Button>
+            )}
+          </div>
           <Button onClick={handlePrint} className="gap-2 w-fit">
             <Printer className="w-4 h-4" />
             {t("printBill")}
           </Button>
         </div>
 
-        {/* Print: 2 bills ซ้าย-ขวา ต่อ 1 แผ่น A4 แนวนอน */}
         <div className="repair-bill-print-wrapper hidden print:flex print:flex-row">
           <BillContent
-            data={data}
+            data={displayData}
             formatPrice={formatPrice}
             copyLabel={t("customerCopy")}
             t={t}
             footerText={footerText}
           />
           <BillContent
-            data={data}
+            data={displayData}
             formatPrice={formatPrice}
             copyLabel={t("shopCopy")}
             t={t}
@@ -271,11 +397,10 @@ const RepairBill = () => {
           />
         </div>
 
-        {/* หน้าจอ: แสดงซ้าย-ขวา เหมือนตอนพิมพ์ */}
         <div className="print:hidden flex flex-row gap-4 w-full">
           <div className="flex-1 min-w-0">
             <BillContent
-              data={data}
+              data={displayData}
               formatPrice={formatPrice}
               copyLabel={t("customerCopy")}
               t={t}
@@ -284,7 +409,7 @@ const RepairBill = () => {
           </div>
           <div className="flex-1 min-w-0">
             <BillContent
-              data={data}
+              data={displayData}
               formatPrice={formatPrice}
               copyLabel={t("shopCopy")}
               t={t}

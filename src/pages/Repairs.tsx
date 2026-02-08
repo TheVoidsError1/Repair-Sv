@@ -1,119 +1,35 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, Edit, Eye, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { RepairOrderData } from "./RepairBill";
-
-const repairs = [
-  {
-    id: "REP-001",
-    customer: "John Doe",
-    phone: "081-234-5678",
-    device: "iPhone 14 Pro",
-    issue: "Screen Replacement",
-    issueTh: "เปลี่ยนหน้าจอ",
-    status: "in-progress",
-    technician: "Tom",
-    createdAt: "2024-01-15",
-    estimatedCost: 4500,
-  },
-  {
-    id: "REP-002",
-    customer: "Jane Smith",
-    phone: "082-345-6789",
-    device: "Samsung Galaxy S23",
-    issue: "Battery Replacement",
-    issueTh: "เปลี่ยนแบตเตอรี่",
-    status: "pending",
-    technician: "Unassigned",
-    technicianTh: "ยังไม่มอบหมาย",
-    createdAt: "2024-01-15",
-    estimatedCost: 1200,
-  },
-  {
-    id: "REP-003",
-    customer: "Mike Johnson",
-    phone: "083-456-7890",
-    device: "Google Pixel 7",
-    issue: "Water Damage Repair",
-    issueTh: "ซ่อมเสียหายจากน้ำ",
-    status: "completed",
-    technician: "Anna",
-    createdAt: "2024-01-14",
-    estimatedCost: 3200,
-  },
-  {
-    id: "REP-004",
-    customer: "Sarah Williams",
-    phone: "084-567-8901",
-    device: "iPhone 13",
-    issue: "Back Glass Repair",
-    issueTh: "ซ่อมกระจกหลัง",
-    status: "completed",
-    technician: "Tom",
-    createdAt: "2024-01-14",
-    estimatedCost: 2800,
-  },
-  {
-    id: "REP-005",
-    customer: "David Brown",
-    phone: "085-678-9012",
-    device: "OnePlus 11",
-    issue: "Charging Port Replacement",
-    issueTh: "เปลี่ยนพอร์ตชาร์จ",
-    status: "cancelled",
-    technician: "Anna",
-    createdAt: "2024-01-13",
-    estimatedCost: 800,
-  },
-  {
-    id: "REP-006",
-    customer: "Emily Chen",
-    phone: "086-789-0123",
-    device: "iPhone 15 Pro Max",
-    issue: "Speaker Not Working",
-    issueTh: "ลำโพงไม่ทำงาน",
-    status: "pending",
-    technician: "Unassigned",
-    technicianTh: "ยังไม่มอบหมาย",
-    createdAt: "2024-01-15",
-    estimatedCost: 1500,
-  },
-];
+import { Edit, Eye, Filter, MoreHorizontal, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
@@ -123,34 +39,17 @@ const statusStyles: Record<string, string> = {
   "picked-up": "status-completed",
 };
 
-const initialFormData = {
-  customer: "",
-  phone: "",
-  model: "",
-  color: "",
-  screenLockCode: "",
-  problemSymptoms: "",
-  deposit: "",
-  estimatedPrice: "",
-  repairSummaryPrice: "",
-  dateOfReport: "",
-  timeOfReport: "",
-  scheduledPickupTime: "",
-};
-
 const Repairs = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { repairs, setRepairs } = useRepairs();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState(initialFormData);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedRepair, setSelectedRepair] =
-    useState<(typeof repairs)[number] | null>(null);
+  const [selectedRepair, setSelectedRepair] = useState<RepairItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editingRepair, setEditingRepair] =
-    useState<(typeof repairs)[number] | null>(null);
+  const [editingRepair, setEditingRepair] = useState<RepairItem | null>(null);
   const [editingStatus, setEditingStatus] = useState<
     "pending" | "in-progress" | "completed" | "cancelled" | "picked-up"
   >("pending");
@@ -166,81 +65,20 @@ const Repairs = () => {
     { id: "anna", name: "Anna", nameTh: "แอนนา" },
   ];
 
-  const timeSlots = (() => {
-    const slots: string[] = [];
-    for (let h = 8; h <= 20; h++) {
-      slots.push(`${h.toString().padStart(2, "0")}:00`);
-      if (h < 20) slots.push(`${h.toString().padStart(2, "0")}:30`);
+  // เดิมเปิด Dialog — ตอนนี้ไปหน้าสร้างงานซ่อมเต็มหน้าแทน
+  useEffect(() => {
+    if (searchParams.get("openCreate") === "1") {
+      navigate("/repairs/new", { replace: true });
     }
-    return slots;
-  })();
+  }, [searchParams, navigate]);
 
-  const scheduledPickupDate = formData.scheduledPickupTime
-    ? (() => {
-        const d = new Date(formData.scheduledPickupTime);
-        return isNaN(d.getTime()) ? undefined : d;
-      })()
-    : undefined;
-  const scheduledPickupTimeSlot = formData.scheduledPickupTime
-    ? formData.scheduledPickupTime.slice(11, 16)
-    : "";
-
-  const setScheduledPickupDate = (date: Date | undefined) => {
-    const dateStr = date
-      ? `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`
-      : "";
-    const timePart = scheduledPickupTimeSlot || "09:00";
-    setFormData((prev) => ({
-      ...prev,
-      scheduledPickupTime: dateStr ? `${dateStr}T${timePart}` : "",
-    }));
-  };
-
-  const setScheduledPickupTimeSlot = (slot: string) => {
-    const useSlot = slot || "09:00";
-    const datePart = scheduledPickupDate
-      ? `${scheduledPickupDate.getFullYear()}-${(scheduledPickupDate.getMonth() + 1).toString().padStart(2, "0")}-${scheduledPickupDate.getDate().toString().padStart(2, "0")}`
-      : new Date().toISOString().slice(0, 10);
-    setFormData((prev) => ({
-      ...prev,
-      scheduledPickupTime: `${datePart}T${useSlot}`,
-    }));
-  };
-
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleCreateOrder = () => {
-    const now = new Date();
-    const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    const orderData: RepairOrderData = {
-      ...formData,
-      dateOfReport: formData.dateOfReport || defaultDate,
-      timeOfReport: formData.timeOfReport || undefined,
-      scheduledPickupTime: formData.scheduledPickupTime || undefined,
-    };
-    setIsDialogOpen(false);
-    setFormData(initialFormData);
-    navigate("/repairs/bill", { state: orderData });
-  };
-
-  const setReportDateTimeOnOpen = () => {
-    const now = new Date();
-    setFormData((prev) => ({
-      ...prev,
-      dateOfReport: now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
-      timeOfReport: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
-    }));
-  };
+  // ซิงค์ฟิลเตอร์สถานะจาก URL (?status=...) เมื่อมาจาก Sidebar คลังข้อมูล
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status && ["all", "pending", "in-progress", "completed", "cancelled", "picked-up"].includes(status)) {
+      setStatusFilter(status);
+    }
+  }, [searchParams.get("status")]);
 
   const statusLabels: Record<string, string> = {
     pending: t("pending"),
@@ -260,12 +98,12 @@ const Repairs = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleViewDetails = (repair: (typeof repairs)[number]) => {
+  const handleViewDetails = (repair: RepairItem) => {
     setSelectedRepair(repair);
     setDetailOpen(true);
   };
 
-  const handleEditOrder = (repair: (typeof repairs)[number]) => {
+  const handleEditOrder = (repair: RepairItem) => {
     setEditingRepair(repair);
     setEditingStatus(
       (repair.status as
@@ -282,238 +120,9 @@ const Repairs = () => {
   return (
     <MainLayout>
       <div className="page-header">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="page-title">{t("repairManagement")}</h1>
-            <p className="page-description">{t("repairDescription")}</p>
-          </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              if (open) setReportDateTimeOnOpen();
-              setIsDialogOpen(open);
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                {t("newRepairOrder")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[580px] max-h-[96vh] flex flex-col overflow-hidden p-0 gap-0">
-              <DialogHeader className="px-6 pt-5 pb-3 border-b border-border/60 shrink-0">
-                <div className="flex flex-row items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <DialogTitle className="text-lg font-semibold tracking-tight">
-                      {t("createNewRepairOrder")}
-                    </DialogTitle>
-                    <DialogDescription className="text-sm text-muted-foreground">
-                      {t("enterCustomerDeviceDetails")}
-                    </DialogDescription>
-                  </div>
-                  <div className="flex flex-col items-end rounded-lg bg-muted/50 px-3 py-2 border border-border/50 shrink-0">
-                    <span className="text-xs text-muted-foreground">
-                      {t("dateOfRepairReport")}
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums text-foreground">
-                      {formData.dateOfReport ||
-                        new Date().toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
-                      {" · "}
-                      {formData.timeOfReport ||
-                        `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`}
-                    </span>
-                  </div>
-                </div>
-              </DialogHeader>
-              <div className="px-6 py-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="grid gap-1">
-                    <Label htmlFor="customer" className="text-xs font-medium text-muted-foreground">
-                      {t("customerName")}
-                    </Label>
-                    <Input
-                      id="customer"
-                      placeholder={t("enterCustomerName")}
-                      value={formData.customer}
-                      onChange={(e) => handleInputChange("customer", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">
-                      {t("phoneNumber")}
-                    </Label>
-                    <Input
-                      id="phone"
-                      placeholder={t("enterPhoneNumber")}
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange("phone", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="model" className="text-xs font-medium text-muted-foreground">
-                      {t("model")}
-                    </Label>
-                    <Input
-                      id="model"
-                      placeholder={t("enterModel")}
-                      value={formData.model}
-                      onChange={(e) => handleInputChange("model", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="color" className="text-xs font-medium text-muted-foreground">
-                      {t("color")}
-                    </Label>
-                    <Input
-                      id="color"
-                      placeholder={t("enterColor")}
-                      value={formData.color}
-                      onChange={(e) => handleInputChange("color", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1 sm:col-span-2">
-                    <Label htmlFor="screenLockCode" className="text-xs font-medium text-muted-foreground">
-                      {t("screenLockCode")}
-                    </Label>
-                    <Input
-                      id="screenLockCode"
-                      placeholder={t("enterScreenLockCode")}
-                      value={formData.screenLockCode}
-                      onChange={(e) => handleInputChange("screenLockCode", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1 sm:col-span-2">
-                    <Label htmlFor="issue" className="text-xs font-medium text-muted-foreground">
-                      {t("problemSymptoms")}
-                    </Label>
-                    <Textarea
-                      id="issue"
-                      placeholder={t("enterProblemSymptoms")}
-                      className="min-h-[56px] resize-none text-sm"
-                      value={formData.problemSymptoms}
-                      onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2 sm:col-span-2">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      {t("selectScheduledPickupTime")}
-                    </Label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 min-w-[140px] justify-start gap-2 font-normal"
-                          >
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            {scheduledPickupDate
-                              ? scheduledPickupDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : t("pickUpDate")}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={scheduledPickupDate}
-                            onSelect={(d) => setScheduledPickupDate(d ?? undefined)}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <Select
-                        value={scheduledPickupTimeSlot || "__none__"}
-                        onValueChange={(v) => setScheduledPickupTimeSlot(v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger className="h-9 w-[120px]">
-                          <SelectValue placeholder={t("pickUpTime")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeSlots.map((slot) => (
-                            <SelectItem key={slot} value={slot}>
-                              {slot}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {formData.scheduledPickupTime && (
-                      <p className="text-xs font-medium text-foreground rounded bg-muted/50 px-2.5 py-1.5 border border-border/50 truncate">
-                        {t("pickupSummary")}:{" "}
-                        {scheduledPickupDate?.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}{" "}
-                        {scheduledPickupTimeSlot || "—"}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="deposit" className="text-xs font-medium text-muted-foreground">
-                      {t("deposit")}
-                    </Label>
-                    <Input
-                      id="deposit"
-                      type="number"
-                      placeholder={t("enterDeposit")}
-                      value={formData.deposit}
-                      onChange={(e) => handleInputChange("deposit", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="estimatedPrice" className="text-xs font-medium text-muted-foreground">
-                      {t("estimatedPriceBaht")}
-                    </Label>
-                    <Input
-                      id="estimatedPrice"
-                      type="number"
-                      placeholder={t("enterEstimatedPrice")}
-                      value={formData.estimatedPrice}
-                      onChange={(e) => handleInputChange("estimatedPrice", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="grid gap-1 sm:col-span-2">
-                    <Label htmlFor="repairSummaryPrice" className="text-xs font-medium text-muted-foreground">
-                      {t("repairSummaryPrice")}
-                    </Label>
-                    <Input
-                      id="repairSummaryPrice"
-                      type="number"
-                      placeholder={t("enterRepairSummaryPrice")}
-                      value={formData.repairSummaryPrice}
-                      onChange={(e) => handleInputChange("repairSummaryPrice", e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter className="px-6 py-3 border-t border-border/60 bg-muted/20 shrink-0">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  {t("cancel")}
-                </Button>
-                <Button onClick={handleCreateOrder}>
-                  {t("createOrder")}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <div>
+          <h1 className="page-title">{t("repairManagement")}</h1>
+          <p className="page-description">{t("repairDescription")}</p>
         </div>
       </div>
 
@@ -554,10 +163,10 @@ const Repairs = () => {
                 <th>{t("customer")}</th>
                 <th>{t("device")}</th>
                 <th>{t("issue")}</th>
-                <th>{t("technician")}</th>
                 <th>{t("estCost")}</th>
                 <th>{t("status")}</th>
-                <th>{t("actions")}</th>
+                <th>{t("tagLabel")}</th>
+                <th>{t("report")}</th>
               </tr>
             </thead>
             <tbody>
@@ -572,16 +181,28 @@ const Repairs = () => {
                     </td>
                     <td>{repair.device}</td>
                     <td>{language === "th" ? repair.issueTh : repair.issue}</td>
-                    <td>
-                      {repair.technician === "Unassigned"
-                        ? language === "th" ? "ยังไม่มอบหมาย" : repair.technician
-                        : repair.technician}
-                    </td>
                     <td>฿{repair.estimatedCost.toLocaleString()}</td>
                     <td>
                       <span className={`status-badge ${statusStyles[repair.status]}`}>
                         {statusLabels[repair.status]}
                       </span>
+                    </td>
+                    <td>
+                      {repair.tag ? (
+                        <span
+                          className={
+                            repair.tag === "endOfDay"
+                              ? "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                              : "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                          }
+                        >
+                          {repair.tag === "endOfDay"
+                            ? t("endOfDay")
+                            : t("leaveDevice")}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">–</span>
+                      )}
                     </td>
                     <td>
                       <DropdownMenu>
@@ -712,6 +333,24 @@ const Repairs = () => {
                       : selectedRepair.issue}
                   </p>
                 </div>
+                {selectedRepair.tag && (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs text-muted-foreground">
+                      {t("tagLabel")}
+                    </Label>
+                    <span
+                      className={
+                        selectedRepair.tag === "endOfDay"
+                          ? "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : "inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                      }
+                    >
+                      {selectedRepair.tag === "endOfDay"
+                        ? t("endOfDay")
+                        : t("leaveDevice")}
+                    </span>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -942,6 +581,15 @@ const Repairs = () => {
             </Button>
             <Button
               onClick={() => {
+                if (editingRepair) {
+                  setRepairs((prev) =>
+                    prev.map((r) =>
+                      r.id === editingRepair.id
+                        ? { ...r, status: editingStatus }
+                        : r
+                    )
+                  );
+                }
                 setConfirmSaveOpen(false);
                 setEditOpen(false);
                 setSelectedUserId("");

@@ -1,57 +1,19 @@
+import {
+    getSubjectIdFromPath,
+    isSubjectsMode,
+    SUBJECT_ORDER,
+    SUBJECTS_CONFIG,
+    type SidebarMenuItem,
+    type SidebarSubjectConfig,
+} from "@/config/sidebarConfig";
+import { Language } from "@/lib/translations";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Wrench,
-  Package,
-  ShieldCheck,
-  DollarSign,
-  Settings,
-  Smartphone,
-  X,
-  LogOut,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Language } from "@/lib/translations";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    titleTh: "แดชบอร์ด",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Repairs",
-    titleTh: "การซ่อม",
-    href: "/repairs",
-    icon: Wrench,
-  },
-  {
-    title: "Inventory",
-    titleTh: "สินค้าคงคลัง",
-    href: "/inventory",
-    icon: Package,
-  },
-  {
-    title: "Warranty",
-    titleTh: "การรับประกัน",
-    href: "/warranty",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Finance",
-    titleTh: "การเงิน",
-    href: "/finance",
-    icon: DollarSign,
-  },
-  {
-    title: "Settings",
-    titleTh: "ตั้งค่า",
-    href: "/settings",
-    icon: Settings,
-  },
-];
+/** หน้าแรก = แดชบอร์ด (ไม่ใช้หน้าเลือกหมวดกับการ์ด) */
+const SUBJECTS_PATH = "/";
 
 interface AppSidebarProps {
   language?: Language;
@@ -61,6 +23,172 @@ interface AppSidebarProps {
   setMobileOpen?: (value: boolean) => void;
 }
 
+/** เช็คว่า pathname + search ตรงกับเมนูย่อยนี้หรือไม่ */
+function isMenuItemActive(
+  item: SidebarMenuItem,
+  pathname: string,
+  searchParams: URLSearchParams
+): boolean {
+  const basePath = item.href.split("?")[0];
+  if (pathname !== basePath) return false;
+  if (!item.matchQuery || Object.keys(item.matchQuery).length === 0) {
+    // เมนูแบบไม่มี query (เช่น "ทั้งหมด"): active เมื่อ path ตรงและไม่มี filter
+    const hasNoFilter = !searchParams.get("status") && !searchParams.get("openCreate");
+    return hasNoFilter;
+  }
+  for (const [key, value] of Object.entries(item.matchQuery)) {
+    if (searchParams.get(key) !== value) return false;
+  }
+  return true;
+}
+
+/** โหมดที่ 1: Subjects — แสดงรายการหมวดหลัก */
+function SubjectsNav({
+  language,
+  collapsed,
+  setMobileOpen,
+}: {
+  language: Language;
+  collapsed: boolean;
+  setMobileOpen: (v: boolean) => void;
+}) {
+  const location = useLocation();
+  const currentSubjectId = getSubjectIdFromPath(location.pathname);
+
+  return (
+    <div className="space-y-1">
+      {!collapsed && (
+        <p className="px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+          {language === "th" ? "เลือกหมวด" : "Subjects"}
+        </p>
+      )}
+      {SUBJECT_ORDER.map((subjectId) => {
+        const subject = SUBJECTS_CONFIG[subjectId];
+        if (!subject) return null;
+        const isActive = currentSubjectId === subjectId;
+        const title = language === "th" ? subject.titleTh : subject.titleEn;
+        return (
+          <Link
+            key={subject.id}
+            to={subject.basePath}
+            onClick={() => setMobileOpen(false)}
+            className={cn(
+              "sidebar-link flex items-center gap-3 rounded-lg border-l-2 -ml-px",
+              isActive ? "active border-sidebar-primary text-sidebar-primary" : "border-transparent"
+            )}
+          >
+            <span
+              className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0",
+                isActive ? "bg-sidebar-primary/20 text-sidebar-primary" : subject.iconBg
+              )}
+            >
+              <subject.icon className="w-4 h-4" />
+            </span>
+            {!collapsed && (
+              <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis">
+                {title}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/** โหมดที่ 2: Context Sidebar — เมนูย่อยของหมวดที่เลือก */
+function ContextNav({
+  subject,
+  language,
+  collapsed,
+  pathname,
+  searchParams,
+  setMobileOpen,
+}: {
+  subject: SidebarSubjectConfig;
+  language: Language;
+  collapsed: boolean;
+  pathname: string;
+  searchParams: URLSearchParams;
+  setMobileOpen: (v: boolean) => void;
+}) {
+  const title = language === "th" ? subject.titleTh : subject.titleEn;
+
+  return (
+    <div className="space-y-4">
+      {/* ปุ่มกลับไปหมวดหลัก */}
+      <Link
+        to={SUBJECTS_PATH}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          "sidebar-link flex items-center gap-3 rounded-lg text-sidebar-muted hover:text-sidebar-foreground"
+        )}
+      >
+        <span className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0">
+          <ArrowLeft className="w-4 h-4" />
+        </span>
+        {!collapsed && (
+          <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis">
+            {language === "th" ? "กลับหมวดหลัก" : "Back to subjects"}
+          </span>
+        )}
+      </Link>
+
+      {/* ชื่อหมวดปัจจุบัน — ไม่ใช้พื้นหลังแบบกดได้ */}
+      {!collapsed && (
+        <div className="flex items-center gap-3 px-3 py-1.5">
+          <span className={cn("flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0", subject.iconBg)}>
+            <subject.icon className="w-4 h-4" />
+          </span>
+          <span className="text-sm font-medium text-sidebar-foreground truncate">{title}</span>
+        </div>
+      )}
+
+      {/* Sections + รายการเมนูย่อย */}
+      {subject.sections.map((section) => (
+        <div key={section.id} className="space-y-1">
+          {!collapsed && (
+            <p className="px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+              {language === "th" ? section.labelTh : section.labelEn}
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {section.items.map((item) => {
+              const active = isMenuItemActive(item, pathname, searchParams);
+              const label = language === "th" ? item.labelTh : item.labelEn;
+              return (
+                <Link
+                  key={item.id}
+                  to={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 py-2 px-3 rounded-lg text-sm transition-colors -ml-px border-l-2",
+                    "text-sidebar-foreground/90 hover:text-sidebar-foreground",
+                    active
+                      ? "border-sidebar-primary text-sidebar-primary font-medium"
+                      : "border-transparent"
+                  )}
+                >
+                  <span className={cn(
+                    "flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0",
+                    active ? "text-sidebar-primary" : "text-sidebar-muted"
+                  )}>
+                    <item.icon className="w-3.5 h-3.5" />
+                  </span>
+                  {!collapsed && (
+                    <span className="flex-1 min-w-0 truncate">{label}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AppSidebar({
   language = "th",
   collapsed: controlledCollapsed,
@@ -68,6 +196,7 @@ export function AppSidebar({
   mobileOpen: controlledMobileOpen,
   setMobileOpen: controlledSetMobileOpen,
 }: AppSidebarProps) {
+  const location = useLocation();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
 
@@ -75,56 +204,61 @@ export function AppSidebar({
   const setCollapsed = controlledSetCollapsed ?? setInternalCollapsed;
   const mobileOpen = controlledMobileOpen ?? internalMobileOpen;
   const setMobileOpen = controlledSetMobileOpen ?? setInternalMobileOpen;
-  const location = useLocation();
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
 
-  const isActive = (href: string) => {
-    if (href === "/") return location.pathname === "/";
-    return location.pathname.startsWith(href);
-  };
+  const subjectsMode = isSubjectsMode(location.pathname);
+  const currentSubjectId = getSubjectIdFromPath(location.pathname);
+  const currentSubject = currentSubjectId ? SUBJECTS_CONFIG[currentSubjectId] : null;
 
   const SidebarContent = () => (
     <>
-      {/* Logo - shrink-0 */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-6 border-b border-sidebar-border">
+      {/* Logo — คลิกกลับหน้าเลือกหมวด */}
+      <Link
+        to={SUBJECTS_PATH}
+        onClick={() => setMobileOpen(false)}
+        className="shrink-0 flex items-center gap-3 px-4 py-6 border-b border-sidebar-border transition-colors"
+      >
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-sidebar-primary">
           <Smartphone className="w-5 h-5 text-sidebar-primary-foreground" />
         </div>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">
-              Macfix service
-            </span>
+            <span className="text-sm font-semibold text-sidebar-foreground">Macfix service</span>
             <span className="text-xs text-sidebar-muted">
               {language === "th" ? "ระบบจัดการร้านซ่อม" : "Management"}
             </span>
           </div>
         )}
-      </div>
+      </Link>
 
-      {/* Navigation - overflow-y-auto เมื่อมีเมนูมาก */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            onClick={() => setMobileOpen(false)}
-            className={cn(
-              "sidebar-link",
-              isActive(item.href) && "active"
-            )}
-          >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && (
-              <span className="truncate">
-                {language === "th" ? item.titleTh : item.title}
-              </span>
-            )}
-          </Link>
-        ))}
+      <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4">
+        {subjectsMode ? (
+          <SubjectsNav
+            language={language}
+            collapsed={collapsed}
+            setMobileOpen={setMobileOpen}
+          />
+        ) : currentSubject ? (
+          <ContextNav
+            subject={currentSubject}
+            language={language}
+            collapsed={collapsed}
+            pathname={location.pathname}
+            searchParams={searchParams}
+            setMobileOpen={setMobileOpen}
+          />
+        ) : (
+          /* อยู่หน้าที่ไม่ใช่ /subjects และไม่ตรงหมวดใด (เช่น /login ไม่ใช้ sidebar นี้) — แสดง subjects เป็น fallback */
+          <SubjectsNav
+            language={language}
+            collapsed={collapsed}
+            setMobileOpen={setMobileOpen}
+          />
+        )}
       </nav>
 
-      {/* Logout - shrink-0 เพื่อให้อยู่ด้านล่างเสมอ */}
+      {/* Logout */}
       <div className="shrink-0 p-3 border-t border-sidebar-border">
         <button
           onClick={() => {
@@ -135,9 +269,7 @@ export function AppSidebar({
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />
           {!collapsed && (
-            <span className="truncate">
-              {language === "th" ? "ออกจากระบบ" : "Log out"}
-            </span>
+            <span className="truncate">{language === "th" ? "ออกจากระบบ" : "Log out"}</span>
           )}
         </button>
       </div>
@@ -146,7 +278,6 @@ export function AppSidebar({
 
   return (
     <>
-      {/* Mobile Overlay */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-foreground/50 z-40"
@@ -154,10 +285,9 @@ export function AppSidebar({
         />
       )}
 
-      {/* Mobile Sidebar */}
       <aside
         className={cn(
-          "lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-300",
+          "lg:hidden fixed inset-y-0 left-0 z-50 w-[19rem] min-w-[19rem] max-w-[90vw] bg-sidebar flex flex-col transition-transform duration-300",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -170,11 +300,10 @@ export function AppSidebar({
         <SidebarContent />
       </aside>
 
-      {/* Desktop Sidebar - h-screen เพื่อให้ออกจากระบบอยู่ด้านล่างเสมอ */}
       <aside
         className={cn(
           "hidden lg:flex flex-col flex-shrink-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          collapsed ? "w-20" : "w-64"
+          collapsed ? "w-20" : "w-[19rem] min-w-[19rem]"
         )}
       >
         <SidebarContent />
