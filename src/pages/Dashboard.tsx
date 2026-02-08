@@ -1,10 +1,10 @@
-import { MainLayout } from "@/components/layout/MainLayout";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { RecentRepairs } from "@/components/dashboard/RecentRepairs";
-import { StockAlerts } from "@/components/dashboard/StockAlerts";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
-import { Wrench, Package, DollarSign, Users } from "lucide-react";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { StockAlerts } from "@/components/dashboard/StockAlerts";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { DollarSign, Package, Users, Wrench } from "lucide-react";
 
 const Dashboard = () => {
   const { t } = useLanguage();
@@ -12,8 +12,12 @@ const Dashboard = () => {
   return (
     <MainLayout>
       <div className="page-header">
-        <h1 className="page-title">{t("dashboard")}</h1>
-        <p className="page-description">{t("dashboardWelcome")}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="page-title">{t("dashboard")}</h1>
+            <p className="page-description">{t("dashboardWelcome")}</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}

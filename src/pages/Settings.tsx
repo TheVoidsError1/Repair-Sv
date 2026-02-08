@@ -1,38 +1,38 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Users,
-  Shield,
-  Bell,
-  Globe,
-  Lock,
-  Plus,
-  Edit,
-  Trash2,
-  UserCircle,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
+import {
+    Bell,
+    Edit,
+    Globe,
+    Lock,
+    Plus,
+    Shield,
+    Trash2,
+    UserCircle,
+    Users,
+} from "lucide-react";
 import { useState } from "react";
 
 const users = [
@@ -84,8 +84,12 @@ const Settings = () => {
   return (
     <MainLayout>
       <div className="page-header">
-        <h1 className="page-title">{t("settings")}</h1>
-        <p className="page-description">{t("settingsDescription")}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="page-title">{t("settings")}</h1>
+            <p className="page-description">{t("settingsDescription")}</p>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">

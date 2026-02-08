@@ -1,3 +1,14 @@
+import {
+    getSubjectIdFromPath,
+    isSubjectsMode,
+    SUBJECT_ORDER,
+    SUBJECTS_CONFIG,
+    type SidebarMenuItem,
+    type SidebarSubjectConfig,
+} from "@/config/sidebarConfig";
+import { Language } from "@/lib/translations";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -16,44 +27,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Language } from "@/lib/translations";
 
-const navItems = [
-  {
-    title: "Dashboard",
-    titleTh: "แดชบอร์ด",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Repairs",
-    titleTh: "การซ่อม",
-    href: "/repairs",
-    icon: Wrench,
-  },
-  {
-    title: "Inventory",
-    titleTh: "สินค้าคงคลัง",
-    href: "/inventory",
-    icon: Package,
-  },
-  {
-    title: "Warranty",
-    titleTh: "การรับประกัน",
-    href: "/warranty",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Finance",
-    titleTh: "การเงิน",
-    href: "/finance",
-    icon: DollarSign,
-  },
-  {
-    title: "Settings",
-    titleTh: "ตั้งค่า",
-    href: "/settings",
-    icon: Settings,
-  },
-];
+/** หน้าแรก = แดชบอร์ด (ไม่ใช้หน้าเลือกหมวดกับการ์ด) */
+const SUBJECTS_PATH = "/";
 
 interface AppSidebarProps {
   language?: Language;
@@ -64,10 +39,9 @@ export function AppSidebar({ language = "th" }: AppSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
-  const isActive = (href: string) => {
-    if (href === "/") return location.pathname === "/";
-    return location.pathname.startsWith(href);
-  };
+  const subjectsMode = isSubjectsMode(location.pathname);
+  const currentSubjectId = getSubjectIdFromPath(location.pathname);
+  const currentSubject = currentSubjectId ? SUBJECTS_CONFIG[currentSubjectId] : null;
 
   const SidebarContent = () => (
     <>
@@ -86,7 +60,7 @@ export function AppSidebar({ language = "th" }: AppSidebarProps) {
             </span>
           </div>
         )}
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -147,10 +121,9 @@ export function AppSidebar({ language = "th" }: AppSidebarProps) {
         />
       )}
 
-      {/* Mobile Sidebar */}
       <aside
         className={cn(
-          "lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-300",
+          "lg:hidden fixed inset-y-0 left-0 z-50 w-[19rem] min-w-[19rem] max-w-[90vw] bg-sidebar flex flex-col transition-transform duration-300",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >

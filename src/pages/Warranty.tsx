@@ -1,35 +1,36 @@
-import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Plus,
-  Search,
-  ShieldCheck,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Eye,
-} from "lucide-react";
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+    CheckCircle,
+    Clock,
+    Eye,
+    Filter,
+    Plus,
+    Search,
+    ShieldCheck,
+    XCircle,
+} from "lucide-react";
+import { useState } from "react";
 
 const claims = [
   {
@@ -220,7 +221,8 @@ const Warranty = () => {
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={t("status")} />
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue placeholder={t("filterByStatus")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("allStatus")}</SelectItem>
@@ -244,7 +246,7 @@ const Warranty = () => {
                 <th>{t("originalRepair")}</th>
                 <th>{t("claimReason")}</th>
                 <th>{t("status")}</th>
-                <th>{t("actions")}</th>
+                <th>{t("report")}</th>
               </tr>
             </thead>
             <tbody>

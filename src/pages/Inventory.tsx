@@ -1,27 +1,17 @@
-import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Plus, Search, Package, AlertTriangle, Edit, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
+import { AlertTriangle, Edit, Filter, Package, Search, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 const parts = [
   {
@@ -121,7 +111,6 @@ const Inventory = () => {
   const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const categories = language === "th" ? categoriesTh : categoriesEn;
 
@@ -144,72 +133,9 @@ const Inventory = () => {
   return (
     <MainLayout>
       <div className="page-header">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="page-title">{t("sparePartsInventory")}</h1>
-            <p className="page-description">{t("inventoryDescription")}</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                {t("addNewPart")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>{t("addNewSparePart")}</DialogTitle>
-                <DialogDescription>{t("enterPartDetails")}</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="partName">{t("partName")}</Label>
-                  <Input id="partName" placeholder="e.g., iPhone 14 Screen" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">{t("category")}</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("selectCategory")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.slice(1).map((cat) => (
-                        <SelectItem key={cat} value={cat.toLowerCase()}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="stock">{t("initialStock")}</Label>
-                    <Input id="stock" type="number" placeholder="0" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="minStock">{t("minStockLevel")}</Label>
-                    <Input id="minStock" type="number" placeholder="5" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="cost">{t("costPrice")} (฿)</Label>
-                    <Input id="cost" type="number" placeholder="0" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="sellPrice">{t("sellPrice")} (฿)</Label>
-                    <Input id="sellPrice" type="number" placeholder="0" />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  {t("cancel")}
-                </Button>
-                <Button onClick={() => setIsDialogOpen(false)}>{t("addPart")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <div>
+          <h1 className="page-title">{t("sparePartsInventory")}</h1>
+          <p className="page-description">{t("inventoryDescription")}</p>
         </div>
       </div>
 
@@ -265,6 +191,7 @@ const Inventory = () => {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[180px]">
+            <Filter className="w-4 h-4 mr-2" />
             <SelectValue placeholder={t("category")} />
           </SelectTrigger>
           <SelectContent>
@@ -277,8 +204,10 @@ const Inventory = () => {
         </Select>
       </div>
 
-      {/* Parts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Parts Grid - ห่อด้วย card เดียวเหมือนหน้างานซ่อม */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredParts.map((part) => {
           const isLowStock = part.stock <= part.minStock;
           return (
@@ -336,6 +265,8 @@ const Inventory = () => {
             </div>
           );
         })}
+          </div>
+        </div>
       </div>
     </MainLayout>
   );
