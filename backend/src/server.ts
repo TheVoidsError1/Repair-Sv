@@ -3,6 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeDatabase, closeDatabase, AppDataSource } from './config/data-source.js';
+import authRoutes from './routes/auth.routes.js';
+import personnelRoutes from './routes/personnel.routes.js';
+import customerRoutes from './routes/customer.routes.js';
+import repairRoutes from './routes/repair.routes.js';
+import partRoutes from './routes/part.routes.js';
 
 dotenv.config();
 
@@ -10,7 +15,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -60,6 +68,13 @@ app.get('/api/db/query', async (req, res) => {
     });
   }
 });
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/personnel', personnelRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/repairs', repairRoutes);
+app.use('/api/parts', partRoutes);
 
 // Start server
 const startServer = async () => {

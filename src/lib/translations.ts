@@ -244,6 +244,13 @@ export const translations = {
     addExtraLayerSecurity: "Add an extra layer of security to your account",
     enable2FA: "Enable 2FA",
 
+    // Login
+    loginTitle: "Welcome Back",
+    loginSubtitle: "Sign in to your account to continue",
+    rememberMe: "Remember me",
+    forgotPassword: "Forgot password?",
+    loginButton: "Sign In",
+
     // Sidebar
     management: "Management",
     collapse: "Collapse",
@@ -492,6 +499,13 @@ export const translations = {
     twoFactorAuth: "การยืนยันตัวตนสองขั้นตอน",
     addExtraLayerSecurity: "เพิ่มความปลอดภัยอีกชั้นให้กับบัญชีของคุณ",
     enable2FA: "เปิดใช้งาน 2FA",
+
+    // Login
+    loginTitle: "ยินดีต้อนรับกลับมา",
+    loginSubtitle: "เข้าสู่ระบบเพื่อดำเนินการต่อ",
+    rememberMe: "จดจำฉัน",
+    forgotPassword: "ลืมรหัสผ่าน?",
+    loginButton: "เข้าสู่ระบบ",
 
     // Sidebar
     management: "ระบบจัดการ",

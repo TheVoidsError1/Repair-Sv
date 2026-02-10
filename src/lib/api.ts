@@ -1,0 +1,188 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+
+export interface ApiResponse<T> {
+  status: 'success' | 'error';
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+class ApiClient {
+  private baseURL: string;
+
+  constructor(baseURL: string) {
+    this.baseURL = baseURL;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseURL}${endpoint}`;
+    const token = localStorage.getItem('authToken');
+
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          status: 'error',
+          message: data.message || 'An error occurred',
+          error: data.error,
+        };
+      }
+
+      return {
+        status: 'success',
+        data: data.data || data,
+        message: data.message,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Network error',
+      };
+    }
+  }
+
+  // Authentication
+  async login(email: string, password: string) {
+    return this.request<{ token: string; user: any }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }
+
+  // Personnel (Staff/Technician)
+  async getPersonnel() {
+    return this.request<any[]>('/api/personnel');
+  }
+
+  async getPersonnelById(id: string) {
+    return this.request<any>(`/api/personnel/${id}`);
+  }
+
+  async createPersonnel(data: any) {
+    return this.request<any>('/api/personnel', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePersonnel(id: string, data: any) {
+    return this.request<any>(`/api/personnel/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePersonnel(id: string) {
+    return this.request<void>(`/api/personnel/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Customer
+  async getCustomers() {
+    return this.request<any[]>('/api/customers');
+  }
+
+  async getCustomerById(id: string) {
+    return this.request<any>(`/api/customers/${id}`);
+  }
+
+  async createCustomer(data: any) {
+    return this.request<any>('/api/customers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCustomer(id: string, data: any) {
+    return this.request<any>(`/api/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCustomer(id: string) {
+    return this.request<void>(`/api/customers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Repair
+  async getRepairs() {
+    return this.request<any[]>('/api/repairs');
+  }
+
+  async getRepairById(id: string) {
+    return this.request<any>(`/api/repairs/${id}`);
+  }
+
+  async createRepair(data: any) {
+    return this.request<any>('/api/repairs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateRepair(id: string, data: any) {
+    return this.request<any>(`/api/repairs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRepair(id: string) {
+    return this.request<void>(`/api/repairs/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Part (Inventory)
+  async getParts() {
+    return this.request<any[]>('/api/parts');
+  }
+
+  async getPartById(id: string) {
+    return this.request<any>(`/api/parts/${id}`);
+  }
+
+  async createPart(data: any) {
+    return this.request<any>('/api/parts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePart(id: string, data: any) {
+    return this.request<any>(`/api/parts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePart(id: string) {
+    return this.request<void>(`/api/parts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+}
+
+export const apiClient = new ApiClient(API_BASE_URL);
