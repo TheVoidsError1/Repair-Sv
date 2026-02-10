@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RepairsProvider } from "@/contexts/RepairsContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Repairs from "./pages/Repairs";
 import RepairNew from "./pages/RepairNew";
@@ -28,20 +28,21 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <RepairsProvider>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/repairs" element={<Repairs />} />
-            <Route path="/repairs/new" element={<RepairNew />} />
-            <Route path="/repairs/bill" element={<RepairBill />} />
-            <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
-            <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/warranty" element={<Warranty />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/repairs" element={<Repairs />} />
+              <Route path="/repairs/new" element={<RepairNew />} />
+              <Route path="/repairs/bill" element={<RepairBill />} />
+              <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
+              <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/warranty" element={<Warranty />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </RepairsProvider>
         </BrowserRouter>
       </TooltipProvider>

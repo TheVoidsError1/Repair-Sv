@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
     
     // Load relations
     const repairWithRelations = await repairRepository.findOne({
-      where: { id: savedRepair.id },
+      where: { id: savedRepair[0].id },
       relations: ['customer', 'assignedTo'],
     });
 
@@ -163,3 +163,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+

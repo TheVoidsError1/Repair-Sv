@@ -36,7 +36,7 @@ const Login = () => {
             : `Welcome ${response.data.user.firstName} ${response.data.user.lastName}`,
         });
 
-        navigate("/");
+        navigate("/dashboard");
       } else {
         toast({
           title: language === "th" ? "เข้าสู่ระบบล้มเหลว" : "Login failed",

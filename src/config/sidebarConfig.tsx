@@ -51,7 +51,7 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
     id: "dashboard",
     titleTh: "แดชบอร์ด",
     titleEn: "Dashboard",
-    basePath: "/",
+    basePath: "/dashboard",
     icon: LayoutDashboard,
     iconBg: "bg-violet-500/20 text-violet-400",
     sections: [
@@ -62,7 +62,7 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
         items: [
           {
             id: "overview",
-            href: "/",
+            href: "/dashboard",
             labelTh: "ภาพรวม",
             labelEn: "Overview",
             icon: BarChart3,
