@@ -5,17 +5,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { RepairOrderData, ServiceType } from "./RepairBill";
 
 /** อ่าน type จาก URL: in-store → walk_in, leave-device → drop_off */
 function getServiceTypeFromSearchParams(searchParams: URLSearchParams): ServiceType {
@@ -140,7 +140,8 @@ const RepairNew = () => {
       receive_time: receiveTime,
     };
     setFormData(initialFormData);
-    navigate("/repairs/bill", { state: orderData });
+    // หลังสร้างคำสั่ง ให้ไปหน้าใบแจ้งซ่อมโดยตรง
+    navigate("/repairs/bill/order", { state: orderData });
   };
 
   return (

@@ -12,6 +12,8 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import RepairBill from "./pages/RepairBill";
 import RepairNew from "./pages/RepairNew";
+import RepairOrderBill from "./pages/RepairOrderBill";
+import RepairReceipt from "./pages/RepairReceipt";
 import Repairs from "./pages/Repairs";
 import Settings from "./pages/Settings";
 import Warranty from "./pages/Warranty";
@@ -33,6 +35,8 @@ const App = () => (
             <Route path="/repairs" element={<Repairs />} />
             <Route path="/repairs/new" element={<RepairNew />} />
             <Route path="/repairs/bill" element={<RepairBill />} />
+            <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
+            <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/warranty" element={<Warranty />} />
             <Route path="/finance" element={<Finance />} />

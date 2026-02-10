@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Store,
   Wrench,
-  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -107,14 +106,6 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelTh: "สถานะงานซ่อม",
             labelEn: "Repair status",
             icon: List,
-          },
-          {
-            id: "cancelled",
-            href: "/repairs?status=cancelled",
-            labelTh: "ข้อมูลงานซ่อมที่ยกเลิก",
-            labelEn: "Cancelled repairs",
-            icon: XCircle,
-            matchQuery: { status: "cancelled" },
           },
           {
             id: "bill",

@@ -229,13 +229,21 @@
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 12mm;
+    size: A4 landscape;
+    margin: 6mm;
   }
 
   /* เอา margin เริ่มต้นของ body ออก ให้ใช้ margin จาก @page แทน */
   body {
     margin: 0;
+  }
+
+  /* Vite template default (#root) ทำให้โดนจัดกลาง/มี padding เยอะ — ต้องตัดออกตอนพิมพ์ */
+  #root {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: initial !important;
   }
 
   /* ตัด padding ของ content หลักออกเวลา print */
@@ -245,6 +253,7 @@
 
   /* ให้หน้าบิลกว้างเต็มพื้นที่พิมพ์ แต่ยังเหลือขอบซ้าย-ขวาจาก @page */
   .repair-bill-page {
+    width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -275,6 +284,60 @@
     flex-direction: column;
     justify-content: space-between;
     font-size: 11px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* container สำหรับใบแจ้งซ่อม 2 ใบให้กว้างเต็มหน้ากระดาษเวลา print */
+  .repair-bill-two-col {
+    /* ช่องว่างกลางตั้งค่าเป็น 0 เพื่อให้เส้นกลางติดกับขอบบิลทั้งสองฝั่ง */
+    --bill-gap: 0mm;
+    width: 100%;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-top: 0;
+    margin-bottom: 0;
+    /* กันขอบบน/ล่างของแต่ละใบไม่ให้ชนขอบกระดาษ */
+    padding: 2mm 0 !important;
+    gap: var(--bill-gap) !important;
+    height: calc(100% - 4mm);
+    align-items: stretch;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  /* บังคับคอลัมน์ซ้าย/ขวาให้กว้างเท่ากัน (ตัว wrapper ที่ครอบ BillContent) */
+  .repair-bill-two-col > div {
+    flex: 0 0 calc((100% - var(--bill-gap)) / 2) !important;
+    max-width: calc((100% - var(--bill-gap)) / 2) !important;
+    min-width: 0 !important;
+  }
+
+  /* ปรับขนาดแต่ละบิลให้พอดีกับขอบกระดาษ (ซ้าย/ขวา) */
+  .repair-bill-two-col .repair-bill-single {
+    width: 100% !important;
+    height: 100% !important;
+    /* padding เล็กน้อยด้านใน เพื่อให้ขอบบน/ล่างไม่เกินกระดาษ */
+    padding: 2mm !important;
+    border-width: 2px !important;
+  }
+
+  /* เส้นแบ่งกลางระหว่างใบซ้าย/ขวา (เฉพาะตอนพิมพ์) */
+  .repair-bill-two-col::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    border-left: 1px dashed #999;
+    pointer-events: none;
+  }
+
+  /* เพิ่มระยะห่างแนวตั้งให้เต็มกระดาษขึ้น (เฉพาะโหมดพิมพ์) */
+  .repair-bill-two-col .repair-bill-fields {
+    line-height: 1.35;
   }
 
   .repair-bill-cut-line {
