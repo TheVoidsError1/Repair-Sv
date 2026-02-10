@@ -197,8 +197,8 @@ const Repairs = () => {
                           }
                         >
                           {repair.tag === "endOfDay"
-                            ? t("endOfDay")
-                            : t("leaveDevice")}
+                            ? t("addQuickData")
+                            : t("addRepairData")}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-xs">–</span>
@@ -346,8 +346,8 @@ const Repairs = () => {
                       }
                     >
                       {selectedRepair.tag === "endOfDay"
-                        ? t("endOfDay")
-                        : t("leaveDevice")}
+                        ? t("addQuickData")
+                        : t("addRepairData")}
                     </span>
                   </div>
                 )}

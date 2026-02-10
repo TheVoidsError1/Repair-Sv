@@ -9,19 +9,45 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { RepairOrderData } from "./RepairBill";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import type { RepairOrderData, ServiceType } from "./RepairBill";
+
+/** อ่าน type จาก URL: in-store → walk_in, leave-device → drop_off */
+function getServiceTypeFromSearchParams(searchParams: URLSearchParams): ServiceType {
+  const type = searchParams.get("type");
+  if (type === "leave-device") return "drop_off";
+  return "walk_in"; // in-store หรือไม่มี = รับหน้าร้าน
+}
+
+function getTodayIsoDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+}
+
+/** ปัดเวลา HH:mm ให้เหลือเฉพาะนาที 00 หรือ 30 */
+function roundTimeTo30Min(timeStr: string): string {
+  const m = timeStr.trim().match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!m) return "09:00";
+  let h = parseInt(m[1], 10);
+  let min = parseInt(m[2], 10);
+  if (h > 23 || min > 59) return "09:00";
+  if (min < 15) min = 0;
+  else if (min < 45) min = 30;
+  else {
+    h += 1;
+    min = 0;
+    if (h >= 24) {
+      h = 23;
+      min = 30;
+    }
+  }
+  return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+}
 
 const initialFormData = {
   customer: "",
@@ -38,58 +64,41 @@ const initialFormData = {
   scheduledPickupTime: "",
 };
 
-const pickupHourOptions = (() => {
-  const options: { value: string; hour: number }[] = [];
-  for (let h = 1; h <= 23; h++) {
-    options.push({ value: `${h.toString().padStart(2, "0")}:00`, hour: h });
-  }
-  options.push({ value: "23:59", hour: 24 });
-  return options;
-})();
-
 const RepairNew = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState(initialFormData);
 
-  const scheduledPickupDate = formData.scheduledPickupTime
+  /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
+  const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
+
+  /** เวลารับเครื่อง (HH:mm) ใช้ทั้ง walk_in และ drop_off — นาทีเฉพาะ 00 หรือ 30 */
+  const [receiveTime, setReceiveTime] = useState(() =>
+    roundTimeTo30Min(
+      `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
+    )
+  );
+  /** วันมารับเครื่อง (YYYY-MM-DD) ใช้เฉพาะ drop_off */
+  const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
+
+  const receiveDateAsDate = receiveDate
     ? (() => {
-        const d = new Date(formData.scheduledPickupTime);
-        return isNaN(d.getTime()) ? undefined : d;
+        const [y, m, d] = receiveDate.split("-").map((n) => parseInt(n, 10));
+        if (!y || !m || !d) return undefined;
+        const dt = new Date(y, m - 1, d);
+        return isNaN(dt.getTime()) ? undefined : dt;
       })()
     : undefined;
-  const scheduledPickupTimeSlot = formData.scheduledPickupTime
-    ? formData.scheduledPickupTime.slice(11, 16)
-    : "";
-
-  const setScheduledPickupDate = (date: Date | undefined) => {
-    const dateStr = date
-      ? `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`
-      : "";
-    const timePart = scheduledPickupTimeSlot || "09:00";
-    setFormData((prev) => ({
-      ...prev,
-      scheduledPickupTime: dateStr ? `${dateStr}T${timePart}` : "",
-    }));
-  };
-
-  const setScheduledPickupHour = (timeValue: string) => {
-    const useSlot = timeValue || "09:00";
-    const datePart = scheduledPickupDate
-      ? `${scheduledPickupDate.getFullYear()}-${(scheduledPickupDate.getMonth() + 1).toString().padStart(2, "0")}-${scheduledPickupDate.getDate().toString().padStart(2, "0")}`
-      : new Date().toISOString().slice(0, 10);
-    setFormData((prev) => ({
-      ...prev,
-      scheduledPickupTime: `${datePart}T${useSlot}`,
-    }));
-  };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  /** ตั้งวันที่และเวลาแจ้งซ่อม = ช่วงที่กดเข้ามาสร้างใบแจ้งซ่อม (โหลดหน้านี้) — เรียกครั้งเดียวตอนเปิดหน้า */
   const setReportDateTimeOnOpen = () => {
     const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     setFormData((prev) => ({
       ...prev,
       dateOfReport: now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
@@ -97,7 +106,7 @@ const RepairNew = () => {
         month: "2-digit",
         year: "numeric",
       }),
-      timeOfReport: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
+      timeOfReport: roundTimeTo30Min(timeStr),
     }));
   };
 
@@ -112,11 +121,23 @@ const RepairNew = () => {
       month: "2-digit",
       year: "numeric",
     });
+    const todayIso = getTodayIsoDate();
+    const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
+    const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
+      ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
+      : "09:00";
+    const scheduledPickupTimeIso = dateForPickup && receiveTime
+      ? `${dateForPickup}T${timePart}:00`
+      : undefined;
+    const pickupDate = scheduledPickupTimeIso ? new Date(scheduledPickupTimeIso) : null;
     const orderData: RepairOrderData = {
       ...formData,
       dateOfReport: formData.dateOfReport || defaultDate,
       timeOfReport: formData.timeOfReport || undefined,
-      scheduledPickupTime: formData.scheduledPickupTime || undefined,
+      scheduledPickupTime: pickupDate && !isNaN(pickupDate.getTime()) ? pickupDate.toISOString() : undefined,
+      service_type: serviceType,
+      receive_date: dateForPickup,
+      receive_time: receiveTime,
     };
     setFormData(initialFormData);
     navigate("/repairs/bill", { state: orderData });
@@ -210,71 +231,69 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
                 />
               </div>
-              <div className="grid gap-2 sm:col-span-2">
-                <Label>{t("selectScheduledPickupTime")}</Label>
-                <div className="flex flex-nowrap items-stretch rounded-lg border border-input bg-background overflow-hidden shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="h-10 flex-1 min-w-0 rounded-none border-0 border-r border-input bg-transparent gap-2 font-normal hover:bg-muted/50"
-                      >
-                        <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm">
-                          {scheduledPickupDate
-                            ? scheduledPickupDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-                                day: "2-digit",
+              {/* รูปแบบการรับบริการ: รับหน้าร้าน = เลือกเฉพาะเวลา, ทิ้งเครื่องไว้ = เลือกวัน+เวลา */}
+              {serviceType === "walk_in" && (
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="receive_time">{t("receiveTimeLabel")}</Label>
+                  <Time30Select
+                    id="receive_time"
+                    value={receiveTime}
+                    onChange={(v) => setReceiveTime(roundTimeTo30Min(v))}
+                    className="max-w-[140px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {language === "th" ? "วันที่ใช้วันปัจจุบันอัตโนมัติ (รับซ่อมหน้าร้าน)" : "Date is set to today (walk-in)."}
+                  </p>
+                </div>
+              )}
+              {serviceType === "drop_off" && (
+                <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
+                  <div className="grid gap-2">
+                    <Label>{t("pickupDateLabel")}</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {receiveDateAsDate
+                            ? receiveDateAsDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+                                day: "numeric",
                                 month: "short",
                                 year: "numeric",
                               })
                             : t("pickUpDate")}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={scheduledPickupDate}
-                        onSelect={(d) => setScheduledPickupDate(d ?? undefined)}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Select
-                    value={scheduledPickupTimeSlot || "__none__"}
-                    onValueChange={(v) => setScheduledPickupHour(v === "__none__" ? "" : v)}
-                  >
-                    <SelectTrigger className="h-10 flex-1 min-w-0 rounded-none border-0 border-l border-input bg-transparent focus:ring-0 focus:ring-offset-0 [&>span]:text-sm">
-                      <SelectValue placeholder={t("selectHours")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pickupHourOptions.map(({ value, hour }) => (
-                        <SelectItem key={value} value={value}>
-                          {hour} {t("hoursUnit")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.scheduledPickupTime && (
-                  <p className="text-xs font-medium text-foreground rounded bg-muted/50 px-2.5 py-1.5 border border-border/50 truncate">
-                    {t("pickupSummary")}:{" "}
-                    {scheduledPickupDate?.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}{" "}
-                    {scheduledPickupTimeSlot
-                      ? (() => {
-                          const h = scheduledPickupTimeSlot === "23:59" ? 24 : parseInt(scheduledPickupTimeSlot.slice(0, 2), 10);
-                          return `${h} ${t("hoursUnit")}`;
-                        })()
-                      : "—"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={receiveDateAsDate}
+                          onSelect={(d) => {
+                            if (d) setReceiveDate(`${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`);
+                          }}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="pickup_time">{t("pickupTimeLabel")}</Label>
+                    <Time30Select
+                      id="pickup_time"
+                      value={receiveTime}
+                      onChange={(v) => setReceiveTime(roundTimeTo30Min(v))}
+                      className="w-full max-w-[140px]"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {language === "th" ? "ห้ามเลือกวันย้อนหลัง" : "Past dates are not allowed."}
                   </p>
-                )}
-              </div>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="deposit">{t("deposit")}</Label>
                 <Input

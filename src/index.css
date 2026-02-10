@@ -229,10 +229,8 @@
 
 @media print {
   @page {
-    /* พิมพ์แนวนอน */
-    size: A4 landscape;
-    /* เว้นขอบรอบกระดาษให้ดูสวยงาม */
-    margin: 8mm;
+    size: A4 portrait;
+    margin: 12mm;
   }
 
   /* เอา margin เริ่มต้นของ body ออก ให้ใช้ margin จาก @page แทน */
@@ -252,15 +250,17 @@
     padding: 0 !important;
   }
 
-  /* แบ่งซ้าย-ขวา: สำเนาลูกค้า | สำเนาร้าน */
-  .repair-bill-print-wrapper {
-    display: flex !important;
-    flex-direction: row;
-    width: 100%;
+  /* ใบเสร็จรับเงิน: บิลเดียวต่อหน้าเมื่อพิมพ์ */
+  .receipt-print-wrapper {
+    display: block !important;
     max-width: none;
     margin: 0;
-    gap: 6mm;
-    height: calc(210mm - 16mm);
+  }
+
+  .receipt-print-wrapper .receipt-document {
+    width: 100%;
+    max-width: none;
+    box-shadow: none;
   }
 
   .repair-bill-single {
