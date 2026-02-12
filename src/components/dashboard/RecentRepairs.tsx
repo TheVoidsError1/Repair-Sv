@@ -1,55 +1,9 @@
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-const repairs = [
-  {
-    id: "REP-001",
-    customer: "John Doe",
-    device: "iPhone 14 Pro",
-    issue: "Screen Replacement",
-    issueTh: "เปลี่ยนหน้าจอ",
-    status: "in-progress",
-    date: "2024-01-15",
-  },
-  {
-    id: "REP-002",
-    customer: "Jane Smith",
-    device: "Samsung Galaxy S23",
-    issue: "Battery Replacement",
-    issueTh: "เปลี่ยนแบตเตอรี่",
-    status: "pending",
-    date: "2024-01-15",
-  },
-  {
-    id: "REP-003",
-    customer: "Mike Johnson",
-    device: "Google Pixel 7",
-    issue: "Water Damage",
-    issueTh: "เสียหายจากน้ำ",
-    status: "completed",
-    date: "2024-01-14",
-  },
-  {
-    id: "REP-004",
-    customer: "Sarah Williams",
-    device: "iPhone 13",
-    issue: "Back Glass Repair",
-    issueTh: "ซ่อมกระจกหลัง",
-    status: "completed",
-    date: "2024-01-14",
-  },
-  {
-    id: "REP-005",
-    customer: "David Brown",
-    device: "OnePlus 11",
-    issue: "Charging Port",
-    issueTh: "พอร์ตชาร์จ",
-    status: "cancelled",
-    date: "2024-01-13",
-  },
-];
+import { useRepairs } from "@/contexts/RepairsContext";
+import { useMemo } from "react";
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
@@ -60,6 +14,7 @@ const statusStyles: Record<string, string> = {
 
 export function RecentRepairs() {
   const { t, language } = useLanguage();
+  const { repairs, isLoading } = useRepairs();
 
   const statusLabels: Record<string, string> = {
     pending: t("pending"),
@@ -67,6 +22,17 @@ export function RecentRepairs() {
     completed: t("completed"),
     cancelled: t("cancelled"),
   };
+
+  // เรียงลำดับตามวันที่สร้าง (ล่าสุดก่อน) และจำกัด 5 รายการ
+  const recentRepairs = useMemo(() => {
+    return [...repairs]
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA; // เรียงจากใหม่ไปเก่า
+      })
+      .slice(0, 5); // แสดง 5 รายการล่าสุด
+  }, [repairs]);
 
   return (
     <div className="bg-card rounded-xl border border-border animate-fade-in">
@@ -80,32 +46,43 @@ export function RecentRepairs() {
         </Link>
       </div>
       <div className="overflow-x-auto">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>{t("orderId")}</th>
-              <th>{t("customer")}</th>
-              <th>{t("device")}</th>
-              <th>{t("issue")}</th>
-              <th>{t("status")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {repairs.map((repair) => (
-              <tr key={repair.id}>
-                <td className="font-medium text-foreground">{repair.id}</td>
-                <td>{repair.customer}</td>
-                <td>{repair.device}</td>
-                <td>{language === "th" ? repair.issueTh : repair.issue}</td>
-                <td>
-                  <span className={`status-badge ${statusStyles[repair.status]}`}>
-                    {statusLabels[repair.status]}
-                  </span>
-                </td>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">{t("loading") || "กำลังโหลด..."}</span>
+          </div>
+        ) : recentRepairs.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">{t("noData") || "ไม่มีข้อมูล"}</p>
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>{t("orderId")}</th>
+                <th>{t("customer")}</th>
+                <th>{t("device")}</th>
+                <th>{t("issue")}</th>
+                <th>{t("status")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {recentRepairs.map((repair) => (
+                <tr key={repair.id}>
+                  <td className="font-medium text-foreground">{repair.id}</td>
+                  <td>{repair.customer}</td>
+                  <td>{repair.device}</td>
+                  <td>{language === "th" ? repair.issueTh : repair.issue}</td>
+                  <td>
+                    <span className={`status-badge ${statusStyles[repair.status] || "status-pending"}`}>
+                      {statusLabels[repair.status] || repair.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
