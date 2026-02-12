@@ -120,6 +120,23 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Sidebar width CSS variable - default to 16rem for lg screens */
+  :root {
+    --sidebar-width: 16rem;
+  }
+
+  /* Main content margin for sidebar */
+  .main-content-with-sidebar {
+    margin-left: var(--sidebar-width);
+  }
+
+  /* For xl screens, sidebar is 19rem when expanded */
+  @media (min-width: 1280px) {
+    :root {
+      --sidebar-width: 19rem;
+    }
+  }
 }
 
 @layer components {

@@ -11,7 +11,7 @@ import { canAccessSubject } from "@/lib/roleConfig";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 /** หน้าแรก = แดชบอร์ด (ไม่ใช้หน้าเลือกหมวดกับการ์ด) */
@@ -62,7 +62,7 @@ const currentSubjectId = getSubjectIdFromPath(location.pathname);
 return (
   <div className="space-y-1">
     {!collapsed && (
-      <p className="px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+      <p className="px-2 lg:px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
         {language === "th" ? "เลือกหมวด" : "Subjects"}
       </p>
     )}
@@ -77,7 +77,7 @@ return (
           to={subject.basePath}
           onClick={() => setMobileOpen(false)}
           className={cn(
-            "sidebar-link flex items-center gap-3 rounded-lg border-l-2 -ml-px",
+            "sidebar-link flex items-center gap-2 lg:gap-3 rounded-lg border-l-2 -ml-px",
             isActive ? "active border-sidebar-primary text-sidebar-primary" : "border-transparent"
           )}
         >
@@ -132,7 +132,7 @@ return (
     <button
       onClick={handleBack}
       className={cn(
-        "sidebar-link flex items-center gap-3 rounded-lg text-sidebar-muted hover:text-sidebar-foreground w-full"
+        "sidebar-link flex items-center gap-2 lg:gap-3 rounded-lg text-sidebar-muted hover:text-sidebar-foreground w-full"
       )}
     >
       <span className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0">
@@ -147,7 +147,7 @@ return (
 
     {/* ชื่อหมวดปัจจุบัน — ไม่ใช้พื้นหลังแบบกดได้ */}
     {!collapsed && (
-      <div className="flex items-center gap-3 px-3 py-1.5">
+      <div className="flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-1.5">
         <span className={cn("flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0", subject.iconBg)}>
           <subject.icon className="w-4 h-4" />
         </span>
@@ -159,7 +159,7 @@ return (
     {subject.sections.map((section) => (
       <div key={section.id} className="space-y-1">
         {!collapsed && (
-          <p className="px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+          <p className="px-2 lg:px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
             {language === "th" ? section.labelTh : section.labelEn}
           </p>
         )}
@@ -173,7 +173,7 @@ return (
                 to={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 py-2 px-3 rounded-lg text-sm transition-colors -ml-px border-l-2",
+                  "flex items-center gap-2 lg:gap-3 py-2 px-2 lg:px-3 rounded-lg text-sm transition-colors -ml-px border-l-2",
                   "text-sidebar-foreground/90 hover:text-sidebar-foreground",
                   active
                     ? "border-sidebar-primary text-sidebar-primary font-medium"
@@ -223,28 +223,47 @@ const subjectsMode = isSubjectsMode(location.pathname);
 const currentSubjectId = getSubjectIdFromPath(location.pathname);
 const currentSubject = currentSubjectId ? SUBJECTS_CONFIG[currentSubjectId] : null;
 
+// Set CSS variable for sidebar width
+useEffect(() => {
+  const root = document.documentElement;
+  if (collapsed) {
+    root.style.setProperty('--sidebar-width', '5rem');
+  } else {
+    // Check screen size and set appropriate width
+    const isXl = window.matchMedia('(min-width: 1280px)').matches;
+    root.style.setProperty('--sidebar-width', isXl ? '19rem' : '16rem');
+    
+    // Update on resize
+    const handleResize = () => {
+      if (!collapsed) {
+        const isXlNow = window.matchMedia('(min-width: 1280px)').matches;
+        root.style.setProperty('--sidebar-width', isXlNow ? '19rem' : '16rem');
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }
+}, [collapsed]);
+
 const SidebarContent = () => (
   <>
-    {/* Logo — คลิกกลับหน้าเลือกหมวด */}
-    <Link
-      to={SUBJECTS_PATH}
-      onClick={() => setMobileOpen(false)}
-      className="shrink-0 flex items-center gap-3 px-4 py-6 border-b border-sidebar-border transition-colors"
-    >
-      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-sidebar-primary">
+    {/* Logo */}
+    <div className="shrink-0 flex items-center gap-3 px-3 lg:px-4 py-5 lg:py-6 border-b border-sidebar-border">
+      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-sidebar-primary flex-shrink-0">
         <Smartphone className="w-5 h-5 text-sidebar-primary-foreground" />
       </div>
       {!collapsed && (
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-sidebar-foreground">Macfix service</span>
-          <span className="text-xs text-sidebar-muted">
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm font-semibold text-sidebar-foreground truncate">Macfix service</span>
+          <span className="text-xs text-sidebar-muted truncate">
             {language === "th" ? "ระบบจัดการร้านซ่อม" : "Management"}
           </span>
         </div>
       )}
-    </Link>
+    </div>
 
-    <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4">
+    <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-2 lg:px-3 py-4">
       {subjectsMode ? (
         <SubjectsNav
           language={language}
@@ -273,7 +292,7 @@ const SidebarContent = () => (
     </nav>
 
     {/* Logout */}
-    <div className="shrink-0 p-3 border-t border-sidebar-border">
+    <div className="shrink-0 p-2 lg:p-3 border-t border-sidebar-border">
       <button
         onClick={() => {
           setMobileOpen(false);
@@ -317,8 +336,10 @@ return (
 
     <aside
       className={cn(
-        "hidden lg:flex flex-col flex-shrink-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
-        collapsed ? "w-20" : "w-[19rem] min-w-[19rem]"
+        "hidden lg:flex flex-col fixed inset-y-0 left-0 z-10 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        collapsed 
+          ? "w-20 min-w-[5rem]" 
+          : "w-[19rem] min-w-[19rem] xl:w-[19rem] lg:w-[16rem]"
       )}
     >
       <SidebarContent />
