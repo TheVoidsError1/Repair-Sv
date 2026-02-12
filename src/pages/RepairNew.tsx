@@ -32,8 +32,8 @@ import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
 import { getPartStockStatus, partsList } from "@/lib/partsData";
-import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { cn } from "@/lib/utils";
+import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -190,8 +190,10 @@ const RepairNew = () => {
       service_type: serviceType,
       receive_date: dateForPickup,
       receive_time: receiveTime,
+      selectedPartId: selectedPartId || undefined,
     };
     setFormData(initialFormData);
+    setSelectedPartId("");
     navigate("/repairs/bill/order", { state: orderData });
   };
 
@@ -219,11 +221,18 @@ const RepairNew = () => {
       service_type: serviceType,
       receive_date: dateForPickup,
       receive_time: receiveTime,
+      selectedPartId: selectedPartId || undefined,
     };
     setFormData(initialFormData);
+    setSelectedPartId("");
     setDuplicateSnWarning(false);
     navigate("/repairs/bill/order", { state: orderData });
   };
+
+  const selectedPart = selectedPartId ? partsList.find((p) => p.id === selectedPartId) : null;
+  const selectedPartStockStatus = selectedPart ? getPartStockStatus(selectedPart.stock) : null;
+  const isPartOutOfStock = selectedPart !== null && selectedPart.stock === 0;
+  const canCreateOrder = !isPartOutOfStock;
 
   return (
     <MainLayout>
@@ -332,6 +341,52 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
                 />
               </div>
+
+              {/* ส่วนเลือกอะไหล่ — ต่อจากอาการเสีย */}
+              <div className="grid gap-2 sm:col-span-2 space-y-2">
+                <Label htmlFor="part-select">{t("selectPart")}</Label>
+                <Select value={selectedPartId || undefined} onValueChange={(v) => setSelectedPartId(v || "")}>
+                  <SelectTrigger id="part-select" className="w-full">
+                    <SelectValue placeholder={t("selectPartPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {partsList.map((part) => (
+                      <SelectItem key={part.id} value={part.id}>
+                        {language === "th" ? part.nameTh : part.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPart && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                    <span className="font-medium text-foreground">
+                      {t("partStock")}: {selectedPart.stock.toLocaleString()}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        selectedPartStockStatus === "high" &&
+                          "border-green-500/60 bg-green-500/15 text-green-700 dark:text-green-400",
+                        selectedPartStockStatus === "low" &&
+                          "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
+                        selectedPartStockStatus === "out" &&
+                          "border-destructive/60 bg-destructive/15 text-destructive"
+                      )}
+                    >
+                      {selectedPartStockStatus === "high" && t("stockStatusHigh")}
+                      {selectedPartStockStatus === "low" && t("stockStatusLow")}
+                      {selectedPartStockStatus === "out" && t("outOfStock")}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {t("sellPrice")}: {selectedPart.sellPrice.toLocaleString()} {t("baht")}
+                    </span>
+                  </div>
+                )}
+                {isPartOutOfStock && (
+                  <p className="text-sm text-destructive">{t("outOfStockCannotCreate")}</p>
+                )}
+              </div>
+
               {/* รูปแบบการรับบริการ: รับหน้าร้าน = เลือกเฉพาะเวลา, ทิ้งเครื่องไว้ = เลือกวัน+เวลา */}
               {serviceType === "walk_in" && (
                 <div className="grid gap-2 sm:col-span-2">
@@ -431,7 +486,9 @@ const RepairNew = () => {
             <Button variant="outline" onClick={() => navigate("/repairs")}>
               {t("cancel")}
             </Button>
-            <Button onClick={handleCreateOrder}>{t("createOrder")}</Button>
+            <Button onClick={handleCreateOrder} disabled={!canCreateOrder}>
+              {t("createOrder")}
+            </Button>
           </CardFooter>
         </Card>
 
