@@ -10,6 +10,8 @@ export type RepairTag = "endOfDay" | "leaveDevice";
 
 export interface RepairItem {
   id: string;
+  /** Serial Number / IMEI — ใช้เป็นตัวระบุหลักสำหรับการรับประกัน */
+  serialNumber?: string;
   customer: string;
   phone: string;
   device: string;
@@ -26,6 +28,7 @@ export interface RepairItem {
 const initialRepairs: RepairItem[] = [
   {
     id: "REP-001",
+    serialNumber: "350001234567890",
     customer: "John Doe",
     phone: "081-234-5678",
     device: "iPhone 14 Pro",
@@ -39,6 +42,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-002",
+    serialNumber: "351112345678901",
     customer: "Jane Smith",
     phone: "082-345-6789",
     device: "Samsung Galaxy S23",
@@ -53,6 +57,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-003",
+    serialNumber: "352223456789012",
     customer: "Mike Johnson",
     phone: "083-456-7890",
     device: "Google Pixel 7",
@@ -66,6 +71,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-004",
+    serialNumber: "353334567890123",
     customer: "Sarah Williams",
     phone: "084-567-8901",
     device: "iPhone 13",
@@ -78,6 +84,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-005",
+    serialNumber: "354445678901234",
     customer: "David Brown",
     phone: "085-678-9012",
     device: "OnePlus 11",
@@ -91,6 +98,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-006",
+    serialNumber: "355556789012345",
     customer: "Emily Chen",
     phone: "086-789-0123",
     device: "iPhone 15 Pro Max",
@@ -105,6 +113,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-008",
+    serialNumber: "356667890123456",
     customer: "Robert Taylor",
     phone: "087-890-1234",
     device: "iPhone 12",
@@ -118,6 +127,7 @@ const initialRepairs: RepairItem[] = [
   },
   {
     id: "REP-010",
+    serialNumber: "357778901234567",
     customer: "Lisa Anderson",
     phone: "088-901-2345",
     device: "Samsung Galaxy S22",

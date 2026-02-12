@@ -171,6 +171,12 @@ export const translations = {
     runningLow: "Running Low",
     readyToSell: "Ready to Sell",
     units: "units",
+    selectPart: "Select part",
+    selectPartPlaceholder: "Choose part...",
+    partStock: "Stock",
+    stockStatusHigh: "In stock",
+    stockStatusLow: "Low stock",
+    outOfStockCannotCreate: "Selected part is out of stock. Cannot create order.",
 
     // Warranty
     warrantyClaims: "Warranty Claims",
@@ -184,6 +190,7 @@ export const translations = {
     submitClaim: "Submit Claim",
     searchClaims: "Search claims...",
     claimId: "Claim ID",
+    serialOrImei: "SN / IMEI",
     originalRepair: "Original Repair",
     searchRepairPlaceholder: "Type repair ID or customer name to search...",
     noRepairFound: "No repair found",
@@ -455,6 +462,12 @@ export const translations = {
     runningLow: "ใกล้หมด",
     readyToSell: "พร้อมขาย",
     units: "ชิ้น",
+    selectPart: "เลือกอะไหล่",
+    selectPartPlaceholder: "เลือกอะไหล่...",
+    partStock: "สต็อก",
+    stockStatusHigh: "มีสต็อก",
+    stockStatusLow: "สต็อกต่ำ",
+    outOfStockCannotCreate: "อะไหล่ที่เลือกหมดสต็อก ไม่สามารถสร้างคำสั่งได้",
 
     // Warranty
     warrantyClaims: "เคลมการรับประกัน",
@@ -468,6 +481,7 @@ export const translations = {
     submitClaim: "ยื่นเคลม",
     searchClaims: "ค้นหาเคลม...",
     claimId: "เลขที่เคลม",
+    serialOrImei: "หมายเลขเครื่อง (SN/IMEI)",
     originalRepair: "งานซ่อมเดิม",
     searchRepairPlaceholder: "พิมพ์เลขที่งานซ่อม หรือชื่อลูกค้า เพื่อค้นหา",
     noRepairFound: "ไม่พบงานซ่อม",
