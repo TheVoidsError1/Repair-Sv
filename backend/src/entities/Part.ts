@@ -15,6 +15,9 @@ export class Part {
   name!: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
+  nameTh?: string; // ชื่อภาษาไทย
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
   partNumber?: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
@@ -26,8 +29,11 @@ export class Part {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  costPrice!: number; // ราคาทุน
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  price!: number;
+  price!: number; // ราคาขาย
 
   @Column({ type: 'integer', default: 0 })
   stockQuantity!: number;
@@ -37,6 +43,9 @@ export class Part {
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   category?: string; // 'screen', 'battery', 'camera', etc.
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  categoryTh?: string; // หมวดหมู่ภาษาไทย
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   location?: string; // Warehouse location

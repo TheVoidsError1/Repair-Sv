@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiClient } from "@/lib/api";
 
 /** สถานะตามสต็อก: หมด = 0, ใกล้หมด = 1..minStock, พร้อมขาย = > minStock */
 function getPartStatus(stock: number, minStock: number): "out" | "low" | "ready" {
@@ -47,99 +48,76 @@ function getPartType(category: string): "screen" | "battery" | "others" {
   return "others";
 }
 
-const initialParts = [
-  {
-    id: "PART-001",
-    name: "iPhone 14 Pro Screen",
-    nameTh: "หน้าจอ iPhone 14 Pro",
-    category: "Screens",
-    categoryTh: "หน้าจอ",
-    stock: 2,
-    minStock: 5,
-    cost: 3500,
-    sellPrice: 4500,
-  },
-  {
-    id: "PART-002",
-    name: "iPhone 14 Battery",
-    nameTh: "แบตเตอรี่ iPhone 14",
-    category: "Batteries",
-    categoryTh: "แบตเตอรี่",
-    stock: 15,
-    minStock: 10,
-    cost: 800,
-    sellPrice: 1200,
-  },
-  {
-    id: "PART-003",
-    name: "Samsung S23 Screen",
-    nameTh: "หน้าจอ Samsung S23",
-    category: "Screens",
-    categoryTh: "หน้าจอ",
-    stock: 5,
-    minStock: 5,
-    cost: 4200,
-    sellPrice: 5500,
-  },
-  {
-    id: "PART-004",
-    name: "Samsung S23 Battery",
-    nameTh: "แบตเตอรี่ Samsung S23",
-    category: "Batteries",
-    categoryTh: "แบตเตอรี่",
-    stock: 3,
-    minStock: 5,
-    cost: 700,
-    sellPrice: 1100,
-  },
-  {
-    id: "PART-005",
-    name: "USB-C Charging Port",
-    nameTh: "พอร์ตชาร์จ USB-C",
-    category: "Ports",
-    categoryTh: "พอร์ต",
-    stock: 8,
-    minStock: 10,
-    cost: 150,
-    sellPrice: 350,
-  },
-  {
-    id: "PART-006",
-    name: "iPhone 13 Back Glass",
-    nameTh: "กระจกหลัง iPhone 13",
-    category: "Glass",
-    categoryTh: "กระจก",
-    stock: 12,
-    minStock: 8,
-    cost: 600,
-    sellPrice: 950,
-  },
-  {
-    id: "PART-007",
-    name: "Pixel 7 Screen",
-    nameTh: "หน้าจอ Pixel 7",
-    category: "Screens",
-    categoryTh: "หน้าจอ",
-    stock: 6,
-    minStock: 5,
-    cost: 3200,
-    sellPrice: 4200,
-  },
-  {
-    id: "PART-008",
-    name: "Lightning Charging Port",
-    nameTh: "พอร์ตชาร์จ Lightning",
-    category: "Ports",
-    categoryTh: "พอร์ต",
-    stock: 20,
-    minStock: 15,
-    cost: 180,
-    sellPrice: 400,
-  },
-];
-
 const categoriesEn = ["All", "Screens", "Batteries", "Ports", "Glass"];
 const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบตเตอรี่", "พอร์ต", "กระจก"];
+
+// Type for Part from API (backend format)
+interface PartFromAPI {
+  id: string; // UUID from backend
+  name: string;
+  nameTh?: string;
+  partNumber?: string;
+  costPrice: number;
+  price: number;
+  stockQuantity: number;
+  minStockLevel: number;
+  category?: string;
+  categoryTh?: string;
+  [key: string]: any;
+}
+
+// Type for Part in frontend (frontend format)
+interface PartFrontend {
+  id: string; // UUID from backend (for API calls)
+  displayId: string; // partNumber or id for display
+  name: string;
+  nameTh: string;
+  category: string;
+  categoryTh: string;
+  stock: number;
+  minStock: number;
+  cost: number;
+  sellPrice: number;
+}
+
+// Helper function to convert API format to frontend format
+function convertPartFromAPI(part: PartFromAPI): PartFrontend {
+  return {
+    id: part.id, // Keep UUID for API calls
+    displayId: part.partNumber || part.id, // Use partNumber for display
+    name: part.name,
+    nameTh: part.nameTh || part.name,
+    category: part.category || "Others",
+    categoryTh: part.categoryTh || "อื่นๆ",
+    stock: part.stockQuantity,
+    minStock: part.minStockLevel,
+    cost: Number(part.costPrice),
+    sellPrice: Number(part.price),
+  };
+}
+
+// Helper function to convert frontend format to API format
+function convertPartToAPI(part: {
+  name: string;
+  nameTh: string;
+  category: string;
+  categoryTh: string;
+  stock: string | number;
+  minStock: string | number;
+  cost: string | number;
+  sellPrice: string | number;
+}): any {
+  return {
+    name: part.name.trim(),
+    nameTh: part.nameTh.trim(),
+    category: part.category || "Others",
+    categoryTh: part.categoryTh || "อื่นๆ",
+    stockQuantity: Number(part.stock) || 0,
+    minStockLevel: Number(part.minStock) || 10,
+    costPrice: Number(part.cost) || 0,
+    price: Number(part.sellPrice) || 0,
+  };
+}
 
 const Inventory = () => {
   const { t, language } = useLanguage();
@@ -147,7 +125,8 @@ const Inventory = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [parts, setParts] = useState(initialParts);
+  const [parts, setParts] = useState<PartFrontend[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "screen" | "battery" | "others">("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -165,6 +144,37 @@ const Inventory = () => {
     sellPrice: "",
   });
 
+  // Load parts from API
+  useEffect(() => {
+    const loadParts = async () => {
+      setIsLoading(true);
+      try {
+        const response = await apiClient.getParts();
+        if (response.status === "success" && response.data) {
+          const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
+          setParts(convertedParts);
+        } else {
+          toast({
+            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+            description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts"),
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error loading parts:", error);
+        toast({
+          title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+          description: language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadParts();
+  }, []);
+
   const filteredParts = parts.filter((part) => {
     const search = searchQuery.toLowerCase();
     const searchName = (language === "th" ? part.nameTh : part.name).toLowerCase();
@@ -172,7 +182,7 @@ const Inventory = () => {
     const matchesSearch =
       !search ||
       searchName.includes(search) ||
-      part.id.toLowerCase().includes(search) ||
+      part.displayId.toLowerCase().includes(search) ||
       searchCategory.includes(search);
 
     const partType = getPartType(part.category);
@@ -206,7 +216,7 @@ const Inventory = () => {
     }
   }, [searchParams]);
 
-  const openEditDialog = (part: (typeof parts)[0]) => {
+  const openEditDialog = (part: PartFrontend) => {
     setEditingPartId(part.id);
     setNewPart({
       name: part.name,
@@ -256,7 +266,7 @@ const Inventory = () => {
     handleNewPartChange("categoryTh", catTh);
   };
 
-  const handleSavePart = () => {
+  const handleSavePart = async () => {
     if (!newPart.name.trim() || !newPart.nameTh.trim()) {
       toast({
         title: language === "th" ? "กรุณากรอกชื่อสินค้า" : "Please enter part name",
@@ -264,63 +274,81 @@ const Inventory = () => {
       return;
     }
 
-    const stock = Number(newPart.stock) || 0;
-    const minStock = Number(newPart.minStock) || 0;
-    const cost = Number(newPart.cost) || 0;
-    const sellPrice = Number(newPart.sellPrice) || 0;
-    const categoryValue = newPart.category || "Others";
-    const categoryThValue = newPart.categoryTh || "อื่นๆ";
+    const partData = convertPartToAPI(newPart);
 
-    if (editingPartId) {
-      setParts((prev) =>
-        prev.map((p) =>
-          p.id === editingPartId
-            ? {
-                ...p,
-                name: newPart.name.trim(),
-                nameTh: newPart.nameTh.trim(),
-                category: categoryValue,
-                categoryTh: categoryThValue,
-                stock,
-                minStock,
-                cost,
-                sellPrice,
-              }
-            : p
-        )
-      );
+    try {
+      if (editingPartId) {
+        // Find the original part to get the backend ID (UUID)
+        const originalPart = parts.find((p) => p.id === editingPartId);
+        if (!originalPart) {
+          toast({
+            title: language === "th" ? "ไม่พบข้อมูล" : "Not found",
+            description: language === "th" ? "ไม่พบข้อมูลอะไหล่ที่ต้องการแก้ไข" : "Part not found",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Use the UUID from backend
+        const backendId = originalPart.id;
+        const response = await apiClient.updatePart(backendId, partData);
+
+        if (response.status === "success" && response.data) {
+          const updatedPart = convertPartFromAPI(response.data as PartFromAPI);
+          setParts((prev) =>
+            prev.map((p) => (p.id === editingPartId ? updatedPart : p))
+          );
+          toast({
+            title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
+            description:
+              language === "th"
+                ? "บันทึกการแก้ไขอะไหล่แล้ว"
+                : "Part has been updated.",
+          });
+          closeFormDialog();
+        } else {
+          toast({
+            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+            description: response.message || (language === "th" ? "ไม่สามารถแก้ไขข้อมูลได้" : "Failed to update part"),
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Generate partNumber if not provided
+        if (!partData.partNumber) {
+          const count = parts.length + 1;
+          partData.partNumber = `PART-${count.toString().padStart(3, "0")}`;
+        }
+
+        const response = await apiClient.createPart(partData);
+
+        if (response.status === "success" && response.data) {
+          const newPartConverted = convertPartFromAPI(response.data as PartFromAPI);
+          setParts((prev) => [newPartConverted, ...prev]);
+          toast({
+            title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
+            description:
+              language === "th"
+                ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
+                : "New part has been added to inventory.",
+          });
+          closeFormDialog();
+        } else {
+          toast({
+            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+            description: response.message || (language === "th" ? "ไม่สามารถเพิ่มข้อมูลได้" : "Failed to create part"),
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error saving part:", error);
       toast({
-        title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
-        description:
-          language === "th"
-            ? "บันทึกการแก้ไขอะไหล่แล้ว"
-            : "Part has been updated.",
-      });
-    } else {
-      const nextIndex = parts.length + 1;
-      const id = `PART-${nextIndex.toString().padStart(3, "0")}`;
-      const created = {
-        id,
-        name: newPart.name.trim(),
-        nameTh: newPart.nameTh.trim(),
-        category: categoryValue,
-        categoryTh: categoryThValue,
-        stock,
-        minStock,
-        cost,
-        sellPrice,
-      };
-      setParts((prev) => [created, ...prev]);
-      toast({
-        title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
-        description:
-          language === "th"
-            ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
-            : "New part has been added to inventory.",
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถบันทึกข้อมูลได้" : "Failed to save part",
+        variant: "destructive",
       });
     }
-
-    closeFormDialog();
   };
 
   const openAddDialog = () => {
@@ -587,81 +615,16 @@ const Inventory = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredParts.map((part) => {
-                const status = getPartStatus(part.stock, part.minStock);
-                const statusLabel =
-                  status === "out"
-                    ? language === "th"
-                      ? "หมด"
-                      : "Out of stock"
-                    : status === "low"
-                      ? language === "th"
-                        ? "ใกล้หมด"
-                        : "Low stock"
-                      : language === "th"
-                        ? "พร้อมขาย"
-                        : "Ready";
-                const statusClass =
-                  status === "out"
-                    ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                    : status === "low"
-                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
-                return (
-                  <tr key={part.id}>
-                    <td className="w-[56px] py-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    </td>
-                    <td className="font-medium text-foreground tabular-nums">{part.id}</td>
-                    <td>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {language === "th" ? part.nameTh : part.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {language === "th" ? part.categoryTh : part.category}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="text-right tabular-nums">฿{part.cost.toLocaleString()}</td>
-                    <td className="text-right tabular-nums">
-                      ฿{part.sellPrice.toLocaleString()}
-                    </td>
-                    <td className="text-right">
-                      <span className="font-medium tabular-nums text-primary">
-                        {part.stock.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="text-right tabular-nums text-muted-foreground">
-                      {part.minStock.toLocaleString()}
-                    </td>
-                    <td>
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                          statusClass
-                        )}
-                      >
-                        {statusLabel}
-                      </span>
-                    </td>
-                    <td className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label={t("edit")}
-                        onClick={() => openEditDialog(part)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredParts.length === 0 && (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="py-12 text-center text-sm text-muted-foreground"
+                  >
+                    {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
+                  </td>
+                </tr>
+              ) : filteredParts.length === 0 ? (
                 <tr>
                   <td
                     colSpan={9}
@@ -670,6 +633,81 @@ const Inventory = () => {
                     {language === "th" ? "ไม่พบรายการอะไหล่" : "No parts found."}
                   </td>
                 </tr>
+              ) : (
+                filteredParts.map((part) => {
+                  const status = getPartStatus(part.stock, part.minStock);
+                  const statusLabel =
+                    status === "out"
+                      ? language === "th"
+                        ? "หมด"
+                        : "Out of stock"
+                      : status === "low"
+                        ? language === "th"
+                          ? "ใกล้หมด"
+                          : "Low stock"
+                        : language === "th"
+                          ? "พร้อมขาย"
+                          : "Ready";
+                  const statusClass =
+                    status === "out"
+                      ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                      : status === "low"
+                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                  return (
+                    <tr key={part.id}>
+                      <td className="w-[56px] py-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      </td>
+                      <td className="font-medium text-foreground tabular-nums">{part.displayId}</td>
+                      <td>
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {language === "th" ? part.nameTh : part.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {language === "th" ? part.categoryTh : part.category}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="text-right tabular-nums">฿{part.cost.toLocaleString()}</td>
+                      <td className="text-right tabular-nums">
+                        ฿{part.sellPrice.toLocaleString()}
+                      </td>
+                      <td className="text-right">
+                        <span className="font-medium tabular-nums text-primary">
+                          {part.stock.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="text-right tabular-nums text-muted-foreground">
+                        {part.minStock.toLocaleString()}
+                      </td>
+                      <td>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                            statusClass
+                          )}
+                        >
+                          {statusLabel}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={t("edit")}
+                          onClick={() => openEditDialog(part)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
