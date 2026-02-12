@@ -1,14 +1,5 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,58 +11,20 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { cn } from "@/lib/utils";
 import {
     Bell,
-    Edit,
     Globe,
     Lock,
-    Plus,
     Shield,
-    Trash2,
-    UserCircle,
-    Users,
 } from "lucide-react";
 import { useState } from "react";
-
-const users = [
-  {
-    id: 1,
-    name: "Admin User",
-    email: "admin@repairpro.com",
-    role: "owner",
-    status: "active",
-    lastLogin: "2024-01-15 09:30",
-  },
-  {
-    id: 2,
-    name: "Tom Technician",
-    email: "tom@repairpro.com",
-    role: "staff",
-    status: "active",
-    lastLogin: "2024-01-15 08:45",
-  },
-  {
-    id: 3,
-    name: "Anna Support",
-    email: "anna@repairpro.com",
-    role: "staff",
-    status: "active",
-    lastLogin: "2024-01-14 17:00",
-  },
-  {
-    id: 4,
-    name: "Mike Manager",
-    email: "mike@repairpro.com",
-    role: "staff",
-    status: "inactive",
-    lastLogin: "2024-01-10 14:20",
-  },
-];
+import { toast } from "sonner";
 
 const Settings = () => {
   const { t, language, setLanguage } = useLanguage();
+  const { currentUser, updateUser } = useAuth();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -79,7 +32,24 @@ const Settings = () => {
     newRepair: true,
     warrantyExpiry: false,
   });
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const handleUpdatePassword = () => {
+    if (!currentUser) return;
+    if (!newPassword || newPassword.length < 4) {
+      toast.error(language === "th" ? "รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร" : "New password must be at least 4 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
+      return;
+    }
+    updateUser(currentUser.id, { password: newPassword });
+    setNewPassword("");
+    setConfirmPassword("");
+    toast.success(language === "th" ? "เปลี่ยนรหัสผ่านแล้ว" : "Password updated");
+  };
 
   return (
     <MainLayout>
@@ -92,12 +62,8 @@ const Settings = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
-          <TabsTrigger value="users" className="gap-2">
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">{t("users")}</span>
-          </TabsTrigger>
+      <Tabs defaultValue="language" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
           <TabsTrigger value="language" className="gap-2">
             <Globe className="w-4 h-4" />
             <span className="hidden sm:inline">{t("language")}</span>
@@ -111,118 +77,6 @@ const Settings = () => {
             <span className="hidden sm:inline">{t("security")}</span>
           </TabsTrigger>
         </TabsList>
-
-        {/* Users Tab */}
-        <TabsContent value="users" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border">
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">{t("userManagement")}</h3>
-                <p className="text-sm text-muted-foreground">{t("manageStaffAccounts")}</p>
-              </div>
-              <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    {t("addUser")}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{t("addNewUser")}</DialogTitle>
-                    <DialogDescription>{t("createNewStaffAccount")}</DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">{t("fullName")}</Label>
-                      <Input id="name" placeholder={t("enterFullName")} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">{t("email")}</Label>
-                      <Input id="email" type="email" placeholder={t("enterEmail")} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="role">{t("role")}</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("selectRole")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="staff">{t("staff")}</SelectItem>
-                          <SelectItem value="owner">{t("owner")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="password">{t("password")}</Label>
-                      <Input id="password" type="password" placeholder={t("enterPassword")} />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                      {t("cancel")}
-                    </Button>
-                    <Button onClick={() => setIsUserDialogOpen(false)}>
-                      {t("createUser")}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="p-6 space-y-4">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <UserCircle className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground">{user.name}</p>
-                        <span
-                          className={cn(
-                            "status-badge text-xs",
-                            user.role === "owner" ? "status-in-progress" : "status-completed"
-                          )}
-                        >
-                          {user.role === "owner" ? t("owner") : t("staff")}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm text-muted-foreground">{t("lastLogin")}</p>
-                      <p className="text-sm text-foreground">{user.lastLogin}</p>
-                    </div>
-                    <div
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        user.status === "active" ? "bg-status-completed" : "bg-muted-foreground"
-                      )}
-                    />
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
 
         {/* Language Tab */}
         <TabsContent value="language" className="space-y-6">
@@ -330,7 +184,7 @@ const Settings = () => {
           </div>
         </TabsContent>
 
-        {/* Security Tab */}
+        {/* Security Tab — เปลี่ยนรหัสผ่าน (ทั้งพนักงานและเจ้าของ) */}
         <TabsContent value="security" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">
@@ -341,18 +195,26 @@ const Settings = () => {
             </p>
             <div className="space-y-6 max-w-md">
               <div className="grid gap-2">
-                <Label htmlFor="current-password">{t("currentPassword")}</Label>
-                <Input id="current-password" type="password" />
-              </div>
-              <div className="grid gap-2">
                 <Label htmlFor="new-password">{t("newPassword")}</Label>
-                <Input id="new-password" type="password" />
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder={t("newPassword")}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="confirm-password">{t("confirmNewPassword")}</Label>
-                <Input id="confirm-password" type="password" />
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder={t("enterConfirmPassword")}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
               </div>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={handleUpdatePassword}>
                 <Lock className="w-4 h-4" />
                 {t("updatePassword")}
               </Button>

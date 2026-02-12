@@ -1,10 +1,13 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RepairsProvider } from "@/contexts/RepairsContext";
+import { WarrantyProvider } from "@/contexts/WarrantyContext";
+import { canAccessRoute } from "@/lib/roleConfig";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Repairs from "./pages/Repairs";
 import RepairNew from "./pages/RepairNew";
@@ -19,6 +22,28 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+/** ตรวจสิทธิ์ตาม role — พนักงานเข้า path เฉพาะเจ้าของไม่ได้ จะ redirect ไปแดชบอร์ด */
+function RoleProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, currentUser } = useAuth();
+  const location = useLocation();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  const role = currentUser?.role ?? "staff";
+  if (!canAccessRoute(location.pathname, role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

@@ -6,6 +6,8 @@ import {
     type SidebarMenuItem,
     type SidebarSubjectConfig,
 } from "@/config/sidebarConfig";
+import { useAuth } from "@/contexts/AuthContext";
+import { canAccessSubject } from "@/lib/roleConfig";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import {

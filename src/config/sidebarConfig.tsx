@@ -5,10 +5,10 @@ import {
   LayoutDashboard,
   List,
   Package,
-  PlusCircle,
   Settings,
   ShieldCheck,
   Store,
+  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -140,20 +140,6 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
           },
         ],
       },
-      {
-        id: "adding",
-        labelTh: "เพิ่ม",
-        labelEn: "Adding",
-        items: [
-          {
-            id: "add-stock",
-            href: "/inventory?add=1",
-            labelTh: "เพิ่มสินค้า",
-            labelEn: "Add item",
-            icon: PlusCircle,
-          },
-        ],
-      },
     ],
   },
   finance: {
@@ -228,9 +214,33 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
       },
     ],
   },
+  admin: {
+    id: "admin",
+    titleTh: "จัดการระบบ",
+    titleEn: "Admin",
+    basePath: "/admin",
+    icon: Users,
+    iconBg: "bg-amber-500/20 text-amber-400",
+    sections: [
+      {
+        id: "main",
+        labelTh: "หลัก",
+        labelEn: "Main",
+        items: [
+          {
+            id: "users",
+            href: "/admin/users",
+            labelTh: "จัดการผู้ใช้",
+            labelEn: "User management",
+            icon: Users,
+          },
+        ],
+      },
+    ],
+  },
 };
 
-/** ลำดับการแสดงหมวดหลัก (โหมด Subjects) */
+/** ลำดับการแสดงหมวดหลัก (โหมด Subjects) — admin แสดงเฉพาะเจ้าของ */
 export const SUBJECT_ORDER: string[] = [
   "dashboard",
   "repair",
@@ -238,6 +248,7 @@ export const SUBJECT_ORDER: string[] = [
   "finance",
   "warranty",
   "settings",
+  "admin",
 ];
 
 /** จาก pathname หา subject id ปัจจุบัน (หรือ null ถ้าอยู่ /subjects) */

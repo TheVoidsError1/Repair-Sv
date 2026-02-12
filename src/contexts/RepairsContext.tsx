@@ -103,6 +103,32 @@ const initialRepairs: RepairItem[] = [
     estimatedCost: 1500,
     tag: "leaveDevice",
   },
+  {
+    id: "REP-008",
+    customer: "Robert Taylor",
+    phone: "087-890-1234",
+    device: "iPhone 12",
+    issue: "Back Glass Repair",
+    issueTh: "ซ่อมกระจกหลัง",
+    status: "completed",
+    technician: "Tom",
+    createdAt: "2024-01-12",
+    estimatedCost: 2800,
+    tag: "endOfDay",
+  },
+  {
+    id: "REP-010",
+    customer: "Lisa Anderson",
+    phone: "088-901-2345",
+    device: "Samsung Galaxy S22",
+    issue: "Battery Replacement",
+    issueTh: "เปลี่ยนแบตเตอรี่",
+    status: "completed",
+    technician: "Anna",
+    createdAt: "2024-01-13",
+    estimatedCost: 1200,
+    tag: "leaveDevice",
+  },
 ];
 
 interface RepairsContextValue {

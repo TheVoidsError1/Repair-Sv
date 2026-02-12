@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Mail, Lock, Settings2, Smartphone, Wrench } from "lucide-react";
 import { type FormEvent, useState } from "react";
@@ -10,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const { t, language } = useLanguage();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -129,6 +131,12 @@ const Login = () => {
             </h1>
             <p className="mt-2 text-slate-500 text-sm">{t("loginSubtitle")}</p>
           </div>
+
+          {error && (
+            <div className="rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-3">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
