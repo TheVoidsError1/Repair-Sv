@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
+import { cn } from "@/lib/utils";
 import { repairItemToBillData } from "@/types/repairOrder";
 import { ArrowLeft, FileText, Receipt } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const RepairBill = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { repairs } = useRepairs();
+  const highlightRepairId = (location.state as { highlightRepairId?: string } | null)?.highlightRepairId;
 
   const handleIssueReceipt = (item: RepairItem) => {
     const orderData = repairItemToBillData(item, language);
@@ -74,23 +77,28 @@ const RepairBill = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {repairs.map((item) => (
+                    {repairs.map((item) => {
+                      const isHighlight = highlightRepairId === item.id;
+                      return (
                       <tr
                         key={item.id}
-                        className="border-b border-border last:border-0 hover:bg-muted/30"
+                        className={cn(
+                          "border-b border-border last:border-0 hover:bg-muted/30",
+                          isHighlight && "bg-primary/10 border-l-4 border-l-primary"
+                        )}
                       >
-                        <td className="p-3 font-mono text-muted-foreground">{item.id}</td>
+                        <td className={cn("p-3 font-mono", isHighlight ? "text-foreground font-semibold" : "text-muted-foreground")}>{item.id}</td>
                         <td className="p-3">
-                          <div>{item.customer}</div>
+                          <div className={cn(isHighlight && "font-semibold text-foreground")}>{item.customer}</div>
                           {item.phone && (
-                            <div className="text-muted-foreground text-xs mt-0.5">{item.phone}</div>
+                            <div className={cn("text-xs mt-0.5", isHighlight ? "text-foreground/80" : "text-muted-foreground")}>{item.phone}</div>
                           )}
                         </td>
-                        <td className="p-3">{item.device}</td>
-                        <td className="p-3">
+                        <td className={cn("p-3", isHighlight && "font-medium text-foreground")}>{item.device}</td>
+                        <td className={cn("p-3", isHighlight && "font-medium text-foreground")}>
                           {language === "th" ? item.issueTh : item.issue}
                         </td>
-                        <td className="p-3 text-right">
+                        <td className={cn("p-3 text-right", isHighlight && "font-semibold text-foreground")}>
                           ฿{item.estimatedCost.toLocaleString()}
                         </td>
                         <td className="p-3 text-right">
@@ -105,7 +113,7 @@ const RepairBill = () => {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                    ); })}
                   </tbody>
                 </table>
               </div>

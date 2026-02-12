@@ -7,6 +7,8 @@
 export type ServiceType = "walk_in" | "drop_off";
 
 export interface RepairOrderData {
+  /** Serial Number / IMEI (15 digits) — ใช้เป็นตัวระบุหลักสำหรับการรับประกัน */
+  serialNumber?: string;
   customer: string;
   phone: string;
   model: string;
@@ -22,11 +24,14 @@ export interface RepairOrderData {
   service_type?: ServiceType;
   receive_date?: string;
   receive_time?: string;
+  /** รหัสอะไหล่ที่เลือก (จาก parts table) */
+  selectedPartId?: string;
 }
 
 /** รายการซ่อมที่ใช้สร้างข้อมูลบิล (ฟิลด์ที่จำเป็นจาก RepairsContext) */
 export interface RepairItemForBill {
   id: string;
+  serialNumber?: string;
   customer: string;
   phone: string;
   device: string;
@@ -193,6 +198,7 @@ export function repairItemToBillData(item: RepairItemForBill, language: "th" | "
   const now = new Date();
   const rawTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
   return {
+    serialNumber: item.serialNumber,
     customer: item.customer,
     phone: item.phone,
     model: item.device,

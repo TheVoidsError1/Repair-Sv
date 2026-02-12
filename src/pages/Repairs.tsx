@@ -1,4 +1,14 @@
 import { MainLayout } from "@/components/layout/MainLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,10 +29,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
+import { useRepairs, type RepairItem, type RepairTag } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
 import { repairItemToBillData, type RepairOrderData } from "@/types/repairOrder";
-import { Eye, Filter, Search } from "lucide-react";
+import { Eye, FileText, Filter, Pencil, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -261,6 +271,9 @@ const Repairs = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRepair, setSelectedRepair] = useState<RepairItem | null>(null);
   const [detailOrder, setDetailOrder] = useState<RepairOrderData | null>(null);
+  const [isDetailEditing, setIsDetailEditing] = useState(false);
+  const [detailTag, setDetailTag] = useState<RepairTag | "">("");
+  const [deleteRepairConfirm, setDeleteRepairConfirm] = useState<RepairItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editingRepair, setEditingRepair] = useState<RepairItem | null>(null);
   const [editingStatus, setEditingStatus] = useState<
@@ -321,11 +334,76 @@ const Repairs = () => {
     return matchesSearch && matchesStatus && matchesTag;
   });
 
+  // ซิงค์ selectedRepair กับ repairs เมื่อเปลี่ยนสถานะจาก dropdown ในตาราง (ให้ Dialog แสดงสถานะล่าสุด)
+  useEffect(() => {
+    if (detailOpen && selectedRepair) {
+      const updated = repairs.find((r) => r.id === selectedRepair.id);
+      if (updated && updated.status !== selectedRepair.status) {
+        setSelectedRepair(updated);
+      }
+    }
+  }, [detailOpen, repairs, selectedRepair?.id]);
+
   const handleViewDetails = (repair: RepairItem) => {
     const orderData = repairItemToBillData(repair, language === "th" ? "th" : "en");
     setSelectedRepair(repair);
     setDetailOrder(orderData);
+    setDetailTag(repair.tag ?? "");
+    setIsDetailEditing(false);
     setDetailOpen(true);
+  };
+
+  const handleSaveDetail = () => {
+    if (!selectedRepair || !detailOrder) return;
+    setRepairs((prev) =>
+      prev.map((r) =>
+        r.id === selectedRepair.id
+          ? {
+              ...r,
+              customer: detailOrder.customer,
+              phone: detailOrder.phone,
+              device: detailOrder.model,
+              issue: detailOrder.problemSymptoms,
+              issueTh: detailOrder.problemSymptoms,
+              estimatedCost: Number(detailOrder.estimatedPrice || r.estimatedCost),
+              tag: detailTag === "" ? undefined : (detailTag as RepairTag),
+            }
+          : r
+      )
+    );
+    setSelectedRepair((prev) =>
+      prev
+        ? {
+            ...prev,
+            customer: detailOrder.customer,
+            phone: detailOrder.phone,
+            device: detailOrder.model,
+            issue: detailOrder.problemSymptoms,
+            issueTh: detailOrder.problemSymptoms,
+            estimatedCost: Number(detailOrder.estimatedPrice || prev.estimatedCost),
+            tag: detailTag === "" ? undefined : (detailTag as RepairTag),
+          }
+        : null
+    );
+    setIsDetailEditing(false);
+    toast({
+      title: language === "th" ? "บันทึกสำเร็จ" : "Saved",
+      description: language === "th" ? "อัปเดตรายละเอียดงานซ่อมแล้ว" : "Repair details have been updated.",
+    });
+  };
+
+  const handleDeleteRepair = () => {
+    if (!deleteRepairConfirm) return;
+    setRepairs((prev) => prev.filter((r) => r.id !== deleteRepairConfirm.id));
+    setDetailOpen(false);
+    setSelectedRepair(null);
+    setDetailOrder(null);
+    setDeleteRepairConfirm(null);
+    toast({
+      title: language === "th" ? "ลบงานซ่อมแล้ว" : "Repair deleted",
+      description: language === "th" ? "รายการถูกลบออกจากระบบ" : "The repair order has been removed.",
+      variant: "destructive",
+    });
   };
 
   const handleEditOrder = (repair: RepairItem) => {
@@ -580,7 +658,7 @@ const Repairs = () => {
         </div>
       </div>
 
-      {/* Repair detail dialog – แสดงใบแจ้งซ่อมเต็มใบ + แก้ไขบางฟิลด์ได้ */}
+      {/* รายละเอียดงานซ่อม — ดู / แก้ไข / ลบ ได้ */}
       <Dialog
         open={detailOpen}
         onOpenChange={(open) => {
@@ -588,94 +666,242 @@ const Repairs = () => {
           if (!open) {
             setSelectedRepair(null);
             setDetailOrder(null);
+            setIsDetailEditing(false);
           }
         }}
       >
-        <DialogContent className="sm:max-w-[840px] max-h-[95vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto p-0 gap-0">
           {selectedRepair && detailOrder && (
             <>
-              <DialogHeader className="flex flex-row items-start justify-between gap-4">
-                <div className="space-y-1.5">
-                  <DialogTitle>
-                    {language === "th" ? "ใบแจ้งซ่อม" : "Repair order"}
+              <DialogHeader className="px-6 pt-6 pb-4 flex flex-row items-start justify-between gap-4 border-b border-border">
+                <div className="space-y-1">
+                  <DialogTitle className="text-xl">
+                    {language === "th" ? "รายละเอียดงานซ่อม" : "Repair details"}
                   </DialogTitle>
                   <DialogDescription>
                     {language === "th"
-                      ? "ดูและแก้ไขข้อมูลใบแจ้งซ่อม ก่อนพิมพ์หรือออกใบเสร็จ"
-                      : "View and edit repair order details before printing or issuing receipt."}
+                      ? "ดู แก้ไข หรือลบรายการงานซ่อม"
+                      : "View, edit, or delete this repair order."}
                   </DialogDescription>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {t("orderId")}
-                  </p>
-                  <p className="text-sm font-semibold text-foreground">
-                    {selectedRepair.id}
-                  </p>
-                </div>
+                <span className="text-sm font-semibold text-foreground shrink-0">
+                  {selectedRepair.id}
+                </span>
               </DialogHeader>
 
-              {/* ใบแจ้งซ่อมแบบแก้ไขในตัว (inline) */}
-              <div className="border border-border rounded-lg p-4 bg-muted/40 flex justify-center">
-                <div className="w-full max-w-[640px]">
-                  <RepairBillPreview
-                    data={detailOrder}
-                    copyLabel={language === "th" ? "ลูกค้า" : "Customer"}
-                    onChange={(patch) =>
-                      setDetailOrder((prev) =>
-                        prev ? { ...prev, ...patch } : prev
-                      )
-                    }
-                  />
+              <div className="px-6 py-4 space-y-4">
+                {/* เลขที่คำสั่ง (read-only) */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{t("orderId")}</Label>
+                  <span className="text-sm text-foreground">{selectedRepair.id}</span>
+                </div>
+
+                {/* IMEI / Serial Number (read-only) */}
+                {selectedRepair.serialNumber && (
+                  <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                    <Label className="text-sm text-muted-foreground">
+                      {language === "th" ? "IMEI / SN" : "IMEI / Serial"}
+                    </Label>
+                    <span className="text-sm text-foreground font-mono">{selectedRepair.serialNumber}</span>
+                  </div>
+                )}
+
+                {/* ลูกค้า */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{t("customer")}</Label>
+                  {isDetailEditing ? (
+                    <Input
+                      value={detailOrder.customer}
+                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, customer: e.target.value } : p))}
+                      className="h-9"
+                    />
+                  ) : (
+                    <span className="text-sm text-foreground">{detailOrder.customer}</span>
+                  )}
+                </div>
+
+                {/* เบอร์โทร */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{language === "th" ? "เบอร์โทร" : "Phone"}</Label>
+                  {isDetailEditing ? (
+                    <Input
+                      value={detailOrder.phone}
+                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, phone: e.target.value } : p))}
+                      className="h-9"
+                    />
+                  ) : (
+                    <span className="text-sm text-foreground">{detailOrder.phone}</span>
+                  )}
+                </div>
+
+                {/* อุปกรณ์ */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{t("device")}</Label>
+                  {isDetailEditing ? (
+                    <Input
+                      value={detailOrder.model}
+                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, model: e.target.value } : p))}
+                      className="h-9"
+                    />
+                  ) : (
+                    <span className="text-sm text-foreground">{detailOrder.model}</span>
+                  )}
+                </div>
+
+                {/* ปัญหา */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-start">
+                  <Label className="text-sm text-muted-foreground pt-2">{t("issue")}</Label>
+                  {isDetailEditing ? (
+                    <Textarea
+                      value={detailOrder.problemSymptoms}
+                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, problemSymptoms: e.target.value } : p))}
+                      rows={2}
+                      className="resize-none"
+                    />
+                  ) : (
+                    <span className="text-sm text-foreground">{detailOrder.problemSymptoms}</span>
+                  )}
+                </div>
+
+                {/* ราคาประมาณ */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{language === "th" ? "ราคาประมาณ" : "Est. price"}</Label>
+                  {isDetailEditing ? (
+                    <Input
+                      type="number"
+                      value={detailOrder.estimatedPrice || ""}
+                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, estimatedPrice: e.target.value } : p))}
+                      className="h-9"
+                    />
+                  ) : (
+                    <span className="text-sm text-foreground">
+                      ฿{Number(detailOrder.estimatedPrice || 0).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+
+                {/* สถานะ — แสดงอย่างเดียว แก้ไขจาก dropdown ในคอลัมน์ตาราง */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{t("status")}</Label>
+                  <span className={`status-badge ${statusStyles[selectedRepair.status]}`}>
+                    {selectedRepair.status === "in-progress"
+                      ? (language === "th" ? "กำลังซ่อม" : t("inProgress"))
+                      : selectedRepair.status === "completed"
+                        ? (language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed"))
+                        : selectedRepair.status === "picked-up"
+                          ? (language === "th" ? "รับเครื่องแล้ว" : t("pickedUp"))
+                          : selectedRepair.status === "cancelled"
+                            ? (language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled"))
+                            : t("pending")}
+                  </span>
+                </div>
+
+                {/* แท็ก */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{language === "th" ? "แท็ก" : "Tag"}</Label>
+                  {isDetailEditing ? (
+                    <Select value={detailTag || "none"} onValueChange={(v) => setDetailTag(v === "none" ? "" : (v as RepairTag))}>
+                      <SelectTrigger className="w-full max-w-[240px] h-9">
+                        <SelectValue placeholder={language === "th" ? "ทุกแท็ก" : "All tags"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">–</SelectItem>
+                        <SelectItem value="endOfDay">{language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in"}</SelectItem>
+                        <SelectItem value="leaveDevice">{language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off"}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-sm text-foreground">
+                      {detailTag === "endOfDay"
+                        ? (language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in")
+                        : detailTag === "leaveDevice"
+                          ? (language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off")
+                          : "–"}
+                    </span>
+                  )}
+                </div>
+
+                {/* วันที่ */}
+                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
+                  <Label className="text-sm text-muted-foreground">{t("date")}</Label>
+                  <span className="text-sm text-foreground">{selectedRepair.createdAt}</span>
                 </div>
               </div>
 
-              <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-3 mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setDetailOpen(false)}
-                >
-                  {t("cancel")}
-                </Button>
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    onClick={() => {
-                      if (!selectedRepair || !detailOrder) return;
-                      setRepairs((prev) =>
-                        prev.map((r) =>
-                          r.id === selectedRepair.id
-                            ? {
-                                ...r,
-                                customer: detailOrder.customer,
-                                phone: detailOrder.phone,
-                                device: detailOrder.model,
-                                issue: detailOrder.problemSymptoms,
-                                issueTh: detailOrder.problemSymptoms,
-                                estimatedCost: Number(
-                                  detailOrder.estimatedPrice || r.estimatedCost
-                                ),
-                              }
-                            : r
-                        )
-                      );
-                      setDetailOpen(false);
-                      toast({
-                        title: language === "th" ? "บันทึกสำเร็จ" : "Saved",
-                        description:
-                          language === "th"
-                            ? "อัปเดตใบแจ้งซ่อมเรียบร้อยแล้ว"
-                            : "Repair order has been updated.",
-                      });
-                    }}
-                  >
-                    {language === "th" ? "บันทึกการเปลี่ยนแปลง" : "Save changes"}
-                  </Button>
-                </div>
+              <DialogFooter className="px-6 py-4 border-t border-border flex flex-row flex-wrap items-center justify-between gap-3">
+                {isDetailEditing ? (
+                  <>
+                    <Button variant="outline" onClick={() => setIsDetailEditing(false)} className="gap-2">
+                      <X className="w-4 h-4" />
+                      {language === "th" ? "ไม่บันทึก" : "Discard"}
+                    </Button>
+                    <Button onClick={handleSaveDetail} className="gap-2 min-w-[100px]">
+                      <Pencil className="w-4 h-4" />
+                      {language === "th" ? "บันทึก" : "Save"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" onClick={() => setDetailOpen(false)} className="gap-2 text-muted-foreground">
+                      {language === "th" ? "ปิด" : "Close"}
+                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={() => setIsDetailEditing(true)} className="gap-2">
+                        <Pencil className="w-4 h-4" />
+                        {language === "th" ? "แก้ไข" : "Edit"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => {
+                          setDetailOpen(false);
+                          navigate("/repairs/bill", { state: { highlightRepairId: selectedRepair.id } });
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                        {language === "th" ? "ไปออกบิล" : "Issue bill"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="gap-2"
+                        onClick={() => setDeleteRepairConfirm(selectedRepair)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {language === "th" ? "ลบ" : "Delete"}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ยืนยันลบงานซ่อม */}
+      <AlertDialog open={!!deleteRepairConfirm} onOpenChange={(open) => !open && setDeleteRepairConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === "th" ? "ยืนยันลบงานซ่อม" : "Delete repair order?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === "th"
+                ? `คุณจะลบรายการ ${deleteRepairConfirm?.id ?? ""} ออกจากระบบ ไม่สามารถกู้คืนได้`
+                : `This will permanently remove ${deleteRepairConfirm?.id ?? ""}. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteRepair}
+            >
+              {language === "th" ? "ลบ" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit repair status dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

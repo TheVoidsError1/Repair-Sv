@@ -16,6 +16,8 @@ export type WarrantyClaimStatus =
 export interface WarrantyClaim {
   id: string;
   repairId: string;
+  /** Serial Number ของเครื่องตอนยื่นเคลม — ใช้ตรวจสอบว่าเครื่องตรงกับงานซ่อมเดิม */
+  serialNumber?: string;
   claimReason: string;
   claimReasonTh: string;
   status: WarrantyClaimStatus;
@@ -26,6 +28,7 @@ const initialClaims: WarrantyClaim[] = [
   {
     id: "WRN-001",
     repairId: "REP-001",
+    serialNumber: "350001234567890",
     claimReason: "Screen flickering after 2 weeks",
     claimReasonTh: "หน้าจอกระพริบหลังจาก 2 สัปดาห์",
     status: "pending",
@@ -34,6 +37,7 @@ const initialClaims: WarrantyClaim[] = [
   {
     id: "WRN-002",
     repairId: "REP-003",
+    serialNumber: "352223456789012",
     claimReason: "Device not charging properly",
     claimReasonTh: "อุปกรณ์ชาร์จไม่เข้า",
     status: "approved",
@@ -42,6 +46,7 @@ const initialClaims: WarrantyClaim[] = [
   {
     id: "WRN-003",
     repairId: "REP-010",
+    serialNumber: "357778901234567",
     claimReason: "Battery drains too fast",
     claimReasonTh: "แบตเตอรี่หมดเร็วเกินไป",
     status: "in-progress",
@@ -50,6 +55,7 @@ const initialClaims: WarrantyClaim[] = [
   {
     id: "WRN-004",
     repairId: "REP-008",
+    serialNumber: "356667890123456",
     claimReason: "Glass cracked again",
     claimReasonTh: "กระจกแตกอีกครั้ง",
     status: "rejected",
@@ -72,6 +78,7 @@ interface WarrantyContextValue {
   claims: WarrantyClaim[];
   addClaim: (params: {
     repairId: string;
+    serialNumber?: string;
     claimReason: string;
     claimReasonTh: string;
   }) => WarrantyClaim;
@@ -89,6 +96,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
   const addClaim = useCallback(
     (params: {
       repairId: string;
+      serialNumber?: string;
       claimReason: string;
       claimReasonTh: string;
     }) => {
@@ -96,6 +104,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
       const newClaim: WarrantyClaim = {
         id: nextClaimId(claims),
         repairId: params.repairId,
+        serialNumber: params.serialNumber,
         claimReason: params.claimReason,
         claimReasonTh: params.claimReasonTh,
         status: "pending",

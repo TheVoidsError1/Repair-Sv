@@ -1,4 +1,15 @@
 import { MainLayout } from "@/components/layout/MainLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +20,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useRepairs } from "@/contexts/RepairsContext";
+import { getPartStockStatus, partsList } from "@/lib/partsData";
+import { cn } from "@/lib/utils";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -49,7 +70,18 @@ function roundTimeTo30Min(timeStr: string): string {
   return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 }
 
+/** IMEI/Serial: ถ้าเป็นตัวเลขเท่านั้นต้อง 15 หลัก */
+function validateSerialNumber(value: string): { valid: boolean; message?: string } {
+  const trimmed = value.trim();
+  if (!trimmed) return { valid: false, message: "กรุณากรอกหมายเลข IMEI / Serial Number" };
+  if (/^\d+$/.test(trimmed) && trimmed.length !== 15) {
+    return { valid: false, message: "หมายเลข IMEI ต้องเป็นตัวเลข 15 หลัก" };
+  }
+  return { valid: true };
+}
+
 const initialFormData = {
+  serialNumber: "",
   customer: "",
   phone: "",
   model: "",
@@ -68,7 +100,11 @@ const RepairNew = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { repairs } = useRepairs();
   const [formData, setFormData] = useState(initialFormData);
+  const [serialError, setSerialError] = useState("");
+  const [duplicateSnWarning, setDuplicateSnWarning] = useState(false);
+  const [selectedPartId, setSelectedPartId] = useState<string>("");
 
   /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
   const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
@@ -115,6 +151,21 @@ const RepairNew = () => {
   }, []);
 
   const handleCreateOrder = () => {
+    setSerialError("");
+    setDuplicateSnWarning(false);
+    const sn = formData.serialNumber.trim();
+    const validation = validateSerialNumber(formData.serialNumber);
+    if (!validation.valid) {
+      setSerialError(language === "th" ? (validation.message ?? "กรุณากรอก IMEI 15 หลัก") : "Enter 15-digit IMEI / Serial");
+      return;
+    }
+    const isDuplicate = repairs.some(
+      (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+    );
+    if (isDuplicate) {
+      setDuplicateSnWarning(true);
+      return;
+    }
     const now = new Date();
     const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
       day: "2-digit",
@@ -132,17 +183,56 @@ const RepairNew = () => {
     const pickupDate = scheduledPickupTimeIso ? new Date(scheduledPickupTimeIso) : null;
     const orderData: RepairOrderData = {
       ...formData,
+      serialNumber: sn,
       dateOfReport: formData.dateOfReport || defaultDate,
       timeOfReport: formData.timeOfReport || undefined,
       scheduledPickupTime: pickupDate && !isNaN(pickupDate.getTime()) ? pickupDate.toISOString() : undefined,
       service_type: serviceType,
       receive_date: dateForPickup,
       receive_time: receiveTime,
+      selectedPartId: selectedPartId || undefined,
     };
     setFormData(initialFormData);
-    // หลังสร้างคำสั่ง ให้ไปหน้าใบแจ้งซ่อมโดยตรง
+    setSelectedPartId("");
     navigate("/repairs/bill/order", { state: orderData });
   };
+
+  const doSubmitOrder = () => {
+    const sn = formData.serialNumber.trim();
+    const now = new Date();
+    const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const todayIso = getTodayIsoDate();
+    const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
+    const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
+      ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
+      : "09:00";
+    const scheduledPickupTimeIso = dateForPickup && receiveTime ? `${dateForPickup}T${timePart}:00` : undefined;
+    const pickupDate = scheduledPickupTimeIso ? new Date(scheduledPickupTimeIso) : null;
+    const orderData: RepairOrderData = {
+      ...formData,
+      serialNumber: sn,
+      dateOfReport: formData.dateOfReport || defaultDate,
+      timeOfReport: formData.timeOfReport || undefined,
+      scheduledPickupTime: pickupDate && !isNaN(pickupDate.getTime()) ? pickupDate.toISOString() : undefined,
+      service_type: serviceType,
+      receive_date: dateForPickup,
+      receive_time: receiveTime,
+      selectedPartId: selectedPartId || undefined,
+    };
+    setFormData(initialFormData);
+    setSelectedPartId("");
+    setDuplicateSnWarning(false);
+    navigate("/repairs/bill/order", { state: orderData });
+  };
+
+  const selectedPart = selectedPartId ? partsList.find((p) => p.id === selectedPartId) : null;
+  const selectedPartStockStatus = selectedPart ? getPartStockStatus(selectedPart.stock) : null;
+  const isPartOutOfStock = selectedPart !== null && selectedPart.stock === 0;
+  const canCreateOrder = !isPartOutOfStock;
 
   return (
     <MainLayout>
@@ -195,6 +285,25 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                 />
               </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="serialNumber">
+                  {language === "th" ? "หมายเลข IMEI / Serial Number" : "IMEI / Serial Number"}
+                  <span className="text-destructive ml-1">*</span>
+                </Label>
+                <Input
+                  id="serialNumber"
+                  placeholder={language === "th" ? "กรอก 15 หลัก (ตัวเลข)" : "15 digits (numeric)"}
+                  value={formData.serialNumber}
+                  onChange={(e) => {
+                    handleInputChange("serialNumber", e.target.value);
+                    setSerialError("");
+                  }}
+                  className={serialError ? "border-destructive" : ""}
+                />
+                {serialError && (
+                  <p className="text-sm text-destructive">{serialError}</p>
+                )}
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="model">{t("model")}</Label>
                 <Input
@@ -232,6 +341,52 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
                 />
               </div>
+
+              {/* ส่วนเลือกอะไหล่ — ต่อจากอาการเสีย */}
+              <div className="grid gap-2 sm:col-span-2 space-y-2">
+                <Label htmlFor="part-select">{t("selectPart")}</Label>
+                <Select value={selectedPartId || undefined} onValueChange={(v) => setSelectedPartId(v || "")}>
+                  <SelectTrigger id="part-select" className="w-full">
+                    <SelectValue placeholder={t("selectPartPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {partsList.map((part) => (
+                      <SelectItem key={part.id} value={part.id}>
+                        {language === "th" ? part.nameTh : part.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPart && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
+                    <span className="font-medium text-foreground">
+                      {t("partStock")}: {selectedPart.stock.toLocaleString()}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        selectedPartStockStatus === "high" &&
+                          "border-green-500/60 bg-green-500/15 text-green-700 dark:text-green-400",
+                        selectedPartStockStatus === "low" &&
+                          "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
+                        selectedPartStockStatus === "out" &&
+                          "border-destructive/60 bg-destructive/15 text-destructive"
+                      )}
+                    >
+                      {selectedPartStockStatus === "high" && t("stockStatusHigh")}
+                      {selectedPartStockStatus === "low" && t("stockStatusLow")}
+                      {selectedPartStockStatus === "out" && t("outOfStock")}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {t("sellPrice")}: {selectedPart.sellPrice.toLocaleString()} {t("baht")}
+                    </span>
+                  </div>
+                )}
+                {isPartOutOfStock && (
+                  <p className="text-sm text-destructive">{t("outOfStockCannotCreate")}</p>
+                )}
+              </div>
+
               {/* รูปแบบการรับบริการ: รับหน้าร้าน = เลือกเฉพาะเวลา, ทิ้งเครื่องไว้ = เลือกวัน+เวลา */}
               {serviceType === "walk_in" && (
                 <div className="grid gap-2 sm:col-span-2">
@@ -331,9 +486,32 @@ const RepairNew = () => {
             <Button variant="outline" onClick={() => navigate("/repairs")}>
               {t("cancel")}
             </Button>
-            <Button onClick={handleCreateOrder}>{t("createOrder")}</Button>
+            <Button onClick={handleCreateOrder} disabled={!canCreateOrder}>
+              {t("createOrder")}
+            </Button>
           </CardFooter>
         </Card>
+
+        <AlertDialog open={duplicateSnWarning} onOpenChange={(open) => !open && setDuplicateSnWarning(false)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {language === "th" ? "หมายเลข IMEI / SN ซ้ำ" : "Duplicate Serial Number"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === "th"
+                  ? "หมายเลขนี้มีในประวัติงานซ่อมแล้ว การสร้างซ้ำอาจส่งผลต่อการรับประกัน ต้องการดำเนินการต่อหรือไม่?"
+                  : "This serial number already exists in repair history. Creating again may affect warranty. Continue anyway?"}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={doSubmitOrder}>
+                {language === "th" ? "ดำเนินการต่อ" : "Continue"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

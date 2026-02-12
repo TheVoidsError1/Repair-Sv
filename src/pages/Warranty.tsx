@@ -1,13 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Dialog,
     DialogContent,
@@ -19,11 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
 import {
     Select,
     SelectContent,
@@ -41,7 +29,6 @@ import { cn } from "@/lib/utils";
 import {
     CheckCircle,
     CheckCircle2,
-    ChevronsUpDown,
     Clock,
     Eye,
     Filter,
@@ -50,7 +37,36 @@ import {
     ShieldCheck,
     XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+
+/** จำนวนวันรับประกันเริ่มต้น (ใช้จาก repair.createdAt ของงานซ่อมที่ completed) */
+const DEFAULT_WARRANTY_DAYS = 90;
+
+/** คำนวณวันหมดประกันจากวันที่ซ่อม (YYYY-MM-DD) + จำนวนวัน */
+function getWarrantyExpiryDate(repairDateStr: string, warrantyDays: number): string {
+  const d = new Date(repairDateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return repairDateStr;
+  d.setDate(d.getDate() + warrantyDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/** คำนวณจำนวนวันคงเหลือจนหมดประกัน (ติดลบ = หมดอายุแล้ว) */
+function getRemainingWarrantyDays(expiryDateStr: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(expiryDateStr + "T00:00:00");
+  if (isNaN(expiry.getTime())) return 0;
+  expiry.setHours(0, 0, 0, 0);
+  const diff = expiry.getTime() - today.getTime();
+  return Math.floor(diff / (24 * 60 * 60 * 1000));
+}
+
+/** สถานะประกันสำหรับ badge: valid (เขียว), expiring_soon (เหลือง), expired (แดง) */
+function getWarrantyBadgeStatus(remainingDays: number): "valid" | "expiring_soon" | "expired" {
+  if (remainingDays < 0) return "expired";
+  if (remainingDays <= 30) return "expiring_soon";
+  return "valid";
+}
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
@@ -80,6 +96,21 @@ const Warranty = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<WarrantyClaim | null>(null);
+  const [inspectionClaim, setInspectionClaim] = useState<WarrantyClaim | null>(null);
+  const [inspectionChecks, setInspectionChecks] = useState({
+    deviceCondition: false,
+    claimReasonMatch: false,
+    customerVerified: false,
+  });
+  const [snMismatchClaim, setSnMismatchClaim] = useState<WarrantyClaim | null>(null);
+
+  const resetInspectionModal = () => {
+    setInspectionClaim(null);
+    setInspectionChecks({ deviceCondition: false, claimReasonMatch: false, customerVerified: false });
+  };
+
+  const inspectionComplete =
+    inspectionChecks.deviceCondition && inspectionChecks.claimReasonMatch && inspectionChecks.customerVerified;
 
   // เลือกได้เฉพาะงานซ่อมที่เสร็จแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
   const completedRepairs = repairs.filter((r) => r.status === "completed");
@@ -94,10 +125,13 @@ const Warranty = () => {
   const filteredClaims = claims.filter((claim) => {
     const repair = repairs.find((r) => r.id === claim.repairId);
     const customer = repair?.customer ?? "";
+    const sn = (repair?.serialNumber ?? claim.serialNumber ?? "").toLowerCase();
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      claim.repairId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      claim.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.toLowerCase().includes(searchQuery.toLowerCase());
+      claim.repairId.toLowerCase().includes(q) ||
+      claim.id.toLowerCase().includes(q) ||
+      customer.toLowerCase().includes(q) ||
+      (sn && sn.includes(q));
     const matchesStatus =
       statusFilter === "all" || claim.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -107,19 +141,36 @@ const Warranty = () => {
   const approvedCount = claims.filter((c) => c.status === "approved").length;
   const rejectedCount = claims.filter((c) => c.status === "rejected").length;
 
-  // ฟอร์มสร้างเคลมใหม่
-  const [newRepairId, setNewRepairId] = useState("");
+  // ค้นหาด้วย Serial Number (SN / IMEI) — ใช้เป็นตัวระบุหลักสำหรับการรับประกัน
+  const [snSearchInput, setSnSearchInput] = useState("");
   const [newClaimReason, setNewClaimReason] = useState("");
-  const [repairComboboxOpen, setRepairComboboxOpen] = useState(false);
+
+  /** หางานซ่อมล่าสุดจาก serial_number (เฉพาะที่ completed) */
+  const repairBySn = (() => {
+    const sn = snSearchInput.trim();
+    if (!sn) return null;
+    const withSn = repairs.filter(
+      (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase() && r.status === "completed"
+    );
+    if (withSn.length === 0) return null;
+    withSn.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    return withSn[0];
+  })();
+
+  const snNotFound = snSearchInput.trim() !== "" && repairBySn === null;
+  const repairDateBySn = repairBySn?.createdAt ?? "";
+  const expiryDateBySn = repairBySn ? getWarrantyExpiryDate(repairBySn.createdAt, DEFAULT_WARRANTY_DAYS) : "";
+  const remainingDaysBySn = expiryDateBySn ? getRemainingWarrantyDays(expiryDateBySn) : 0;
+  const previousClaimCountBySn = repairBySn
+    ? claims.filter((c) => c.repairId === repairBySn.id).length
+    : 0;
+  const canSubmitClaim = !!repairBySn && !snNotFound && newClaimReason.trim().length > 0;
 
   const handleSubmitClaim = () => {
-    if (!newRepairId.trim()) {
+    if (!repairBySn) {
       toast({
         title: language === "th" ? "แจ้งเตือน" : "Notice",
-        description:
-          language === "th"
-            ? "กรุณาเลือกงานซ่อมเดิม"
-            : "Please select the original repair.",
+        description: language === "th" ? "ไม่พบงานซ่อมตามหมายเลข SN/IMEI" : "No repair found for this serial number.",
         variant: "destructive",
       });
       return;
@@ -127,17 +178,15 @@ const Warranty = () => {
     if (!newClaimReason.trim()) {
       toast({
         title: language === "th" ? "แจ้งเตือน" : "Notice",
-        description:
-          language === "th"
-            ? "กรุณากรอกเหตุผลการเคลม"
-            : "Please enter the claim reason.",
+        description: language === "th" ? "กรุณากรอกเหตุผลการเคลม" : "Please enter the claim reason.",
         variant: "destructive",
       });
       return;
     }
     const reason = newClaimReason.trim();
     addClaim({
-      repairId: newRepairId,
+      repairId: repairBySn.id,
+      serialNumber: repairBySn.serialNumber,
       claimReason: reason,
       claimReasonTh: reason,
     });
@@ -145,17 +194,10 @@ const Warranty = () => {
       title: language === "th" ? "สำเร็จ" : "Success",
       description: t("submitClaim"),
     });
-    setNewRepairId("");
+    setSnSearchInput("");
     setNewClaimReason("");
     setIsDialogOpen(false);
   };
-
-  const selectedRepairForForm = newRepairId
-    ? completedRepairs.find((r) => r.id === newRepairId)
-    : null;
-  const repairDisplayText = selectedRepairForForm
-    ? `${selectedRepairForForm.id} · ${selectedRepairForForm.customer} · ${language === "th" ? selectedRepairForForm.issueTh : selectedRepairForForm.issue}`
-    : "";
 
   const handleViewReport = (claim: WarrantyClaim) => {
     setSelectedClaim(claim);
@@ -184,62 +226,65 @@ const Warranty = () => {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>{t("createWarrantyClaim")}</DialogTitle>
-                <DialogDescription>{t("submitNewWarrantyClaim")}</DialogDescription>
+                <DialogDescription>
+                  {language === "th"
+                    ? "ค้นหาด้วยหมายเลข IMEI / Serial Number ของเครื่องที่ซ่อม"
+                    : "Search by IMEI / Serial Number of the repaired device"}
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="repairId">{t("originalRepairId")}</Label>
-                  <Popover open={repairComboboxOpen} onOpenChange={setRepairComboboxOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="repairId"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={repairComboboxOpen}
-                        className={cn(
-                          "w-full justify-between font-normal",
-                          !newRepairId && "text-muted-foreground"
-                        )}
-                      >
-                        {repairDisplayText || t("searchRepairPlaceholder")}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                      <Command
-                        key={String(repairComboboxOpen)}
-                        filter={(value, search) => {
-                          const s = search.toLowerCase();
-                          if (!s) return 1;
-                          return value.toLowerCase().includes(s) ? 1 : 0;
-                        }}
-                      >
-                        <CommandInput placeholder={t("searchRepairPlaceholder")} />
-                        <CommandList>
-                          <CommandEmpty>{t("noRepairFound")}</CommandEmpty>
-                          <CommandGroup>
-                            {completedRepairs.map((r) => {
-                              const label = `${r.id} · ${r.customer} · ${language === "th" ? r.issueTh : r.issue}`;
-                              const searchValue = `${r.id} ${r.customer} ${r.device} ${r.issue} ${r.issueTh}`;
-                              return (
-                                <CommandItem
-                                  key={r.id}
-                                  value={searchValue}
-                                  onSelect={() => {
-                                    setNewRepairId(r.id);
-                                    setRepairComboboxOpen(false);
-                                  }}
-                                >
-                                  {label}
-                                </CommandItem>
-                              );
-                            })}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Label htmlFor="snSearch">
+                    {language === "th" ? "หมายเลข IMEI / Serial Number (SN)" : "IMEI / Serial Number (SN)"}
+                  </Label>
+                  <Input
+                    id="snSearch"
+                    placeholder={language === "th" ? "กรอก 15 หลัก หรือหมายเลขเครื่อง" : "Enter 15 digits or serial"}
+                    value={snSearchInput}
+                    onChange={(e) => setSnSearchInput(e.target.value)}
+                    className={snNotFound ? "border-destructive" : ""}
+                  />
+                  {snNotFound && (
+                    <p className="text-sm text-destructive">
+                      {language === "th" ? "ไม่พบงานซ่อมตามหมายเลขนี้" : "No repair found for this serial number."}
+                    </p>
+                  )}
                 </div>
+                {repairBySn && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                    <p className="font-medium text-foreground">
+                      {repairBySn.id} · {repairBySn.customer}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                      <span>{language === "th" ? "วันที่ซ่อม" : "Repair date"}</span>
+                      <span className="text-foreground">{repairDateBySn}</span>
+                      <span>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</span>
+                      <span className="text-foreground">{expiryDateBySn}</span>
+                      <span>{language === "th" ? "วันคงเหลือ" : "Remaining days"}</span>
+                      <span className="text-foreground">
+                        {remainingDaysBySn < 0
+                          ? (language === "th" ? "หมดอายุ" : "Expired")
+                          : `${remainingDaysBySn} ${language === "th" ? "วัน" : "days"}`}
+                      </span>
+                      <span>{language === "th" ? "จำนวนเคลมก่อนหน้า" : "Previous claims"}</span>
+                      <span className="text-foreground">{previousClaimCountBySn}</span>
+                    </div>
+                    <p className={cn(
+                      "text-xs font-medium pt-1",
+                      getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                        ? "text-emerald-600"
+                        : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                          ? "text-amber-600"
+                          : "text-red-600"
+                    )}>
+                      {getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                        ? (language === "th" ? "ภายในประกัน" : "In warranty")
+                        : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                          ? (language === "th" ? "ใกล้หมด" : "Expiring soon")
+                          : (language === "th" ? "หมดอายุ" : "Expired")}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="claimReason">{t("claimReason")}</Label>
                   <Textarea
@@ -255,7 +300,9 @@ const Warranty = () => {
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   {t("cancel")}
                 </Button>
-                <Button onClick={handleSubmitClaim}>{t("submitClaim")}</Button>
+                <Button onClick={handleSubmitClaim} disabled={!canSubmitClaim || (repairBySn ? getRemainingWarrantyDays(expiryDateBySn) < 0 : true)}>
+                  {t("submitClaim")}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -280,16 +327,29 @@ const Warranty = () => {
                 <tr>
                   <th>{t("claimId")}</th>
                   <th>{t("customer")}</th>
+                  <th>{t("serialOrImei")}</th>
                   <th>{t("claimReason")}</th>
                   <th>{t("date")}</th>
+                  <th>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</th>
                   <th>{language === "th" ? "การดำเนินการ" : "Actions"}</th>
                 </tr>
               </thead>
               <tbody>
                 {pendingClaims.map((claim) => {
                   const repair = repairs.find((r) => r.id === claim.repairId);
+                  const noRepairRecord = !repair;
+                  const snMismatch =
+                    !!repair &&
+                    !!claim.serialNumber &&
+                    !!repair.serialNumber &&
+                    claim.serialNumber.trim().toLowerCase() !== repair.serialNumber.trim().toLowerCase();
                   const customer = repair?.customer ?? "—";
                   const reasonText = language === "th" ? claim.claimReasonTh : claim.claimReason;
+                  const repairDate = repair?.createdAt ?? claim.claimDate;
+                  const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
+                  const remainingDays = getRemainingWarrantyDays(expiryDate);
+                  const isExpired = remainingDays < 0;
+                  const approveDisabled = isExpired || noRepairRecord || snMismatch;
                   return (
                     <tr key={claim.id}>
                       <td>
@@ -299,20 +359,28 @@ const Warranty = () => {
                         </div>
                       </td>
                       <td>{customer}</td>
+                      <td>
+                        <span className="font-mono text-sm">
+                          {(claim.serialNumber || repair?.serialNumber) ?? "—"}
+                        </span>
+                      </td>
                       <td className="max-w-[200px] truncate">{reasonText}</td>
                       <td>{claim.claimDate}</td>
+                      <td>{expiryDate}</td>
                       <td>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="default"
-                            className="gap-1 bg-status-completed hover:bg-status-completed/90"
+                            className="gap-1 bg-status-completed hover:bg-status-completed/90 disabled:opacity-60"
+                            disabled={approveDisabled}
                             onClick={() => {
-                              updateClaimStatus(claim.id, "approved");
-                              toast({
-                                title: language === "th" ? "อนุมัติแล้ว" : "Approved",
-                                description: `${claim.id} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
-                              });
+                              if (approveDisabled) return;
+                              if (snMismatch) {
+                                setSnMismatchClaim(claim);
+                                return;
+                              }
+                              setInspectionClaim(claim);
                             }}
                           >
                             <CheckCircle2 className="w-4 h-4" />
@@ -344,6 +412,116 @@ const Warranty = () => {
           </div>
         </div>
       )}
+
+      {/* SN ไม่ตรงกับงานซ่อมเดิม — แจ้งเตือนก่อนเปิด inspection */}
+      <Dialog open={!!snMismatchClaim} onOpenChange={(open) => !open && setSnMismatchClaim(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              {language === "th" ? "หมายเลขเครื่องไม่ตรงกับงานซ่อมเดิม" : "Serial number mismatch"}
+            </DialogTitle>
+            <DialogDescription>
+              {language === "th"
+                ? "หมายเลข IMEI/SN ของเคลมนี้ไม่ตรงกับงานซ่อมที่อ้างอิง ลูกค้าอาจนำเครื่องคนละเครื่องมาเคลม ต้องการดำเนินการต่อหรือไม่?"
+                : "This claim's IMEI/SN does not match the original repair record. Customer may be claiming with a different device. Continue anyway?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSnMismatchClaim(null)}>
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => {
+                if (snMismatchClaim) {
+                  setInspectionClaim(snMismatchClaim);
+                  setSnMismatchClaim(null);
+                }
+              }}
+            >
+              {language === "th" ? "ดำเนินการต่อ" : "Continue"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inspection checklist modal — ก่อนอนุมัติเคลม (เจ้าของเท่านั้น) */}
+      <Dialog open={!!inspectionClaim} onOpenChange={(open) => !open && resetInspectionModal()}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "th" ? "รายการตรวจก่อนอนุมัติ" : "Inspection checklist"}
+            </DialogTitle>
+            <DialogDescription>
+              {inspectionClaim
+                ? (language === "th"
+                  ? "ยืนยันรายการด้านล่างก่อนอนุมัติเคลม"
+                  : "Confirm the items below before approving the claim.")
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {inspectionClaim && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                {language === "th" ? "เคลม" : "Claim"}: <span className="font-medium text-foreground">{inspectionClaim.id}</span>
+              </p>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={inspectionChecks.deviceCondition}
+                    onCheckedChange={(c) => setInspectionChecks((prev) => ({ ...prev, deviceCondition: !!c }))}
+                    className="border-border"
+                  />
+                  <span className="text-sm">
+                    {language === "th" ? "ตรวจสอบสภาพเครื่องและความเสียหายตรงกับเหตุผลเคลม" : "Device condition and damage match claim reason"}
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={inspectionChecks.claimReasonMatch}
+                    onCheckedChange={(c) => setInspectionChecks((prev) => ({ ...prev, claimReasonMatch: !!c }))}
+                    className="border-border"
+                  />
+                  <span className="text-sm">
+                    {language === "th" ? "เหตุผลการเคลมสอดคล้องกับงานซ่อมเดิม" : "Claim reason matches original repair"}
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={inspectionChecks.customerVerified}
+                    onCheckedChange={(c) => setInspectionChecks((prev) => ({ ...prev, customerVerified: !!c }))}
+                    className="border-border"
+                  />
+                  <span className="text-sm">
+                    {language === "th" ? "ยืนยันตัวตนลูกค้าแล้ว" : "Customer identity verified"}
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={resetInspectionModal}>
+              {t("cancel")}
+            </Button>
+            <Button
+              disabled={!inspectionComplete}
+              className="gap-1 bg-status-completed hover:bg-status-completed/90"
+              onClick={() => {
+                if (!inspectionClaim || !inspectionComplete) return;
+                updateClaimStatus(inspectionClaim.id, "approved");
+                toast({
+                  title: language === "th" ? "อนุมัติแล้ว" : "Approved",
+                  description: `${inspectionClaim.id} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
+                });
+                resetInspectionModal();
+              }}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {language === "th" ? "ยืนยันอนุมัติ" : "Confirm approval"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary Cards — รูปแบบเดียวกับ Finance / Repairs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -423,9 +601,11 @@ const Warranty = () => {
                 <th>{t("claimId")}</th>
                 <th>{t("customer")}</th>
                 <th>{t("device")}</th>
+                <th>{t("serialOrImei")}</th>
                 <th>{t("originalRepair")}</th>
                 <th>{t("claimReason")}</th>
                 <th>{t("status")}</th>
+                <th>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</th>
                 <th>{t("report")}</th>
               </tr>
             </thead>
@@ -441,6 +621,8 @@ const Warranty = () => {
                 const device = repair?.device ?? "—";
                 const reasonText =
                   language === "th" ? claim.claimReasonTh : claim.claimReason;
+                const repairDate = repair?.createdAt ?? claim.claimDate;
+                const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
                 return (
                   <tr key={claim.id}>
                     <td>
@@ -453,6 +635,11 @@ const Warranty = () => {
                     </td>
                     <td>{customer}</td>
                     <td>{device}</td>
+                    <td>
+                      <span className="font-mono text-sm">
+                        {(claim.serialNumber || repair?.serialNumber) ?? "—"}
+                      </span>
+                    </td>
                     <td>{originalRepairText}</td>
                     <td className="max-w-[200px] truncate">{reasonText}</td>
                     <td>
@@ -463,6 +650,7 @@ const Warranty = () => {
                         {statusLabels[claim.status]}
                       </span>
                     </td>
+                    <td>{expiryDate}</td>
                     <td>
                       <Button
                         variant="ghost"
@@ -482,55 +670,66 @@ const Warranty = () => {
         </div>
       </div>
 
-      {/* Dialog ดูรายงานเคลม — แสดงข้อมูลเคลม + งานซ่อมที่เชื่อมกัน */}
+      {/* Dialog ดูรายละเอียด — ขนาดใหญ่ อ่านง่าย */}
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-[560px] p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="text-xl">
               {t("report")} · {selectedClaim?.id ?? ""}
             </DialogTitle>
-            <DialogDescription>
-              {t("claimId")}: {selectedClaim?.id} / {selectedClaim?.repairId}
+            <DialogDescription className="text-sm">
+              {language === "th" ? "รายละเอียดเคลม" : "Claim details"}
             </DialogDescription>
           </DialogHeader>
-          {selectedClaim && (
-            <div className="grid gap-4 py-2">
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {t("customer")} / {t("device")} / {t("originalRepair")}
-                </p>
-                <p className="text-foreground">
-                  {selectedRepair
-                    ? `${selectedRepair.customer} · ${selectedRepair.device} · ${language === "th" ? selectedRepair.issueTh : selectedRepair.issue}`
-                    : "—"}
-                </p>
+          {selectedClaim && (() => {
+            const repair = repairs.find((r) => r.id === selectedClaim.repairId);
+            const repairDate = repair?.createdAt ?? selectedClaim.claimDate;
+            const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
+            const remainingDays = getRemainingWarrantyDays(expiryDate);
+            const warrantyStatus = getWarrantyBadgeStatus(remainingDays);
+            const warrantyBadgeClass =
+              warrantyStatus === "valid"
+                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                : warrantyStatus === "expiring_soon"
+                  ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                  : "bg-red-500/15 text-red-600 border-red-500/30";
+            const warrantyBadgeLabel =
+              warrantyStatus === "valid"
+                ? language === "th" ? "ภายในประกัน" : "In warranty"
+                : warrantyStatus === "expiring_soon"
+                  ? language === "th" ? "ใกล้หมด" : "Expiring soon"
+                  : language === "th" ? "หมดอายุ" : "Expired";
+            const row = (label: string, value: ReactNode) => (
+              <div key={label} className="grid grid-cols-[120px_1fr] gap-4 py-3 items-baseline border-b border-border/50 last:border-0">
+                <span className="text-sm text-muted-foreground shrink-0">{label}</span>
+                <span className="text-sm text-foreground min-w-0">{value}</span>
               </div>
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {t("claimReason")}
-                </p>
-                <p className="text-foreground">
-                  {language === "th"
-                    ? selectedClaim.claimReasonTh
-                    : selectedClaim.claimReason}
-                </p>
+            );
+            return (
+              <div className="px-6 pb-6 space-y-0">
+                {row(t("claimId"), <span>{selectedClaim.id} <span className="text-muted-foreground">/ {selectedClaim.repairId}</span></span>)}
+                {row(t("customer"), repair?.customer ?? "—")}
+                {row(t("device"), repair?.device ?? "—")}
+                {row(t("serialOrImei"), <span className="font-mono">{(selectedClaim.serialNumber || repair?.serialNumber) ?? "—"}</span>)}
+                {row(t("originalRepair"), repair ? (language === "th" ? repair.issueTh : repair.issue) : "—")}
+                {row(t("claimReason"), language === "th" ? selectedClaim.claimReasonTh : selectedClaim.claimReason)}
+                {row(t("status"), (
+                  <span className={`status-badge ${statusStyles[selectedClaim.status]} inline-flex items-center gap-1 w-fit`}>
+                    {statusIcons[selectedClaim.status]}
+                    {statusLabels[selectedClaim.status]}
+                  </span>
+                ))}
+                {row(language === "th" ? "วันหมดประกัน" : "Expiry date", expiryDate)}
+                {row(language === "th" ? "วันคงเหลือ" : "Remaining days", remainingDays < 0 ? (language === "th" ? "หมดอายุ" : "Expired") : `${remainingDays} ${language === "th" ? "วัน" : "days"}`)}
+                {row(language === "th" ? "สถานะประกัน" : "Warranty status", (
+                  <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", warrantyBadgeClass)}>
+                    {warrantyBadgeLabel}
+                  </span>
+                ))}
+                {row(t("date"), selectedClaim.claimDate)}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {t("status")}:
-                </span>
-                <span
-                  className={`status-badge ${statusStyles[selectedClaim.status]} flex items-center gap-1`}
-                >
-                  {statusIcons[selectedClaim.status]}
-                  {statusLabels[selectedClaim.status]}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("date")}: {selectedClaim.claimDate}
-              </p>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </MainLayout>

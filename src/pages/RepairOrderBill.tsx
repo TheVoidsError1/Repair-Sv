@@ -89,7 +89,9 @@ export const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) 
       <div className="flex gap-4">
         <div className="flex-1 flex items-center gap-2">
           <span>หมายเลขเครื่อง (IMEI)</span>
-          <div className="flex-1 border-b border-gray-400 min-h-[20px]" />
+          <div className="flex-1 border-b border-gray-400 min-h-[20px]">
+            <span className="text-[11px] leading-tight px-1">{data.serialNumber || ""}</span>
+          </div>
         </div>
         <div className="w-48 flex items-center gap-2">
           <span>รหัสล็อคหน้าจอ</span>
