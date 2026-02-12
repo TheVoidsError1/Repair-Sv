@@ -6,6 +6,7 @@ import {
     type SidebarMenuItem,
     type SidebarSubjectConfig,
 } from "@/config/sidebarConfig";
+import { useAuth } from "@/contexts/AuthContext";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
@@ -205,6 +206,7 @@ export function AppSidebar({
   const mobileOpen = controlledMobileOpen ?? internalMobileOpen;
   const setMobileOpen = controlledSetMobileOpen ?? setInternalMobileOpen;
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const searchParams = new URLSearchParams(location.search);
 
   const subjectsMode = isSubjectsMode(location.pathname);
@@ -263,6 +265,7 @@ export function AppSidebar({
         <button
           onClick={() => {
             setMobileOpen(false);
+            logout();
             navigate("/login");
           }}
           className="sidebar-link w-full text-destructive hover:text-destructive hover:bg-destructive/10"

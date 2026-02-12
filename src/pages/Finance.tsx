@@ -1,36 +1,36 @@
-import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Calendar,
-  Download,
-} from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    Calendar,
+    DollarSign,
+    Download,
+    TrendingDown,
+    TrendingUp,
+} from "lucide-react";
+import { useState } from "react";
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
 
 const revenueData = [
   { month: "Jan", monthTh: "ม.ค.", income: 125000, expenses: 45000 },
@@ -129,6 +129,8 @@ const Finance = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="1d">{t("daily")}</SelectItem>
+                <SelectItem value="1w">{t("weekly")}</SelectItem>
                 <SelectItem value="1m">{t("lastMonth")}</SelectItem>
                 <SelectItem value="3m">{t("last3Months")}</SelectItem>
                 <SelectItem value="6m">{t("last6Months")}</SelectItem>

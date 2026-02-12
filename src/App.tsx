@@ -1,8 +1,10 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RepairsProvider } from "@/contexts/RepairsContext";
+import { WarrantyProvider } from "@/contexts/WarrantyContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
@@ -20,33 +22,45 @@ import Warranty from "./pages/Warranty";
 
 const queryClient = new QueryClient();
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <RepairsProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/subjects" element={<Navigate to="/" replace />} />
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/repairs" element={<Repairs />} />
-            <Route path="/repairs/new" element={<RepairNew />} />
-            <Route path="/repairs/bill" element={<RepairBill />} />
-            <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
-            <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/warranty" element={<Warranty />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/settings" element={<Settings />} />
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <RepairsProvider>
+            <WarrantyProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/subjects" element={<Navigate to="/" replace />} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
+            <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
+            <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
+            <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
+            <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+            <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
+            <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-          </RepairsProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+            </Routes>
+            </WarrantyProvider>
+            </RepairsProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </LanguageProvider>
   </QueryClientProvider>
 );

@@ -1,4 +1,14 @@
 import { MainLayout } from "@/components/layout/MainLayout";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -20,8 +30,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
+import type { User, UserRole } from "@/types/user";
 import {
     Bell,
     Edit,
@@ -33,45 +45,18 @@ import {
     UserCircle,
     Users,
 } from "lucide-react";
-import { useState } from "react";
-
-const users = [
-  {
-    id: 1,
-    name: "Admin User",
-    email: "admin@repairpro.com",
-    role: "owner",
-    status: "active",
-    lastLogin: "2024-01-15 09:30",
-  },
-  {
-    id: 2,
-    name: "Tom Technician",
-    email: "tom@repairpro.com",
-    role: "staff",
-    status: "active",
-    lastLogin: "2024-01-15 08:45",
-  },
-  {
-    id: 3,
-    name: "Anna Support",
-    email: "anna@repairpro.com",
-    role: "staff",
-    status: "active",
-    lastLogin: "2024-01-14 17:00",
-  },
-  {
-    id: 4,
-    name: "Mike Manager",
-    email: "mike@repairpro.com",
-    role: "staff",
-    status: "inactive",
-    lastLogin: "2024-01-10 14:20",
-  },
-];
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
 
 const Settings = () => {
   const { t, language, setLanguage } = useLanguage();
+  const {
+    users,
+    addUser,
+    updateUser,
+    deleteUser,
+    formatLastLogin,
+  } = useAuth();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -80,6 +65,99 @@ const Settings = () => {
     warrantyExpiry: false,
   });
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    username: "",
+    role: "staff" as UserRole,
+    password: "",
+    confirmPassword: "",
+  });
+
+  const resetForm = useCallback(() => {
+    setForm({
+      name: "",
+      username: "",
+      role: "staff",
+      password: "",
+      confirmPassword: "",
+    });
+    setEditingUser(null);
+  }, []);
+
+  const openAddDialog = () => {
+    resetForm();
+    setIsUserDialogOpen(true);
+  };
+
+  const openEditDialog = (user: User) => {
+    setEditingUser(user);
+    setForm({
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      password: "",
+      confirmPassword: "",
+    });
+    setIsUserDialogOpen(true);
+  };
+
+  const handleSaveUser = () => {
+    if (editingUser) {
+      if (form.password && form.password !== form.confirmPassword) {
+        toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
+        return;
+      }
+      updateUser(editingUser.id, {
+        name: form.name,
+        role: form.role,
+        status: editingUser.status,
+        ...(form.password ? { password: form.password } : {}),
+      });
+      toast.success(language === "th" ? "บันทึกผู้ใช้แล้ว" : "User saved");
+      setIsUserDialogOpen(false);
+      resetForm();
+      return;
+    }
+    if (!form.username.trim()) {
+      toast.error(language === "th" ? "กรอกชื่อผู้ใช้" : "Enter username");
+      return;
+    }
+    if (!form.password || form.password.length < 4) {
+      toast.error(language === "th" ? "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" : "Password must be at least 4 characters");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
+      return;
+    }
+    const result = addUser({
+      username: form.username.trim(),
+      password: form.password,
+      name: form.name.trim() || form.username.trim(),
+      role: form.role,
+      status: "active",
+    });
+    if (!result.success) {
+      if (result.error === "username_exists") {
+        toast.error(t("usernameExists"));
+      } else {
+        toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong");
+      }
+      return;
+    }
+    toast.success(language === "th" ? "เพิ่มผู้ใช้แล้ว" : "User added");
+    setIsUserDialogOpen(false);
+    resetForm();
+  };
+
+  const handleDeleteUser = (user: User) => {
+    deleteUser(user.id);
+    setDeleteTarget(null);
+    toast.success(language === "th" ? "ลบผู้ใช้แล้ว" : "User deleted");
+  };
 
   return (
     <MainLayout>
@@ -120,30 +198,48 @@ const Settings = () => {
                 <h3 className="text-lg font-semibold text-foreground">{t("userManagement")}</h3>
                 <p className="text-sm text-muted-foreground">{t("manageStaffAccounts")}</p>
               </div>
-              <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+              <Dialog open={isUserDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsUserDialogOpen(open); }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2">
+                  <Button className="gap-2" onClick={openAddDialog}>
                     <Plus className="w-4 h-4" />
                     {t("addUser")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{t("addNewUser")}</DialogTitle>
-                    <DialogDescription>{t("createNewStaffAccount")}</DialogDescription>
+                    <DialogTitle>{editingUser ? t("editUser") : t("addNewUser")}</DialogTitle>
+                    <DialogDescription>
+                      {editingUser
+                        ? (language === "th" ? "แก้ไขข้อมูลผู้ใช้" : "Edit user details")
+                        : t("createNewStaffAccount")}
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                       <Label htmlFor="name">{t("fullName")}</Label>
-                      <Input id="name" placeholder={t("enterFullName")} />
+                      <Input
+                        id="name"
+                        placeholder={t("enterFullName")}
+                        value={form.name}
+                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="email">{t("email")}</Label>
-                      <Input id="email" type="email" placeholder={t("enterEmail")} />
+                      <Label htmlFor="username">{t("username")}</Label>
+                      <Input
+                        id="username"
+                        placeholder={t("enterUsername")}
+                        value={form.username}
+                        onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                        disabled={!!editingUser}
+                      />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="role">{t("role")}</Label>
-                      <Select>
+                      <Select
+                        value={form.role}
+                        onValueChange={(v) => setForm((f) => ({ ...f, role: v as UserRole }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder={t("selectRole")} />
                         </SelectTrigger>
@@ -155,15 +251,31 @@ const Settings = () => {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="password">{t("password")}</Label>
-                      <Input id="password" type="password" placeholder={t("enterPassword")} />
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder={editingUser ? (language === "th" ? "เว้นว่างถ้าไม่เปลี่ยน" : "Leave blank to keep current") : t("enterPassword")}
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="confirmPassword">{t("confirmPassword")}</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder={t("enterConfirmPassword")}
+                        value={form.confirmPassword}
+                        onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                    <Button variant="outline" onClick={() => { setIsUserDialogOpen(false); resetForm(); }}>
                       {t("cancel")}
                     </Button>
-                    <Button onClick={() => setIsUserDialogOpen(false)}>
-                      {t("createUser")}
+                    <Button onClick={handleSaveUser}>
+                      {editingUser ? t("saveChanges") : t("createUser")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -191,13 +303,13 @@ const Settings = () => {
                           {user.role === "owner" ? t("owner") : t("staff")}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">{user.username}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right hidden sm:block">
                       <p className="text-sm text-muted-foreground">{t("lastLogin")}</p>
-                      <p className="text-sm text-foreground">{user.lastLogin}</p>
+                      <p className="text-sm text-foreground">{formatLastLogin(user.lastLogin)}</p>
                     </div>
                     <div
                       className={cn(
@@ -206,13 +318,14 @@ const Settings = () => {
                       )}
                     />
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)}>
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(user)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -373,6 +486,24 @@ const Settings = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteUser")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("deleteUserConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && handleDeleteUser(deleteTarget)}
+            >
+              {t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 };

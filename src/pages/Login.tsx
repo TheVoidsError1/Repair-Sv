@@ -1,22 +1,40 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Lock, Settings2, Smartphone, User, Wrench } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 
 const Login = () => {
   const { t, language } = useLanguage();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: เพิ่ม logic authentication จริง
-    navigate("/");
+    setError("");
+    const result = login(username.trim(), password);
+    if (result.success) {
+      navigate("/", { replace: true });
+    } else {
+      if (result.error === "invalid_credentials") {
+        setError(t("loginErrorInvalid"));
+      } else if (result.error === "account_inactive") {
+        setError(t("loginErrorInactive"));
+      } else {
+        setError(t("loginErrorInvalid"));
+      }
+    }
   };
 
   return (
@@ -91,6 +109,12 @@ const Login = () => {
             </h1>
             <p className="mt-2 text-slate-500 text-sm">{t("loginSubtitle")}</p>
           </div>
+
+          {error && (
+            <div className="rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-3">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">

@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   List,
   Package,
-  PlusCircle,
   Settings,
   ShieldCheck,
   Store,
@@ -137,20 +136,6 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelTh: "รายการสินค้า",
             labelEn: "Stock list",
             icon: Package,
-          },
-        ],
-      },
-      {
-        id: "adding",
-        labelTh: "เพิ่ม",
-        labelEn: "Adding",
-        items: [
-          {
-            id: "add-stock",
-            href: "/inventory?add=1",
-            labelTh: "เพิ่มสินค้า",
-            labelEn: "Add item",
-            icon: PlusCircle,
           },
         ],
       },

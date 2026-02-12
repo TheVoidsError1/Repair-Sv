@@ -1,19 +1,53 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Edit, Filter, Package, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Edit,
+  Filter,
+  Package,
+  PlusCircle,
+  Search,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-const parts = [
+/** สถานะตามสต็อก: หมด = 0, ใกล้หมด = 1..minStock, พร้อมขาย = > minStock */
+function getPartStatus(stock: number, minStock: number): "out" | "low" | "ready" {
+  if (stock === 0) return "out";
+  if (stock <= minStock) return "low";
+  return "ready";
+}
+
+/** แมป category ดิบ → กลุ่มหลัก: จอ / แบตเตอรี่ / อื่นๆ */
+function getPartType(category: string): "screen" | "battery" | "others" {
+  const cat = category.toLowerCase();
+  if (cat.includes("screen")) return "screen";
+  if (cat.includes("batter")) return "battery";
+  return "others";
+}
+
+const initialParts = [
   {
     id: "PART-001",
     name: "iPhone 14 Pro Screen",
@@ -109,46 +143,235 @@ const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบต�
 
 const Inventory = () => {
   const { t, language } = useLanguage();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [parts, setParts] = useState(initialParts);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState<"all" | "screen" | "battery" | "others">("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  /** รหัสอะไหล่ที่กำลังแก้ไข (null = โหมดเพิ่มใหม่) */
+  const [editingPartId, setEditingPartId] = useState<string | null>(null);
 
-  const categories = language === "th" ? categoriesTh : categoriesEn;
-
-  const filteredParts = parts.filter((part) => {
-    const searchName = language === "th" ? part.nameTh : part.name;
-    const matchesSearch =
-      searchName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      part.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "All" || 
-      categoryFilter === "ทั้งหมด" || 
-      part.category === categoryFilter ||
-      part.categoryTh === categoryFilter;
-    return matchesSearch && matchesCategory;
+  const [newPart, setNewPart] = useState({
+    name: "",
+    nameTh: "",
+    category: "",
+    categoryTh: "",
+    stock: "",
+    minStock: "",
+    cost: "",
+    sellPrice: "",
   });
 
-  const lowStockCount = parts.filter((p) => p.stock <= p.minStock).length;
-  const totalValue = parts.reduce((sum, p) => sum + p.stock * p.cost, 0);
+  const filteredParts = parts.filter((part) => {
+    const search = searchQuery.toLowerCase();
+    const searchName = (language === "th" ? part.nameTh : part.name).toLowerCase();
+    const searchCategory = (language === "th" ? part.categoryTh : part.category).toLowerCase();
+    const matchesSearch =
+      !search ||
+      searchName.includes(search) ||
+      part.id.toLowerCase().includes(search) ||
+      searchCategory.includes(search);
+
+    const partType = getPartType(part.category);
+    const matchesType = typeFilter === "all" || typeFilter === partType;
+
+    return matchesSearch && matchesType;
+  });
+
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setEditingPartId(null);
+      setIsAddDialogOpen(true);
+      const catParam = searchParams.get("cat");
+      if (catParam) {
+        const idxEn = categoriesEn.indexOf(catParam);
+        const idxTh = categoriesTh.indexOf(catParam);
+        const idx = idxEn !== -1 ? idxEn : idxTh;
+        if (idx > 0) {
+          const catEn = categoriesEn[idx];
+          const catTh = categoriesTh[idx];
+          setNewPart((prev) => ({
+            ...prev,
+            category: catEn,
+            categoryTh: catTh,
+          }));
+        }
+      }
+    } else {
+      setIsAddDialogOpen(false);
+      setEditingPartId(null);
+    }
+  }, [searchParams]);
+
+  const openEditDialog = (part: (typeof parts)[0]) => {
+    setEditingPartId(part.id);
+    setNewPart({
+      name: part.name,
+      nameTh: part.nameTh,
+      category: part.category,
+      categoryTh: part.categoryTh,
+      stock: String(part.stock),
+      minStock: String(part.minStock),
+      cost: String(part.cost),
+      sellPrice: String(part.sellPrice),
+    });
+    setIsAddDialogOpen(true);
+  };
+
+  const closeFormDialog = () => {
+    setIsAddDialogOpen(false);
+    setEditingPartId(null);
+    setNewPart({
+      name: "",
+      nameTh: "",
+      category: "",
+      categoryTh: "",
+      stock: "",
+      minStock: "",
+      cost: "",
+      sellPrice: "",
+    });
+    navigate("/inventory", { replace: true });
+  };
+
+  const handleNewPartChange = (field: keyof typeof newPart, value: string) => {
+    setNewPart((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCategorySelect = (value: string) => {
+    const idxEn = categoriesEn.indexOf(value);
+    const idxTh = categoriesTh.indexOf(value);
+    let idx = idxEn !== -1 ? idxEn : idxTh;
+    if (idx <= 0) {
+      handleNewPartChange("category", "");
+      handleNewPartChange("categoryTh", "");
+      return;
+    }
+    const catEn = categoriesEn[idx];
+    const catTh = categoriesTh[idx];
+    handleNewPartChange("category", catEn);
+    handleNewPartChange("categoryTh", catTh);
+  };
+
+  const handleSavePart = () => {
+    if (!newPart.name.trim() || !newPart.nameTh.trim()) {
+      toast({
+        title: language === "th" ? "กรุณากรอกชื่อสินค้า" : "Please enter part name",
+      });
+      return;
+    }
+
+    const stock = Number(newPart.stock) || 0;
+    const minStock = Number(newPart.minStock) || 0;
+    const cost = Number(newPart.cost) || 0;
+    const sellPrice = Number(newPart.sellPrice) || 0;
+    const categoryValue = newPart.category || "Others";
+    const categoryThValue = newPart.categoryTh || "อื่นๆ";
+
+    if (editingPartId) {
+      setParts((prev) =>
+        prev.map((p) =>
+          p.id === editingPartId
+            ? {
+                ...p,
+                name: newPart.name.trim(),
+                nameTh: newPart.nameTh.trim(),
+                category: categoryValue,
+                categoryTh: categoryThValue,
+                stock,
+                minStock,
+                cost,
+                sellPrice,
+              }
+            : p
+        )
+      );
+      toast({
+        title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
+        description:
+          language === "th"
+            ? "บันทึกการแก้ไขอะไหล่แล้ว"
+            : "Part has been updated.",
+      });
+    } else {
+      const nextIndex = parts.length + 1;
+      const id = `PART-${nextIndex.toString().padStart(3, "0")}`;
+      const created = {
+        id,
+        name: newPart.name.trim(),
+        nameTh: newPart.nameTh.trim(),
+        category: categoryValue,
+        categoryTh: categoryThValue,
+        stock,
+        minStock,
+        cost,
+        sellPrice,
+      };
+      setParts((prev) => [created, ...prev]);
+      toast({
+        title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
+        description:
+          language === "th"
+            ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
+            : "New part has been added to inventory.",
+      });
+    }
+
+    closeFormDialog();
+  };
+
+  const openAddDialog = () => {
+    setEditingPartId(null);
+    setNewPart({
+      name: "",
+      nameTh: "",
+      category: "",
+      categoryTh: "",
+      stock: "",
+      minStock: "",
+      cost: "",
+      sellPrice: "",
+    });
+    setIsAddDialogOpen(true);
+    navigate("/inventory", { replace: true });
+  };
+
+  const outCount = parts.filter((p) => getPartStatus(p.stock, p.minStock) === "out").length;
+  const lowCount = parts.filter((p) => getPartStatus(p.stock, p.minStock) === "low").length;
+  const readyCount = parts.filter((p) => getPartStatus(p.stock, p.minStock) === "ready").length;
 
   return (
     <MainLayout>
       <div className="page-header">
-        <div>
-          <h1 className="page-title">{t("sparePartsInventory")}</h1>
-          <p className="page-description">{t("inventoryDescription")}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="page-title">{t("sparePartsInventory")}</h1>
+            <p className="page-description">
+              {language === "th"
+                ? "บริการสินค้าในคลังของคุณให้พร้อมขายอยู่เสมอ"
+                : "Manage your inventory to be always ready for sale."}
+            </p>
+          </div>
+          <Button className="gap-2 shrink-0" onClick={openAddDialog}>
+            <PlusCircle className="w-4 h-4" />
+            {language === "th" ? "เพิ่มสินค้า" : t("addPart")}
+          </Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* การ์ดสรุปแจ้งเตือนสถานะสต็อก */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="stat-card">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-primary/10">
-              <Package className="w-5 h-5 text-primary" />
+            <div className="p-3 rounded-xl bg-status-cancelled/10">
+              <XCircle className="w-5 h-5 text-status-cancelled" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{t("totalItems")}</p>
-              <p className="text-xl font-semibold text-foreground">{parts.length}</p>
+              <p className="text-sm text-muted-foreground">{t("outOfStock")}</p>
+              <p className="text-xl font-semibold text-foreground">{outCount}</p>
             </div>
           </div>
         </div>
@@ -158,114 +381,298 @@ const Inventory = () => {
               <AlertTriangle className="w-5 h-5 text-status-pending" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{t("lowStockItems")}</p>
-              <p className="text-xl font-semibold text-foreground">{lowStockCount}</p>
+              <p className="text-sm text-muted-foreground">{t("runningLow")}</p>
+              <p className="text-xl font-semibold text-foreground">{lowCount}</p>
             </div>
           </div>
         </div>
         <div className="stat-card">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-status-completed/10">
-              <Package className="w-5 h-5 text-status-completed" />
+              <CheckCircle className="w-5 h-5 text-status-completed" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{t("inventoryValue")}</p>
-              <p className="text-xl font-semibold text-foreground">
-                ฿{totalValue.toLocaleString()}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("readyToSell")}</p>
+              <p className="text-xl font-semibold text-foreground">{readyCount}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* ค้นหา + กรองประเภท */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder={t("searchParts")}
+            placeholder={language === "th" ? "Enter เพื่อค้นหาสินค้า" : "Enter to search parts"}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder={t("category")} />
+        <Select
+          value={typeFilter}
+          onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}
+        >
+          <SelectTrigger className="w-[200px]">
+            <Filter className="w-4 h-4 mr-2 shrink-0" />
+            <SelectValue placeholder={language === "th" ? "ประเภท" : t("category")} />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
+            <SelectItem value="all">
+              {language === "th" ? "ทั้งหมด" : "All"}
+            </SelectItem>
+            <SelectItem value="screen">
+              {language === "th" ? "หน้าจอ" : "Screens"}
+            </SelectItem>
+            <SelectItem value="battery">
+              {language === "th" ? "แบตเตอรี่" : "Batteries"}
+            </SelectItem>
+            <SelectItem value="others">
+              {language === "th" ? "อะไหล่อื่นๆ" : "Other parts"}
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Parts Grid - ห่อด้วย card เดียวเหมือนหน้างานซ่อม */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="p-4 sm:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredParts.map((part) => {
-          const isLowStock = part.stock <= part.minStock;
-          return (
-            <div
-              key={part.id}
-              className={cn(
-                "bg-card rounded-xl border p-4 animate-fade-in",
-                isLowStock ? "border-status-cancelled/50" : "border-border"
-              )}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {part.id}
-                </span>
-                {isLowStock && (
-                  <span className="status-badge status-cancelled text-xs">
-                    {t("lowStock")}
-                  </span>
-                )}
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => !open && closeFormDialog()}>
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingPartId
+                ? (language === "th" ? "แก้ไขสินค้า" : "Edit part")
+                : (language === "th" ? "เพิ่มสินค้าใหม่" : t("addNewSparePart"))}
+            </DialogTitle>
+            <DialogDescription>
+              {editingPartId
+                ? (language === "th"
+                    ? "แก้ไขรายละเอียดอะไหล่แล้วกดบันทึก"
+                    : "Edit part details and save.")
+                : (language === "th"
+                    ? "กรอกรายละเอียดสินค้าเพื่อเพิ่มเข้าคลังอะไหล่"
+                    : t("enterPartDetails"))}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="nameTh">
+                  {language === "th" ? "ชื่อสินค้า (ไทย)" : "Part name (TH)"}
+                </Label>
+                <Input
+                  id="nameTh"
+                  placeholder={
+                    language === "th"
+                      ? "เช่น หน้าจอ iPhone 14 Pro"
+                      : "e.g., iPhone 14 Pro screen (TH)"
+                  }
+                  value={newPart.nameTh}
+                  onChange={(e) => handleNewPartChange("nameTh", e.target.value)}
+                />
               </div>
-              <h3 className="font-medium text-foreground mb-1">
-                {language === "th" ? part.nameTh : part.name}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {language === "th" ? part.categoryTh : part.category}
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                <div>
-                  <p className="text-muted-foreground">{t("stock")}</p>
-                  <p
-                    className={cn(
-                      "font-semibold",
-                      isLowStock ? "text-status-cancelled" : "text-foreground"
-                    )}
-                  >
-                    {part.stock} {t("units")}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">{t("sellPrice")}</p>
-                  <p className="font-semibold text-foreground">
-                    ฿{part.sellPrice.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 gap-1">
-                  <Edit className="w-3 h-3" />
-                  {t("edit")}
-                </Button>
-                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="nameEn">
+                  {language === "th" ? "ชื่อสินค้า (อังกฤษ)" : "Part name (EN)"}
+                </Label>
+                <Input
+                  id="nameEn"
+                  placeholder={
+                    language === "th"
+                      ? "เช่น iPhone 14 Pro screen"
+                      : "Part name in English"
+                  }
+                  value={newPart.name}
+                  onChange={(e) => handleNewPartChange("name", e.target.value)}
+                />
               </div>
             </div>
-          );
-        })}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="category">{t("category")}</Label>
+                <Select
+                  value={newPart.category || newPart.categoryTh}
+                  onValueChange={handleCategorySelect}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder={t("selectCategory")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoriesEn.slice(1).map((catEn, index) => {
+                      const idx = index + 1;
+                      const catTh = categoriesTh[idx] || catEn;
+                      const label = language === "th" ? catTh : catEn;
+                      return (
+                        <SelectItem key={catEn} value={catEn}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stock">{t("initialStock")}</Label>
+                  <Input
+                    id="stock"
+                    type="number"
+                    min={0}
+                    value={newPart.stock}
+                    onChange={(e) => handleNewPartChange("stock", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="minStock">{t("minStockLevel")}</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    min={0}
+                    value={newPart.minStock}
+                    onChange={(e) => handleNewPartChange("minStock", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="costPrice">{t("costPrice")}</Label>
+                <Input
+                  id="costPrice"
+                  type="number"
+                  min={0}
+                  value={newPart.cost}
+                  onChange={(e) => handleNewPartChange("cost", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sellPrice">{t("sellPrice")}</Label>
+                <Input
+                  id="sellPrice"
+                  type="number"
+                  min={0}
+                  value={newPart.sellPrice}
+                  onChange={(e) => handleNewPartChange("sellPrice", e.target.value)}
+                />
+              </div>
+            </div>
           </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={closeFormDialog}>
+              {t("cancel")}
+            </Button>
+            <Button onClick={handleSavePart}>
+              {editingPartId
+                ? (language === "th" ? "บันทึก" : "Save")
+                : (language === "th" ? "เพิ่มสินค้า" : t("addPart"))}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ตารางรายการอะไหล่ (รูปแบบเดียวกับหน้างานซ่อม) */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th className="w-[56px]">{language === "th" ? "รูป" : "Image"}</th>
+                <th>{language === "th" ? "รหัส" : "SKU"}</th>
+                <th>{language === "th" ? "สินค้า" : "Product"}</th>
+                <th className="text-right">{language === "th" ? "ราคาทุน" : "Cost"}</th>
+                <th className="text-right">{t("sellPrice")}</th>
+                <th className="text-right">{t("stock")}</th>
+                <th className="text-right">{language === "th" ? "ขั้นต่ำ" : "Min"}</th>
+                <th>{language === "th" ? "สถานะ" : "Status"}</th>
+                <th className="w-12 text-center">{t("edit")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredParts.map((part) => {
+                const status = getPartStatus(part.stock, part.minStock);
+                const statusLabel =
+                  status === "out"
+                    ? language === "th"
+                      ? "หมด"
+                      : "Out of stock"
+                    : status === "low"
+                      ? language === "th"
+                        ? "ใกล้หมด"
+                        : "Low stock"
+                      : language === "th"
+                        ? "พร้อมขาย"
+                        : "Ready";
+                const statusClass =
+                  status === "out"
+                    ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                    : status === "low"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                return (
+                  <tr key={part.id}>
+                    <td className="w-[56px] py-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </td>
+                    <td className="font-medium text-foreground tabular-nums">{part.id}</td>
+                    <td>
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {language === "th" ? part.nameTh : part.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {language === "th" ? part.categoryTh : part.category}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="text-right tabular-nums">฿{part.cost.toLocaleString()}</td>
+                    <td className="text-right tabular-nums">
+                      ฿{part.sellPrice.toLocaleString()}
+                    </td>
+                    <td className="text-right">
+                      <span className="font-medium tabular-nums text-primary">
+                        {part.stock.toLocaleString()}
+                      </span>
+                    </td>
+                    <td className="text-right tabular-nums text-muted-foreground">
+                      {part.minStock.toLocaleString()}
+                    </td>
+                    <td>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          statusClass
+                        )}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label={t("edit")}
+                        onClick={() => openEditDialog(part)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredParts.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="py-12 text-center text-sm text-muted-foreground"
+                  >
+                    {language === "th" ? "ไม่พบรายการอะไหล่" : "No parts found."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </MainLayout>
