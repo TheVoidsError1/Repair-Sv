@@ -7,6 +7,7 @@ import {
     type SidebarSubjectConfig,
 } from "@/config/sidebarConfig";
 import { useAuth } from "@/contexts/AuthContext";
+import { canAccessSubject } from "@/lib/roleConfig";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
@@ -43,15 +44,17 @@ function isMenuItemActive(
   return true;
 }
 
-/** โหมดที่ 1: Subjects — แสดงรายการหมวดหลัก */
+/** โหมดที่ 1: Subjects — แสดงรายการหมวดหลัก (กรองตาม role) */
 function SubjectsNav({
   language,
   collapsed,
   setMobileOpen,
+  userRole,
 }: {
   language: Language;
   collapsed: boolean;
   setMobileOpen: (v: boolean) => void;
+  userRole: "owner" | "staff";
 }) {
   const location = useLocation();
   const currentSubjectId = getSubjectIdFromPath(location.pathname);
@@ -63,7 +66,7 @@ function SubjectsNav({
           {language === "th" ? "เลือกหมวด" : "Subjects"}
         </p>
       )}
-      {SUBJECT_ORDER.map((subjectId) => {
+      {SUBJECT_ORDER.filter((subjectId) => canAccessSubject(subjectId, userRole)).map((subjectId) => {
         const subject = SUBJECTS_CONFIG[subjectId];
         if (!subject) return null;
         const isActive = currentSubjectId === subjectId;
@@ -206,7 +209,8 @@ export function AppSidebar({
   const mobileOpen = controlledMobileOpen ?? internalMobileOpen;
   const setMobileOpen = controlledSetMobileOpen ?? setInternalMobileOpen;
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
+  const userRole = currentUser?.role ?? "staff";
   const searchParams = new URLSearchParams(location.search);
 
   const subjectsMode = isSubjectsMode(location.pathname);
@@ -240,8 +244,9 @@ export function AppSidebar({
             language={language}
             collapsed={collapsed}
             setMobileOpen={setMobileOpen}
+            userRole={userRole}
           />
-        ) : currentSubject ? (
+        ) : currentSubject && canAccessSubject(currentSubjectId!, userRole) ? (
           <ContextNav
             subject={currentSubject}
             language={language}
@@ -251,11 +256,12 @@ export function AppSidebar({
             setMobileOpen={setMobileOpen}
           />
         ) : (
-          /* อยู่หน้าที่ไม่ใช่ /subjects และไม่ตรงหมวดใด (เช่น /login ไม่ใช้ sidebar นี้) — แสดง subjects เป็น fallback */
+          /* อยู่หน้าที่ไม่ใช่ /subjects และไม่ตรงหมวดใด หรือพนักงานเข้า path เฉพาะเจ้าของ — แสดง subjects เป็น fallback */
           <SubjectsNav
             language={language}
             collapsed={collapsed}
             setMobileOpen={setMobileOpen}
+            userRole={userRole}
           />
         )}
       </nav>

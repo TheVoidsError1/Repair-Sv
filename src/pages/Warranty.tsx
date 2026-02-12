@@ -32,6 +32,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
 import { useWarranty, type WarrantyClaim } from "@/contexts/WarrantyContext";
@@ -39,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
     CheckCircle,
+    CheckCircle2,
     ChevronsUpDown,
     Clock,
     Eye,
@@ -66,9 +68,12 @@ const statusIcons: Record<string, React.ReactNode> = {
 
 const Warranty = () => {
   const { t, language } = useLanguage();
+  const { currentUser } = useAuth();
   const { repairs } = useRepairs();
-  const { claims, addClaim } = useWarranty();
+  const { claims, addClaim, updateClaimStatus } = useWarranty();
   const { toast } = useToast();
+  const isOwner = currentUser?.role === "owner";
+  const pendingClaims = claims.filter((c) => c.status === "pending");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -256,6 +261,89 @@ const Warranty = () => {
           </Dialog>
         </div>
       </div>
+
+      {/* เจ้าของเท่านั้น: จัดการคำขออนุมัติเคลม */}
+      {isOwner && pendingClaims.length > 0 && (
+        <div className="bg-card rounded-xl border border-amber-500/30 border-border overflow-hidden mb-6">
+          <div className="p-4 border-b border-border bg-amber-500/5">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-500" />
+              {language === "th" ? "คำขอที่รออนุมัติ" : "Pending approval"}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {language === "th" ? "อนุมัติหรือปฏิเสธเคลมการรับประกัน" : "Approve or reject warranty claims"}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("claimId")}</th>
+                  <th>{t("customer")}</th>
+                  <th>{t("claimReason")}</th>
+                  <th>{t("date")}</th>
+                  <th>{language === "th" ? "การดำเนินการ" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingClaims.map((claim) => {
+                  const repair = repairs.find((r) => r.id === claim.repairId);
+                  const customer = repair?.customer ?? "—";
+                  const reasonText = language === "th" ? claim.claimReasonTh : claim.claimReason;
+                  return (
+                    <tr key={claim.id}>
+                      <td>
+                        <div>
+                          <p className="font-medium text-foreground">{claim.id}</p>
+                          <p className="text-xs text-muted-foreground">{claim.repairId}</p>
+                        </div>
+                      </td>
+                      <td>{customer}</td>
+                      <td className="max-w-[200px] truncate">{reasonText}</td>
+                      <td>{claim.claimDate}</td>
+                      <td>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="gap-1 bg-status-completed hover:bg-status-completed/90"
+                            onClick={() => {
+                              updateClaimStatus(claim.id, "approved");
+                              toast({
+                                title: language === "th" ? "อนุมัติแล้ว" : "Approved",
+                                description: `${claim.id} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
+                              });
+                            }}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            {language === "th" ? "อนุมัติ" : "Approve"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1"
+                            onClick={() => {
+                              updateClaimStatus(claim.id, "rejected");
+                              toast({
+                                title: language === "th" ? "ปฏิเสธแล้ว" : "Rejected",
+                                description: `${claim.id} ${language === "th" ? "ปฏิเสธเคลมแล้ว" : "claim rejected"}`,
+                                variant: "destructive",
+                              });
+                            }}
+                          >
+                            <XCircle className="w-4 h-4" />
+                            {language === "th" ? "ปฏิเสธ" : "Reject"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards — รูปแบบเดียวกับ Finance / Repairs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
