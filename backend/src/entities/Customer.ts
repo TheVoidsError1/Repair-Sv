@@ -16,8 +16,11 @@ export class Customer {
   @Column({ type: 'varchar', length: 100 })
   firstName!: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  lastName!: string;
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  lastName?: string;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  fullName?: string; // สำหรับเก็บชื่อเต็ม (รองรับกรณีที่ไม่มี firstName/lastName)
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone?: string;

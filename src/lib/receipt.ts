@@ -75,6 +75,7 @@ export function mapRepairOrderToReceiptData(
     estimatedPrice?: string;
     dateOfReport?: string;
     model?: string;
+    selectedPartId?: string;
   },
   options: {
     receiptNo?: string;
@@ -85,22 +86,75 @@ export function mapRepairOrderToReceiptData(
     deliverOrderNo?: string;
     salesmanCode?: string;
     copyLabel?: string;
+    selectedPart?: {
+      partNumber?: string;
+      name?: string;
+      nameTh?: string;
+      price?: number;
+    } | null;
+    selectedParts?: Array<{
+      partNumber?: string;
+      name?: string;
+      nameTh?: string;
+      price?: number;
+    }>;
   } = {}
 ): ReceiptData {
-  const price = parsePrice(data.repairSummaryPrice || data.estimatedPrice || "0");
   const receiptNo = options.receiptNo ?? "—";
   const issueDate = options.issueDate ?? data.dateOfReport ?? "—";
-  const description = data.problemSymptoms?.trim() || (data.model ? `ซ่อม${data.model}` : "รายการซ่อม");
+  
+  // ถ้ามี selectedParts (array) ให้สร้างรายการสำหรับแต่ละ part
+  let items: ReceiptLineItem[] = [];
+  let subtotal = 0;
 
-  const items: ReceiptLineItem[] = [
-    {
-      itemCode: "",
-      description,
-      quantity: 1,
-      unitPrice: price,
-      amount: price,
-    },
-  ];
+  if (options.selectedParts && options.selectedParts.length > 0) {
+    // สร้างรายการสำหรับแต่ละ part
+    items = options.selectedParts.map((part) => {
+      // แปลงราคาให้เป็น number เสมอ (เผื่อ backend ส่งมาเป็น string จาก decimal)
+      const partPrice = part.price != null ? parseFloat(String(part.price)) : 0;
+      subtotal += partPrice;
+      return {
+        itemCode: part.partNumber || "",
+        description: part.nameTh || part.name || "รายการซ่อม",
+        quantity: 1,
+        unitPrice: partPrice,
+        amount: partPrice,
+      };
+    });
+  } else if (options.selectedPart) {
+    // รองรับ backward compatibility: ถ้ามี selectedPart เดียว
+    const partPrice =
+      options.selectedPart.price != null
+        ? parseFloat(String(options.selectedPart.price))
+        : parsePrice(data.repairSummaryPrice || data.estimatedPrice || "0");
+    subtotal = partPrice;
+    items = [
+      {
+        itemCode: options.selectedPart.partNumber || "",
+        description: options.selectedPart.nameTh || options.selectedPart.name || "รายการซ่อม",
+        quantity: 1,
+        unitPrice: partPrice,
+        amount: partPrice,
+      },
+    ];
+  } else {
+    // ถ้าไม่มี part ให้ใช้ราคารวมจาก repairSummaryPrice
+    const price = parsePrice(data.repairSummaryPrice || data.estimatedPrice || "0");
+    subtotal = price;
+    items = [
+      {
+        itemCode: "",
+        description: data.problemSymptoms?.trim() || (data.model ? `ซ่อม${data.model}` : "รายการซ่อม"),
+        quantity: 1,
+        unitPrice: price,
+        amount: price,
+      },
+    ];
+  }
+
+  // คำนวณ VAT 7%
+  const vat = Math.round((subtotal * 0.07) * 100) / 100; // ปัดเป็น 2 ทศนิยม
+  const grandTotal = subtotal + vat;
 
   return {
     shop: {
@@ -118,13 +172,20 @@ export function mapRepairOrderToReceiptData(
     deliverOrderNo: options.deliverOrderNo ?? "",
     salesmanCode: options.salesmanCode ?? "",
     items,
-    subtotal: price,
-    vat: null,
-    grandTotal: price,
+    subtotal,
+    vat,
+    grandTotal,
     copyLabel: options.copyLabel,
   };
 }
 
 export function formatReceiptNumber(n: number): string {
-  return n.toLocaleString("th-TH");
+  // ป้องกันค่า NaN / Infinity
+  if (typeof n !== "number" || !isFinite(n)) return "0.00";
+
+  // แสดงทศนิยม 2 ตำแหน่งแบบอ่านง่าย
+  return n.toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }

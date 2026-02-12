@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { ReceiptContent } from "@/components/receipt/ReceiptContent";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiClient } from "@/lib/api";
 import { mapRepairOrderToReceiptData } from "@/lib/receipt";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import {
@@ -54,6 +55,80 @@ const RepairReceipt = () => {
   const [serviceType, setServiceType] = useState<ServiceType>("walk_in");
   const [receiveTime, setReceiveTime] = useState(() => getInitialReportDateTime().timeOfReport);
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
+  const [selectedPart, setSelectedPart] = useState<{ partNumber?: string; name?: string; nameTh?: string; price?: number } | null>(null);
+  const [selectedParts, setSelectedParts] = useState<Array<{ partNumber?: string; name?: string; nameTh?: string; price?: number }>>([]);
+
+  // Load repair data from API if repairId is provided
+  useEffect(() => {
+    const loadRepairData = async () => {
+      // ถ้ามี selectedParts ใน dataFromNav (จาก RepairBill ที่ส่งมา) ให้ใช้เลย
+      if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
+        setSelectedParts(dataFromNav.selectedParts as any);
+        return;
+      }
+
+      // ถ้ามี selectedPart ใน dataFromNav (backward compatibility) ให้ใช้เลย
+      if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
+        setSelectedPart(dataFromNav.selectedPart as any);
+        return;
+      }
+
+      // ถ้าไม่มี repairId แต่มี selectedPartId ใน dataFromNav ให้ดึง part จาก API
+      if (!dataFromNav?.repairId && dataFromNav?.selectedPartId) {
+        try {
+          const partResponse = await apiClient.getPartById(dataFromNav.selectedPartId);
+          if (partResponse.status === 'success' && partResponse.data) {
+            const part = partResponse.data;
+            setSelectedPart({
+              partNumber: part.partNumber || undefined,
+              name: part.name,
+              nameTh: part.nameTh || part.name,
+              price: part.price,
+            });
+          }
+        } catch (error) {
+          console.error('Error loading part data:', error);
+        }
+        return;
+      }
+      
+      if (!dataFromNav?.repairId) return;
+      
+      try {
+        // ดึงข้อมูล repairs ทั้งหมดและหา repair ที่ตรงกับ repairId (อาจเป็น repairNumber หรือ UUID)
+        const response = await apiClient.getRepairs();
+        if (response.status === 'success' && response.data) {
+          // หา repair จาก repairNumber หรือ id
+          const repair = response.data.find((r: any) => 
+            r.repairNumber === dataFromNav.repairId || r.id === dataFromNav.repairId
+          );
+          if (repair) {
+            // ถ้ามี selectedParts (array) ให้ใช้
+            if (repair.selectedParts && Array.isArray(repair.selectedParts) && repair.selectedParts.length > 0) {
+              setSelectedParts(repair.selectedParts.map((part: any) => ({
+                partNumber: part.partNumber || undefined,
+                name: part.name,
+                nameTh: part.nameTh || part.name,
+                price: part.price,
+              })));
+            } else if (repair.selectedPart) {
+              // backward compatibility: ถ้ามี selectedPart เดียว
+              setSelectedPart({
+                partNumber: repair.selectedPart.partNumber || undefined,
+                name: repair.selectedPart.name,
+                nameTh: repair.selectedPart.nameTh || repair.selectedPart.name,
+                price: repair.selectedPart.price,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading repair data:', error);
+      }
+    };
+
+    loadRepairData();
+  }, [dataFromNav?.repairId, dataFromNav?.selectedPartId, dataFromNav]);
 
   useEffect(() => {
     if (!dataFromNav) return;
@@ -143,6 +218,8 @@ const RepairReceipt = () => {
         receiptNo: (dataFromNav as { repairId?: string })?.repairId ?? "—",
         issueDate: effectiveData.dateOfReport,
         copyLabel: t("receiptForCustomer"),
+        selectedPart: selectedPart, // backward compatibility
+        selectedParts: selectedParts.length > 0 ? selectedParts : undefined,
       })
     : null;
 

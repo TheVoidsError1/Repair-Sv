@@ -191,7 +191,7 @@ export function validateServiceForm(
 }
 
 /** แมปรายการซ่อม → ข้อมูลสำหรับใบรับซ่อม */
-export function repairItemToBillData(item: RepairItemForBill, language: "th" | "en"): RepairOrderData {
+export function repairItemToBillData(item: RepairItemForBill & { selectedPartId?: string; selectedPart?: { partNumber?: string; name?: string; nameTh?: string } }, language: "th" | "en"): RepairOrderData {
   const problemText = language === "th" ? item.issueTh : item.issue;
   const cost = String(item.estimatedCost);
   const service_type: ServiceType = item.tag === "endOfDay" ? "walk_in" : "drop_off";
@@ -214,5 +214,6 @@ export function repairItemToBillData(item: RepairItemForBill, language: "th" | "
     service_type,
     receive_date: getTodayIsoDate(),
     receive_time: roundTimeTo30Min(rawTime),
+    selectedPartId: item.selectedPartId,
   };
 }

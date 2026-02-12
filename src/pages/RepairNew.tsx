@@ -31,10 +31,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
-import { getPartStockStatus, partsList } from "@/lib/partsData";
+import { apiClient } from "@/lib/api";
+import { getPartStockStatus, type Part } from "@/lib/partsData";
 import { cn } from "@/lib/utils";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar as CalendarIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -80,6 +82,35 @@ function validateSerialNumber(value: string): { valid: boolean; message?: string
   return { valid: true };
 }
 
+// Interface for Part from API
+interface PartFromAPI {
+  id: string;
+  name: string;
+  nameTh?: string;
+  partNumber?: string;
+  costPrice: number | string;
+  price: number | string;
+  stockQuantity: number;
+  minStockLevel: number;
+  category?: string;
+  categoryTh?: string;
+}
+
+// Convert API part to frontend Part format
+function convertPartFromAPI(part: PartFromAPI): Part {
+  return {
+    id: part.id,
+    name: part.name,
+    nameTh: part.nameTh || part.name,
+    category: part.category || "Others",
+    categoryTh: part.categoryTh || "อื่นๆ",
+    stock: part.stockQuantity,
+    minStock: part.minStockLevel,
+    cost: Number(part.costPrice),
+    sellPrice: Number(part.price),
+  };
+}
+
 const initialFormData = {
   serialNumber: "",
   customer: "",
@@ -100,11 +131,15 @@ const RepairNew = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { repairs } = useRepairs();
+  const { repairs, refreshRepairs } = useRepairs();
   const [formData, setFormData] = useState(initialFormData);
   const [serialError, setSerialError] = useState("");
   const [duplicateSnWarning, setDuplicateSnWarning] = useState(false);
-  const [selectedPartId, setSelectedPartId] = useState<string>("");
+  const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [partsList, setPartsList] = useState<Part[]>([]);
+  const [isLoadingParts, setIsLoadingParts] = useState(true);
+  const { toast } = useToast();
 
   /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
   const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
@@ -150,7 +185,38 @@ const RepairNew = () => {
     setReportDateTimeOnOpen();
   }, []);
 
-  const handleCreateOrder = () => {
+  // Load parts from API
+  useEffect(() => {
+    const loadParts = async () => {
+      setIsLoadingParts(true);
+      try {
+        const response = await apiClient.getParts();
+        if (response.status === 'success' && response.data) {
+          const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
+          setPartsList(convertedParts);
+        } else {
+          toast({
+            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+            description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts"),
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error loading parts:', error);
+        toast({
+          title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+          description: language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingParts(false);
+      }
+    };
+
+    loadParts();
+  }, [language, toast]);
+
+  const handleCreateOrder = async () => {
     setSerialError("");
     setDuplicateSnWarning(false);
     const sn = formData.serialNumber.trim();
@@ -159,80 +225,235 @@ const RepairNew = () => {
       setSerialError(language === "th" ? (validation.message ?? "กรุณากรอก IMEI 15 หลัก") : "Enter 15-digit IMEI / Serial");
       return;
     }
-    const isDuplicate = repairs.some(
-      (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
-    );
-    if (isDuplicate) {
-      setDuplicateSnWarning(true);
+    
+    // Check for duplicate serial number in database
+    try {
+      const existingRepairs = await apiClient.getRepairs();
+      if (existingRepairs.status === 'success' && existingRepairs.data) {
+        const isDuplicate = existingRepairs.data.some(
+          (r: any) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+        );
+        if (isDuplicate) {
+          setDuplicateSnWarning(true);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error checking duplicate serial number:', error);
+    }
+
+    // Validate required fields
+    if (!formData.customer.trim()) {
+      toast({
+        title: language === "th" ? "กรุณากรอกชื่อลูกค้า" : "Please enter customer name",
+        variant: "destructive",
+      });
       return;
     }
-    const now = new Date();
-    const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    const todayIso = getTodayIsoDate();
-    const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
-    const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
-      ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
-      : "09:00";
-    const scheduledPickupTimeIso = dateForPickup && receiveTime
-      ? `${dateForPickup}T${timePart}:00`
-      : undefined;
-    const pickupDate = scheduledPickupTimeIso ? new Date(scheduledPickupTimeIso) : null;
-    const orderData: RepairOrderData = {
-      ...formData,
-      serialNumber: sn,
-      dateOfReport: formData.dateOfReport || defaultDate,
-      timeOfReport: formData.timeOfReport || undefined,
-      scheduledPickupTime: pickupDate && !isNaN(pickupDate.getTime()) ? pickupDate.toISOString() : undefined,
-      service_type: serviceType,
-      receive_date: dateForPickup,
-      receive_time: receiveTime,
-      selectedPartId: selectedPartId || undefined,
-    };
-    setFormData(initialFormData);
-    setSelectedPartId("");
-    navigate("/repairs/bill/order", { state: orderData });
+
+    if (!formData.phone.trim()) {
+      toast({
+        title: language === "th" ? "กรุณากรอกเบอร์โทรศัพท์" : "Please enter phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const now = new Date();
+      const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const todayIso = getTodayIsoDate();
+      const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
+      const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
+        ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
+        : "09:00";
+      const scheduledPickupTimeIso = dateForPickup && receiveTime
+        ? `${dateForPickup}T${timePart}:00`
+        : undefined;
+
+      // Prepare data for API
+      const repairData = {
+        customer: formData.customer.trim(),
+        phone: formData.phone.trim(),
+        serialNumber: sn,
+        model: formData.model.trim(),
+        color: formData.color.trim(),
+        screenLockCode: formData.screenLockCode.trim(),
+        problemSymptoms: formData.problemSymptoms.trim(),
+        deposit: formData.deposit || undefined,
+        estimatedPrice: formData.estimatedPrice || undefined,
+        repairSummaryPrice: formData.repairSummaryPrice || undefined,
+        dateOfReport: formData.dateOfReport || defaultDate,
+        timeOfReport: formData.timeOfReport || undefined,
+        scheduledPickupTime: scheduledPickupTimeIso,
+        service_type: serviceType,
+        receive_date: dateForPickup,
+        receive_time: receiveTime,
+        selectedPartIds: selectedPartIds.length > 0 ? selectedPartIds : undefined,
+      };
+
+      const response = await apiClient.createRepair(repairData);
+
+      if (response.status === 'success' && response.data) {
+        toast({
+          title: language === "th" ? "บันทึกข้อมูลสำเร็จ" : "Repair order created successfully",
+          description: language === "th" 
+            ? `เลขที่ใบแจ้งซ่อม: ${response.data.repairNumber}`
+            : `Repair Number: ${response.data.repairNumber}`,
+        });
+
+        // Refresh repairs list
+        await refreshRepairs();
+
+        // Reset form
+        setFormData(initialFormData);
+        setSelectedPartIds([]);
+        setReceiveTime(roundTimeTo30Min(
+          `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
+        ));
+        setReceiveDate(getTodayIsoDate());
+        setReportDateTimeOnOpen();
+
+        // Navigate to repairs list
+        navigate("/repairs");
+      } else {
+        throw new Error(response.message || 'Failed to create repair');
+      }
+    } catch (error) {
+      console.error('Error creating repair:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: error instanceof Error ? error.message : (language === "th" ? "ไม่สามารถบันทึกข้อมูลได้" : "Failed to create repair"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const doSubmitOrder = () => {
-    const sn = formData.serialNumber.trim();
-    const now = new Date();
-    const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-    const todayIso = getTodayIsoDate();
-    const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
-    const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
-      ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
-      : "09:00";
-    const scheduledPickupTimeIso = dateForPickup && receiveTime ? `${dateForPickup}T${timePart}:00` : undefined;
-    const pickupDate = scheduledPickupTimeIso ? new Date(scheduledPickupTimeIso) : null;
-    const orderData: RepairOrderData = {
-      ...formData,
-      serialNumber: sn,
-      dateOfReport: formData.dateOfReport || defaultDate,
-      timeOfReport: formData.timeOfReport || undefined,
-      scheduledPickupTime: pickupDate && !isNaN(pickupDate.getTime()) ? pickupDate.toISOString() : undefined,
-      service_type: serviceType,
-      receive_date: dateForPickup,
-      receive_time: receiveTime,
-      selectedPartId: selectedPartId || undefined,
-    };
-    setFormData(initialFormData);
-    setSelectedPartId("");
+  const doSubmitOrder = async () => {
     setDuplicateSnWarning(false);
-    navigate("/repairs/bill/order", { state: orderData });
+    
+    // Validate required fields
+    if (!formData.customer.trim()) {
+      toast({
+        title: language === "th" ? "กรุณากรอกชื่อลูกค้า" : "Please enter customer name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      toast({
+        title: language === "th" ? "กรุณากรอกเบอร์โทรศัพท์" : "Please enter phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const sn = formData.serialNumber.trim();
+      const now = new Date();
+      const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const todayIso = getTodayIsoDate();
+      const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
+      const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
+        ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
+        : "09:00";
+      const scheduledPickupTimeIso = dateForPickup && receiveTime ? `${dateForPickup}T${timePart}:00` : undefined;
+
+      // Prepare data for API
+      const repairData = {
+        customer: formData.customer.trim(),
+        phone: formData.phone.trim(),
+        serialNumber: sn,
+        model: formData.model.trim(),
+        color: formData.color.trim(),
+        screenLockCode: formData.screenLockCode.trim(),
+        problemSymptoms: formData.problemSymptoms.trim(),
+        deposit: formData.deposit || undefined,
+        estimatedPrice: formData.estimatedPrice || undefined,
+        repairSummaryPrice: formData.repairSummaryPrice || undefined,
+        dateOfReport: formData.dateOfReport || defaultDate,
+        timeOfReport: formData.timeOfReport || undefined,
+        scheduledPickupTime: scheduledPickupTimeIso,
+        service_type: serviceType,
+        receive_date: dateForPickup,
+        receive_time: receiveTime,
+        selectedPartIds: selectedPartIds.length > 0 ? selectedPartIds : undefined,
+      };
+
+      const response = await apiClient.createRepair(repairData);
+
+      if (response.status === 'success' && response.data) {
+        toast({
+          title: language === "th" ? "บันทึกข้อมูลสำเร็จ" : "Repair order created successfully",
+          description: language === "th" 
+            ? `เลขที่ใบแจ้งซ่อม: ${response.data.repairNumber}`
+            : `Repair Number: ${response.data.repairNumber}`,
+        });
+
+        // Refresh repairs list
+        await refreshRepairs();
+
+        // Reset form
+        setFormData(initialFormData);
+        setSelectedPartIds([]);
+        setReceiveTime(roundTimeTo30Min(
+          `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
+        ));
+        setReceiveDate(getTodayIsoDate());
+        setReportDateTimeOnOpen();
+
+        // Navigate to repairs list
+        navigate("/repairs");
+      } else {
+        throw new Error(response.message || 'Failed to create repair');
+      }
+    } catch (error) {
+      console.error('Error creating repair:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: error instanceof Error ? error.message : (language === "th" ? "ไม่สามารถบันทึกข้อมูลได้" : "Failed to create repair"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const selectedPart = selectedPartId ? partsList.find((p) => p.id === selectedPartId) : null;
-  const selectedPartStockStatus = selectedPart ? getPartStockStatus(selectedPart.stock) : null;
-  const isPartOutOfStock = selectedPart !== null && selectedPart.stock === 0;
-  const canCreateOrder = !isPartOutOfStock;
+  // Filter out already selected parts from dropdown
+  const availableParts = partsList.filter((part) => !selectedPartIds.includes(part.id));
+  
+  // Get selected parts data
+  const selectedParts = selectedPartIds
+    .map((id) => partsList.find((p) => p.id === id))
+    .filter((p): p is Part => p !== undefined);
+  
+  const hasOutOfStockPart = selectedParts.some((part) => part.stock === 0);
+  const canCreateOrder = !hasOutOfStockPart;
+
+  const handleAddPart = (partId: string) => {
+    if (partId && !selectedPartIds.includes(partId)) {
+      setSelectedPartIds([...selectedPartIds, partId]);
+    }
+  };
+
+  const handleRemovePart = (partId: string) => {
+    setSelectedPartIds(selectedPartIds.filter((id) => id !== partId));
+  };
 
   return (
     <MainLayout>
@@ -345,44 +566,78 @@ const RepairNew = () => {
               {/* ส่วนเลือกอะไหล่ — ต่อจากอาการเสีย */}
               <div className="grid gap-2 sm:col-span-2 space-y-2">
                 <Label htmlFor="part-select">{t("selectPart")}</Label>
-                <Select value={selectedPartId || undefined} onValueChange={(v) => setSelectedPartId(v || "")}>
+                <Select 
+                  value="" 
+                  onValueChange={handleAddPart}
+                  disabled={isLoadingParts || availableParts.length === 0}
+                >
                   <SelectTrigger id="part-select" className="w-full">
-                    <SelectValue placeholder={t("selectPartPlaceholder")} />
+                    <SelectValue placeholder={isLoadingParts ? (language === "th" ? "กำลังโหลด..." : "Loading...") : availableParts.length === 0 ? (language === "th" ? "ไม่มีอะไหล่เหลือ" : "No parts available") : t("selectPartPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {partsList.map((part) => (
-                      <SelectItem key={part.id} value={part.id}>
-                        {language === "th" ? part.nameTh : part.name}
+                    {availableParts.length === 0 && !isLoadingParts ? (
+                      <SelectItem value="no-parts" disabled>
+                        {language === "th" ? "ไม่มีอะไหล่เหลือ" : "No parts available"}
                       </SelectItem>
-                    ))}
+                    ) : (
+                      availableParts.map((part) => (
+                        <SelectItem key={part.id} value={part.id}>
+                          {language === "th" ? part.nameTh : part.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
-                {selectedPart && (
-                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm">
-                    <span className="font-medium text-foreground">
-                      {t("partStock")}: {selectedPart.stock.toLocaleString()}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        selectedPartStockStatus === "high" &&
-                          "border-green-500/60 bg-green-500/15 text-green-700 dark:text-green-400",
-                        selectedPartStockStatus === "low" &&
-                          "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
-                        selectedPartStockStatus === "out" &&
-                          "border-destructive/60 bg-destructive/15 text-destructive"
-                      )}
-                    >
-                      {selectedPartStockStatus === "high" && t("stockStatusHigh")}
-                      {selectedPartStockStatus === "low" && t("stockStatusLow")}
-                      {selectedPartStockStatus === "out" && t("outOfStock")}
-                    </Badge>
-                    <span className="text-muted-foreground">
-                      {t("sellPrice")}: {selectedPart.sellPrice.toLocaleString()} {t("baht")}
-                    </span>
+                
+                {/* แสดงรายการอะไหล่ที่เลือกแล้ว */}
+                {selectedParts.length > 0 && (
+                  <div className="space-y-2">
+                    {selectedParts.map((part) => {
+                      const stockStatus = getPartStockStatus(part.stock);
+                      return (
+                        <div
+                          key={part.id}
+                          className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm"
+                        >
+                          <span className="font-medium text-foreground flex-1">
+                            {language === "th" ? part.nameTh : part.name}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {t("partStock")}: {part.stock.toLocaleString()}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              stockStatus === "high" &&
+                                "border-green-500/60 bg-green-500/15 text-green-700 dark:text-green-400",
+                              stockStatus === "low" &&
+                                "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
+                              stockStatus === "out" &&
+                                "border-destructive/60 bg-destructive/15 text-destructive"
+                            )}
+                          >
+                            {stockStatus === "high" && t("stockStatusHigh")}
+                            {stockStatus === "low" && t("stockStatusLow")}
+                            {stockStatus === "out" && t("outOfStock")}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {t("sellPrice")}: {part.sellPrice.toLocaleString()} {t("baht")}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleRemovePart(part.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                {isPartOutOfStock && (
+                {hasOutOfStockPart && (
                   <p className="text-sm text-destructive">{t("outOfStockCannotCreate")}</p>
                 )}
               </div>
@@ -483,11 +738,11 @@ const RepairNew = () => {
             </div>
           </CardContent>
           <CardFooter className="flex gap-3 border-t border-border/60 bg-muted/20 py-5 px-6">
-            <Button variant="outline" onClick={() => navigate("/repairs")}>
+            <Button variant="outline" onClick={() => navigate("/repairs")} disabled={isSubmitting}>
               {t("cancel")}
             </Button>
-            <Button onClick={handleCreateOrder} disabled={!canCreateOrder}>
-              {t("createOrder")}
+            <Button onClick={handleCreateOrder} disabled={!canCreateOrder || isSubmitting}>
+              {isSubmitting ? (language === "th" ? "กำลังบันทึก..." : "Saving...") : t("createOrder")}
             </Button>
           </CardFooter>
         </Card>

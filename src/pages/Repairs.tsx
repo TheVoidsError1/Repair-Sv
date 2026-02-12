@@ -264,7 +264,7 @@ const Repairs = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { repairs, setRepairs } = useRepairs();
+  const { repairs, setRepairs, refreshRepairs, isLoading } = useRepairs();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState<"all" | "endOfDay" | "leaveDevice">("all");
@@ -567,21 +567,30 @@ const Repairs = () => {
       {/* Repairs Table */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t("orderId")}</th>
-                <th>{t("customer")}</th>
-                <th>{t("device")}</th>
-                <th>{t("issue")}</th>
-                <th>{t("estCost")}</th>
-                <th>{t("status")}</th>
-                <th>{t("tagLabel")}</th>
-                <th>{t("viewDetails")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRepairs.map((repair) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-muted-foreground">{language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}</p>
+            </div>
+          ) : filteredRepairs.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-muted-foreground">{language === "th" ? "ไม่มีข้อมูลงานซ่อม" : "No repairs found"}</p>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("orderId")}</th>
+                  <th>{t("customer")}</th>
+                  <th>{t("device")}</th>
+                  <th>{t("issue")}</th>
+                  <th>{t("estCost")}</th>
+                  <th>{t("status")}</th>
+                  <th>{t("tagLabel")}</th>
+                  <th>{t("viewDetails")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRepairs.map((repair) => (
                   <tr key={repair.id}>
                     <td className="font-medium text-foreground">{repair.id}</td>
                     <td>
@@ -652,9 +661,10 @@ const Repairs = () => {
                       </Button>
                     </td>
                   </tr>
-              ))}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

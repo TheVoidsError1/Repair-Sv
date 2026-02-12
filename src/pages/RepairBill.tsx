@@ -21,7 +21,14 @@ const RepairBill = () => {
 
   const handleIssueReceipt = (item: RepairItem) => {
     const orderData = repairItemToBillData(item, language);
-    navigate("/repairs/bill/receipt", { state: { ...orderData, repairId: item.id } });
+    navigate("/repairs/bill/receipt", { 
+      state: { 
+        ...orderData, 
+        repairId: item.id,
+        selectedPart: item.selectedPart, // backward compatibility
+        selectedParts: item.selectedParts || (item.selectedPart ? [item.selectedPart] : undefined),
+      } 
+    });
   };
 
   return (

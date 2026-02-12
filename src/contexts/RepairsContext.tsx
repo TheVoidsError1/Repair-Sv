@@ -3,8 +3,10 @@ import {
     useContext,
     useMemo,
     useState,
+    useEffect,
     type ReactNode,
 } from "react";
+import { apiClient } from "@/lib/api";
 
 export type RepairTag = "endOfDay" | "leaveDevice";
 
@@ -23,135 +25,99 @@ export interface RepairItem {
   createdAt: string;
   estimatedCost: number;
   tag?: RepairTag;
+  /** รหัสอะไหล่ที่เลือก (UUID) - สำหรับ backward compatibility */
+  selectedPartId?: string;
+  /** ข้อมูลอะไหล่ (ถ้ามี) - สำหรับ backward compatibility */
+  selectedPart?: {
+    partNumber?: string;
+    name?: string;
+    nameTh?: string;
+  };
+  /** ข้อมูลอะไหล่ทั้งหมดที่เลือก (array) */
+  selectedParts?: Array<{
+    id?: string;
+    partNumber?: string;
+    name?: string;
+    nameTh?: string;
+    price?: number;
+  }>;
 }
-
-const initialRepairs: RepairItem[] = [
-  {
-    id: "REP-001",
-    serialNumber: "350001234567890",
-    customer: "John Doe",
-    phone: "081-234-5678",
-    device: "iPhone 14 Pro",
-    issue: "Screen Replacement",
-    issueTh: "เปลี่ยนหน้าจอ",
-    status: "in-progress",
-    technician: "Tom",
-    createdAt: "2024-01-15",
-    estimatedCost: 4500,
-    tag: "endOfDay",
-  },
-  {
-    id: "REP-002",
-    serialNumber: "351112345678901",
-    customer: "Jane Smith",
-    phone: "082-345-6789",
-    device: "Samsung Galaxy S23",
-    issue: "Battery Replacement",
-    issueTh: "เปลี่ยนแบตเตอรี่",
-    status: "pending",
-    technician: "Unassigned",
-    technicianTh: "ยังไม่มอบหมาย",
-    createdAt: "2024-01-15",
-    estimatedCost: 1200,
-    tag: "leaveDevice",
-  },
-  {
-    id: "REP-003",
-    serialNumber: "352223456789012",
-    customer: "Mike Johnson",
-    phone: "083-456-7890",
-    device: "Google Pixel 7",
-    issue: "Water Damage Repair",
-    issueTh: "ซ่อมเสียหายจากน้ำ",
-    status: "completed",
-    technician: "Anna",
-    createdAt: "2024-01-14",
-    estimatedCost: 3200,
-    tag: "endOfDay",
-  },
-  {
-    id: "REP-004",
-    serialNumber: "353334567890123",
-    customer: "Sarah Williams",
-    phone: "084-567-8901",
-    device: "iPhone 13",
-    issue: "Back Glass Repair",
-    issueTh: "ซ่อมกระจกหลัง",
-    status: "completed",
-    technician: "Tom",
-    createdAt: "2024-01-14",
-    estimatedCost: 2800,
-  },
-  {
-    id: "REP-005",
-    serialNumber: "354445678901234",
-    customer: "David Brown",
-    phone: "085-678-9012",
-    device: "OnePlus 11",
-    issue: "Charging Port Replacement",
-    issueTh: "เปลี่ยนพอร์ตชาร์จ",
-    status: "cancelled",
-    technician: "Anna",
-    createdAt: "2024-01-13",
-    estimatedCost: 800,
-    tag: "leaveDevice",
-  },
-  {
-    id: "REP-006",
-    serialNumber: "355556789012345",
-    customer: "Emily Chen",
-    phone: "086-789-0123",
-    device: "iPhone 15 Pro Max",
-    issue: "Speaker Not Working",
-    issueTh: "ลำโพงไม่ทำงาน",
-    status: "pending",
-    technician: "Unassigned",
-    technicianTh: "ยังไม่มอบหมาย",
-    createdAt: "2024-01-15",
-    estimatedCost: 1500,
-    tag: "leaveDevice",
-  },
-  {
-    id: "REP-008",
-    serialNumber: "356667890123456",
-    customer: "Robert Taylor",
-    phone: "087-890-1234",
-    device: "iPhone 12",
-    issue: "Back Glass Repair",
-    issueTh: "ซ่อมกระจกหลัง",
-    status: "completed",
-    technician: "Tom",
-    createdAt: "2024-01-12",
-    estimatedCost: 2800,
-    tag: "endOfDay",
-  },
-  {
-    id: "REP-010",
-    serialNumber: "357778901234567",
-    customer: "Lisa Anderson",
-    phone: "088-901-2345",
-    device: "Samsung Galaxy S22",
-    issue: "Battery Replacement",
-    issueTh: "เปลี่ยนแบตเตอรี่",
-    status: "completed",
-    technician: "Anna",
-    createdAt: "2024-01-13",
-    estimatedCost: 1200,
-    tag: "leaveDevice",
-  },
-];
 
 interface RepairsContextValue {
   repairs: RepairItem[];
   setRepairs: React.Dispatch<React.SetStateAction<RepairItem[]>>;
   endOfDayCount: number;
   leaveDeviceCount: number;
+  isLoading: boolean;
+  refreshRepairs: () => Promise<void>;
 }
 
 const RepairsContext = createContext<RepairsContextValue | null>(null);
 
+// Convert API repair data to RepairItem format
+function convertRepairFromAPI(repair: any): RepairItem {
+  return {
+    id: repair.repairNumber || repair.id,
+    serialNumber: repair.serialNumber,
+    customer: repair.customer?.fullName || `${repair.customer?.firstName || ''} ${repair.customer?.lastName || ''}`.trim() || 'Unknown',
+    phone: repair.customer?.phone || '',
+    device: repair.deviceModel || repair.deviceType || '',
+    issue: repair.problemDescription || repair.problemSymptoms || '',
+    issueTh: repair.problemSymptoms || repair.problemDescription || '',
+    status: repair.status || 'pending',
+    technician: repair.assignedTo ? `${repair.assignedTo.firstName} ${repair.assignedTo.lastName || ''}`.trim() : 'Unassigned',
+    technicianTh: repair.assignedTo ? `${repair.assignedTo.firstName} ${repair.assignedTo.lastName || ''}`.trim() : 'ยังไม่มอบหมาย',
+    createdAt: repair.dateOfReport ? new Date(repair.dateOfReport).toISOString().split('T')[0] : repair.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+    estimatedCost: parseFloat(String(repair.estimatedPrice || repair.repairSummaryPrice || repair.totalCost || 0)),
+    tag: repair.serviceType === 'walk_in' ? 'endOfDay' as const : 'leaveDevice' as const,
+    selectedPartId: repair.selectedPartId,
+    selectedPart: repair.selectedPart ? {
+      partNumber: repair.selectedPart.partNumber,
+      name: repair.selectedPart.name,
+      nameTh: repair.selectedPart.nameTh,
+    } : undefined,
+    selectedParts: repair.selectedParts ? repair.selectedParts.map((part: any) => ({
+      id: part.id,
+      partNumber: part.partNumber,
+      name: part.name,
+      nameTh: part.nameTh,
+      price: part.price,
+    })) : (repair.selectedPart ? [{
+      id: repair.selectedPart.id,
+      partNumber: repair.selectedPart.partNumber,
+      name: repair.selectedPart.name,
+      nameTh: repair.selectedPart.nameTh,
+      price: repair.selectedPart.price,
+    }] : undefined),
+  };
+}
+
 export function RepairsProvider({ children }: { children: ReactNode }) {
-  const [repairs, setRepairs] = useState<RepairItem[]>(initialRepairs);
+  const [repairs, setRepairs] = useState<RepairItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refreshRepairs = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getRepairs();
+      if (response.status === 'success' && response.data) {
+        const convertedRepairs = response.data.map(convertRepairFromAPI);
+        setRepairs(convertedRepairs);
+      } else {
+        console.error('Failed to load repairs:', response.message);
+        setRepairs([]);
+      }
+    } catch (error) {
+      console.error('Error loading repairs:', error);
+      setRepairs([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshRepairs();
+  }, []);
 
   const value = useMemo(() => {
     const endOfDayCount = repairs.filter((r) => r.tag === "endOfDay").length;
@@ -161,8 +127,10 @@ export function RepairsProvider({ children }: { children: ReactNode }) {
       setRepairs,
       endOfDayCount,
       leaveDeviceCount,
+      isLoading,
+      refreshRepairs,
     };
-  }, [repairs]);
+  }, [repairs, isLoading]);
 
   return (
     <RepairsContext.Provider value={value}>
