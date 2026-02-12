@@ -18,6 +18,7 @@ import Inventory from "./pages/Inventory";
 import Warranty from "./pages/Warranty";
 import Finance from "./pages/Finance";
 import Settings from "./pages/Settings";
+import AdminUsers from "./pages/Admin/AdminUsers";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -57,18 +58,19 @@ const App = () => (
               <WarrantyProvider>
                 <Routes>
                   <Route path="/" element={<Navigate to="/login" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/repairs" element={<Repairs />} />
-                  <Route path="/repairs/new" element={<RepairNew />} />
-                  <Route path="/repairs/bill" element={<RepairBill />} />
-                  <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
-                  <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
-                  <Route path="/inventory" element={<Inventory />} />
-                  <Route path="/warranty" element={<Warranty />} />
-                  <Route path="/finance" element={<Finance />} />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
+                  <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
+                  <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
+                  <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
+                  <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
+                  <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+                  <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
+                  <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
                   <Route path="/login" element={<Login />} />
-                  <Route path="*" element={<NotFound />} />
+                  <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                 </Routes>
               </WarrantyProvider>
             </RepairsProvider>

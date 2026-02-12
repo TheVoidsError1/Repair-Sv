@@ -94,6 +94,7 @@ type AuthContextType = {
   currentUser: User | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => { success: boolean; error?: string };
+  loginFromApi: (userData: { email: string; username?: string; firstName?: string; lastName?: string; name?: string; role?: "owner" | "staff" }) => void;
   logout: () => void;
   addUser: (user: Omit<User, "id" | "lastLogin">) => { success: boolean; error?: string };
   updateUser: (id: string, data: Partial<Omit<User, "id" | "username">>) => void;
@@ -161,6 +162,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [users]
   );
 
+  const loginFromApi = useCallback(
+    (userData: { email: string; username?: string; firstName?: string; lastName?: string; name?: string; role?: "owner" | "staff" }) => {
+      // ใช้ email เป็น username ถ้าไม่มี username
+      const username = userData.username || userData.email;
+      const name = userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || username;
+      const role = userData.role || "staff";
+      const now = new Date().toISOString();
+      
+      // เช็คว่ามี user นี้ใน users array หรือไม่
+      let user = users.find((u) => u.username.toLowerCase() === username.toLowerCase() || u.username.toLowerCase() === userData.email.toLowerCase());
+      
+      if (!user) {
+        // ถ้ายังไม่มี ให้สร้าง user ใหม่
+        const newUser: User = {
+          id: String(Date.now()),
+          username,
+          password: "", // ไม่เก็บ password จาก API
+          name,
+          role,
+          status: "active",
+          lastLogin: now,
+        };
+        // เพิ่ม user ใหม่
+        setUsers((prev) => [...prev, newUser]);
+        // สร้าง session และ set currentUser
+        const newSession: AuthSession = { username: newUser.username, loginAt: now };
+        localStorage.setItem(STORAGE_AUTH, JSON.stringify(newSession));
+        setSession(newSession);
+        setCurrentUser(newUser);
+      } else {
+        // อัพเดท lastLogin
+        const updatedUser = { ...user, lastLogin: now };
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === user!.id ? updatedUser : u
+          )
+        );
+        // สร้าง session และ set currentUser
+        const newSession: AuthSession = { username: updatedUser.username, loginAt: now };
+        localStorage.setItem(STORAGE_AUTH, JSON.stringify(newSession));
+        setSession(newSession);
+        setCurrentUser(updatedUser);
+      }
+    },
+    [users]
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_AUTH);
     setSession(null);
@@ -207,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     currentUser,
     isAuthenticated: !!currentUser,
     login,
+    loginFromApi,
     logout,
     addUser,
     updateUser,

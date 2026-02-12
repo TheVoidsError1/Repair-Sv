@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const { t, language } = useLanguage();
-  const { login, isAuthenticated } = useAuth();
+  const { loginFromApi } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -31,14 +31,32 @@ const Login = () => {
         localStorage.setItem('authToken', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
 
+        // Sync with AuthContext
+        loginFromApi({
+          email: response.data.user.email || email,
+          username: response.data.user.username,
+          firstName: response.data.user.firstName,
+          lastName: response.data.user.lastName,
+          name: response.data.user.name,
+          role: response.data.user.role || (response.data.user.isOwner ? "owner" : "staff"),
+        });
+
+        const userName = response.data.user.name || 
+          `${response.data.user.firstName || ''} ${response.data.user.lastName || ''}`.trim() || 
+          response.data.user.email || 
+          email;
+
         toast({
           title: language === "th" ? "เข้าสู่ระบบสำเร็จ" : "Login successful",
           description: language === "th" 
-            ? `ยินดีต้อนรับ ${response.data.user.firstName} ${response.data.user.lastName}`
-            : `Welcome ${response.data.user.firstName} ${response.data.user.lastName}`,
+            ? `ยินดีต้อนรับ ${userName}`
+            : `Welcome ${userName}`,
         });
 
-        navigate("/dashboard");
+        // รอให้ state update ก่อน navigate
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 100);
       } else {
         toast({
           title: language === "th" ? "เข้าสู่ระบบล้มเหลว" : "Login failed",

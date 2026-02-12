@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
-import { AppSidebar } from "./AppSidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { ReactNode } from "react";
 
 interface MainLayoutProps {
   children: ReactNode;
