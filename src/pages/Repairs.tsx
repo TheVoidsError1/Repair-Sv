@@ -495,26 +495,59 @@ const Repairs = () => {
       return;
     }
 
-    // อัปเดตสถานะ
+    // อัปเดตสถานะลง database
     const repairToUpdate = editingRepair || pendingStatusChange?.repair;
     const newStatus = editingRepair ? editingStatus : pendingStatusChange?.newStatus;
+    
     if (repairToUpdate && newStatus) {
-      setRepairs((prev) =>
-        prev.map((r) =>
-          r.id === repairToUpdate.id ? { ...r, status: newStatus } : r
-        )
-      );
+      try {
+        // เรียก API เพื่ออัปเดตสถานะลง database
+        const updateResponse = await apiClient.updateRepair(repairToUpdate.id, {
+          status: newStatus,
+        });
+
+        if (updateResponse.status === 'success') {
+          // อัปเดตสถานะใน state ชั่วคราว
+          setRepairs((prev) =>
+            prev.map((r) =>
+              r.id === repairToUpdate.id ? { ...r, status: newStatus } : r
+            )
+          );
+          
+          // Refresh ข้อมูลจาก database
+          await refreshRepairs();
+          
+          toast({
+            title: language === "th" ? "อัปเดตสำเร็จ" : "Update successful",
+            description: t("statusUpdateSuccess"),
+          });
+        } else {
+          const errorMsg = updateResponse.message || updateResponse.error || 'Failed to update status';
+          console.error('Update repair API error:', updateResponse);
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        console.error('Error updating repair status:', error);
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : (language === "th" 
+            ? "ไม่สามารถอัปเดตสถานะได้ กรุณาลองใหม่อีกครั้ง" 
+            : "Failed to update status. Please try again.");
+        toast({
+          title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
     }
+    
     setConfirmSaveOpen(false);
     setEditOpen(false);
     setEditingRepair(null);
     setPendingStatusChange(null);
     setCancelReason("");
     setConfirmPassword("");
-    toast({
-      title: language === "th" ? "แจ้งเตือน" : "Notice",
-      description: t("statusUpdateSuccess"),
-    });
   };
 
   const handleStatusFilterChange = (value: string) => {

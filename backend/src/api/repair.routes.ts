@@ -313,17 +313,56 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const repairRepository = AppDataSource.getRepository(Repair);
-    const repair = await repairRepository.findOne({ where: { id } });
+    
+    console.log(`[Update Repair] Looking for repair with id/repairNumber: ${id}`);
+    
+    // Check if id is a valid UUID format (8-4-4-4-12 hex characters)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUUID = uuidRegex.test(id);
+    
+    let repair;
+    if (isUUID) {
+      // If it's a UUID, search by id
+      repair = await repairRepository.findOne({ where: { id } });
+    } else {
+      // If it's not a UUID, it's likely a repairNumber
+      repair = await repairRepository.findOne({ where: { repairNumber: id } });
+    }
 
     if (!repair) {
+      console.log(`[Update Repair] Repair not found: ${id}`);
       return res.status(404).json({
         status: 'error',
         message: 'Repair not found',
       });
     }
 
-    Object.assign(repair, req.body);
+    console.log(`[Update Repair] Found repair: ${repair.id} (${repair.repairNumber}), current status: ${repair.status}`);
+    console.log(`[Update Repair] Request body:`, JSON.stringify(req.body, null, 2));
+
+    // Validate status if provided
+    if (req.body.status !== undefined) {
+      const validStatuses = Object.values(RepairStatus);
+      if (!validStatuses.includes(req.body.status)) {
+        console.log(`[Update Repair] Invalid status: ${req.body.status}, valid: ${validStatuses.join(', ')}`);
+        return res.status(400).json({
+          status: 'error',
+          message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        });
+      }
+      repair.status = req.body.status as RepairStatus;
+      console.log(`[Update Repair] Setting status to: ${repair.status}`);
+    }
+
+    // Update other fields (excluding status which we already handled)
+    const { status, ...otherFields } = req.body;
+    if (Object.keys(otherFields).length > 0) {
+      Object.assign(repair, otherFields);
+    }
+    
+    console.log(`[Update Repair] Saving repair with status: ${repair.status}`);
     const updatedRepair = await repairRepository.save(repair);
+    console.log(`[Update Repair] Saved successfully: ${updatedRepair.id}`);
     
     // Load relations
     const repairWithRelations = await repairRepository.findOne({
@@ -337,7 +376,11 @@ router.put('/:id', async (req, res) => {
       message: 'Repair updated successfully',
     });
   } catch (error) {
-    console.error('Update repair error:', error);
+    console.error('[Update Repair] Error details:', error);
+    if (error instanceof Error) {
+      console.error('[Update Repair] Error message:', error.message);
+      console.error('[Update Repair] Error stack:', error.stack);
+    }
     res.status(500).json({
       status: 'error',
       message: 'Failed to update repair',
