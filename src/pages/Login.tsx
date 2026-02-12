@@ -132,12 +132,6 @@ const Login = () => {
             <p className="mt-2 text-slate-500 text-sm">{t("loginSubtitle")}</p>
           </div>
 
-          {error && (
-            <div className="rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-3">
-              {error}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label

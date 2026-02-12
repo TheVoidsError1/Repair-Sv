@@ -4,6 +4,17 @@ import { Customer } from '../entities/Customer.js';
 
 const router = Router();
 
+// Validation helper functions
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^[0-9]{9,10}$/;
+  return phoneRegex.test(phone.replace(/[-\s]/g, ''));
+};
+
 // Get all customers
 router.get('/', async (req, res) => {
   try {
@@ -60,8 +71,60 @@ router.get('/:id', async (req, res) => {
 // Create customer
 router.post('/', async (req, res) => {
   try {
+    const { firstName, lastName, phone, email, lineId } = req.body;
+
+    // Validation
+    if (!firstName || !firstName.trim()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'First name is required',
+      });
+    }
+
+    if (!lastName || !lastName.trim()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Last name is required',
+      });
+    }
+
+    if (email && !validateEmail(email)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email format',
+      });
+    }
+
+    if (phone && !validatePhone(phone)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid phone number format (should be 9-10 digits)',
+      });
+    }
+
     const customerRepository = AppDataSource.getRepository(Customer);
-    const newCustomer = customerRepository.create(req.body);
+    
+    // Check if email already exists
+    if (email) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { email },
+      });
+      if (existingCustomer) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email already exists',
+        });
+      }
+    }
+
+    const newCustomer = customerRepository.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone?.trim() || null,
+      email: email?.trim() || null,
+      lineId: lineId?.trim() || null,
+    });
+
     const savedCustomer = await customerRepository.save(newCustomer);
 
     res.status(201).json({
@@ -71,6 +134,15 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Create customer error:', error);
+    
+    // Handle database constraint errors
+    if (error instanceof Error && error.message.includes('duplicate')) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Customer with this information already exists',
+      });
+    }
+
     res.status(500).json({
       status: 'error',
       message: 'Failed to create customer',
@@ -83,6 +155,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { firstName, lastName, phone, email, lineId } = req.body;
+    
     const customerRepository = AppDataSource.getRepository(Customer);
     const customer = await customerRepository.findOne({ where: { id } });
 
@@ -93,7 +167,55 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    Object.assign(customer, req.body);
+    // Validation
+    if (firstName !== undefined && (!firstName || !firstName.trim())) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'First name cannot be empty',
+      });
+    }
+
+    if (lastName !== undefined && (!lastName || !lastName.trim())) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Last name cannot be empty',
+      });
+    }
+
+    if (email && !validateEmail(email)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email format',
+      });
+    }
+
+    if (phone && !validatePhone(phone)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid phone number format (should be 9-10 digits)',
+      });
+    }
+
+    // Check if email already exists (excluding current customer)
+    if (email && email !== customer.email) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { email },
+      });
+      if (existingCustomer) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email already exists',
+        });
+      }
+    }
+
+    // Update only provided fields
+    if (firstName !== undefined) customer.firstName = firstName.trim();
+    if (lastName !== undefined) customer.lastName = lastName.trim();
+    if (phone !== undefined) customer.phone = phone?.trim() || null;
+    if (email !== undefined) customer.email = email?.trim() || null;
+    if (lineId !== undefined) customer.lineId = lineId?.trim() || null;
+
     const updatedCustomer = await customerRepository.save(customer);
 
     res.json({
@@ -103,6 +225,15 @@ router.put('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Update customer error:', error);
+    
+    // Handle database constraint errors
+    if (error instanceof Error && error.message.includes('duplicate')) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Customer with this information already exists',
+      });
+    }
+
     res.status(500).json({
       status: 'error',
       message: 'Failed to update customer',
@@ -116,12 +247,24 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const customerRepository = AppDataSource.getRepository(Customer);
-    const customer = await customerRepository.findOne({ where: { id } });
+    const customer = await customerRepository.findOne({ 
+      where: { id },
+      relations: ['repairs'],
+    });
 
     if (!customer) {
       return res.status(404).json({
         status: 'error',
         message: 'Customer not found',
+      });
+    }
+
+    // Check if customer has repairs
+    if (customer.repairs && customer.repairs.length > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cannot delete customer with existing repairs. Please delete or reassign repairs first.',
+        repairsCount: customer.repairs.length,
       });
     }
 
@@ -133,6 +276,15 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Delete customer error:', error);
+    
+    // Handle foreign key constraint errors
+    if (error instanceof Error && error.message.includes('foreign key')) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cannot delete customer with existing repairs',
+      });
+    }
+
     res.status(500).json({
       status: 'error',
       message: 'Failed to delete customer',

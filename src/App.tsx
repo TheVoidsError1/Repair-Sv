@@ -48,29 +48,33 @@ function RoleProtectedRoute({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <RepairsProvider>
-            <Routes>
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/repairs" element={<Repairs />} />
-              <Route path="/repairs/new" element={<RepairNew />} />
-              <Route path="/repairs/bill" element={<RepairBill />} />
-              <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
-              <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/warranty" element={<Warranty />} />
-              <Route path="/finance" element={<Finance />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </RepairsProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <RepairsProvider>
+              <WarrantyProvider>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/login" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/repairs" element={<Repairs />} />
+                  <Route path="/repairs/new" element={<RepairNew />} />
+                  <Route path="/repairs/bill" element={<RepairBill />} />
+                  <Route path="/repairs/bill/order" element={<RepairOrderBill />} />
+                  <Route path="/repairs/bill/receipt" element={<RepairReceipt />} />
+                  <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/warranty" element={<Warranty />} />
+                  <Route path="/finance" element={<Finance />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </WarrantyProvider>
+            </RepairsProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </LanguageProvider>
   </QueryClientProvider>
 );
