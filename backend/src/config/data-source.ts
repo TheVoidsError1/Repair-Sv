@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
-import { Customer, Personnel, Part, Repair } from '../entities/index.js';
+import { Customer, Personnel, Part, Repair, WarrantyClaim } from '../entities/index.js';
 
 dotenv.config();
 
@@ -19,7 +19,7 @@ export const AppDataSource = new DataSource({
   ...passwordConfig,
   synchronize: process.env.NODE_ENV === 'development', // Auto sync schema in dev (use migrations in production)
   logging: process.env.NODE_ENV === 'development',
-  entities: [Customer, Personnel, Part, Repair],
+  entities: [Customer, Personnel, Part, Repair, WarrantyClaim],
   migrations: ['src/migrations/**/*.ts'],
   subscribers: ['src/subscribers/**/*.ts'],
 });

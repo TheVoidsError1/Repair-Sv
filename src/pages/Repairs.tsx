@@ -28,9 +28,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs, type RepairItem, type RepairTag } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
 import { repairItemToBillData, type RepairOrderData } from "@/types/repairOrder";
 import { Eye, FileText, Filter, Pencil, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -262,6 +264,7 @@ const RepairBillPreview = ({
 
 const Repairs = () => {
   const { t, language } = useLanguage();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { repairs, setRepairs, refreshRepairs, isLoading } = useRepairs();
@@ -281,7 +284,6 @@ const Repairs = () => {
   >("pending");
   const [cancelReason, setCancelReason] = useState("");
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   // เปลี่ยนสถานะจากตารางโดยตรง (ไม่ผ่าน Edit dialog)
   const [pendingStatusChange, setPendingStatusChange] = useState<{
@@ -290,12 +292,6 @@ const Repairs = () => {
   } | null>(null);
   const [cancelReasonOpen, setCancelReasonOpen] = useState(false);
   const { toast } = useToast();
-
-  const managementUsers = [
-    { id: "admin", name: "Admin", nameTh: "ผู้ดูแลระบบ" },
-    { id: "tom", name: "Tom", nameTh: "ทอม" },
-    { id: "anna", name: "Anna", nameTh: "แอนนา" },
-  ];
 
   // เดิมเปิด Dialog — ตอนนี้ไปหน้าสร้างงานซ่อมเต็มหน้าแทน
   useEffect(() => {
@@ -435,7 +431,71 @@ const Repairs = () => {
     }
   };
 
-  const applyStatusUpdate = () => {
+  const applyStatusUpdate = async () => {
+    // ตรวจสอบว่ามีผู้ใช้ล็อกอินอยู่
+    if (!currentUser) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "กรุณาเข้าสู่ระบบก่อน" : "Please login first",
+        variant: "destructive",
+      });
+      setConfirmSaveOpen(false);
+      return;
+    }
+
+    // ตรวจสอบรหัสผ่าน
+    if (!confirmPassword) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "กรุณากรอกรหัสผ่าน" : "Please enter password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // ดึงข้อมูลผู้ใช้จาก localStorage เพื่อหา email
+    const storedUser = localStorage.getItem('user');
+    let userEmail = '';
+    
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        userEmail = userData.email || currentUser.username;
+      } catch {
+        userEmail = currentUser.username;
+      }
+    } else {
+      userEmail = currentUser.username;
+    }
+
+    // ตรวจสอบรหัสผ่านผ่าน API
+    try {
+      const loginResponse = await apiClient.login(userEmail, confirmPassword);
+      
+      if (loginResponse.status !== 'success') {
+        toast({
+          title: language === "th" ? "รหัสผ่านไม่ถูกต้อง" : "Invalid password",
+          description: language === "th" 
+            ? "รหัสผ่านที่กรอกไม่ถูกต้อง" 
+            : "The password you entered is incorrect",
+          variant: "destructive",
+        });
+        setConfirmPassword("");
+        return;
+      }
+    } catch (error) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" 
+          ? "ไม่สามารถตรวจสอบรหัสผ่านได้" 
+          : "Unable to verify password",
+        variant: "destructive",
+      });
+      setConfirmPassword("");
+      return;
+    }
+
+    // อัปเดตสถานะ
     const repairToUpdate = editingRepair || pendingStatusChange?.repair;
     const newStatus = editingRepair ? editingStatus : pendingStatusChange?.newStatus;
     if (repairToUpdate && newStatus) {
@@ -450,7 +510,6 @@ const Repairs = () => {
     setEditingRepair(null);
     setPendingStatusChange(null);
     setCancelReason("");
-    setSelectedUserId("");
     setConfirmPassword("");
     toast({
       title: language === "th" ? "แจ้งเตือน" : "Notice",
@@ -1131,20 +1190,21 @@ const Repairs = () => {
         </DialogContent>
       </Dialog>
 
-      {/* เลือกผู้ใช้และรหัสผ่านก่อนบันทึกสถานะ */}
+      {/* ยืนยันรหัสผ่านก่อนบันทึกสถานะ */}
       <Dialog open={confirmSaveOpen} onOpenChange={(open) => {
         setConfirmSaveOpen(open);
         if (!open) {
-          setSelectedUserId("");
           setConfirmPassword("");
           if (!editingRepair) setPendingStatusChange(null);
         }
       }}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>{t("confirmAccessTitle")}</DialogTitle>
+            <DialogTitle>{language === "th" ? "ยืนยันการอัปเดตสถานะ" : "Confirm Status Update"}</DialogTitle>
             <DialogDescription>
-              {t("confirmAccessDescription")}
+              {language === "th" 
+                ? "กรอกรหัสผ่านเพื่อยืนยันการอัปเดตสถานะการซ่อม"
+                : "Enter your password to confirm the repair status update"}
               {pendingStatusChange && (
                 <span className="mt-2 block font-medium text-foreground">
                   {language === "th" ? "คำสั่งซ่อม " : "Order "}
@@ -1157,32 +1217,19 @@ const Repairs = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>{t("selectUserForManagement")}</Label>
-              <Select
-                value={selectedUserId}
-                onValueChange={setSelectedUserId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("selectUserForManagement")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {managementUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {language === "th" ? user.nameTh : user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="confirm-password">{t("password")}</Label>
               <Input
                 id="confirm-password"
                 type="password"
-                placeholder={t("enterPassword")}
+                placeholder={language === "th" ? "กรอกรหัสผ่านที่ใช้เข้าสู่ระบบ" : "Enter your login password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="off"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    applyStatusUpdate();
+                  }
+                }}
               />
             </div>
           </div>
@@ -1191,7 +1238,6 @@ const Repairs = () => {
               variant="outline"
               onClick={() => {
                 setConfirmSaveOpen(false);
-                setSelectedUserId("");
                 setConfirmPassword("");
               }}
             >
@@ -1199,6 +1245,7 @@ const Repairs = () => {
             </Button>
             <Button
               onClick={applyStatusUpdate}
+              disabled={!confirmPassword}
             >
               {t("confirm")}
             </Button>

@@ -24,6 +24,14 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function RootRedirect() {
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <Navigate to="/login" replace />;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
@@ -41,7 +49,7 @@ function RoleProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   const role = currentUser?.role ?? "staff";
   if (!canAccessRoute(location.pathname, role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
 }
@@ -57,7 +65,7 @@ const App = () => (
             <RepairsProvider>
               <WarrantyProvider>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/login" replace />} />
+                  <Route path="/" element={<RootRedirect />} />
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                   <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
                   <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />

@@ -37,7 +37,7 @@ import {
     ShieldCheck,
     XCircle,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 
 /** จำนวนวันรับประกันเริ่มต้น (ใช้จาก repair.createdAt ของงานซ่อมที่ completed) */
 const DEFAULT_WARRANTY_DAYS = 90;
@@ -113,7 +113,10 @@ const Warranty = () => {
     inspectionChecks.deviceCondition && inspectionChecks.claimReasonMatch && inspectionChecks.customerVerified;
 
   // เลือกได้เฉพาะงานซ่อมที่เสร็จแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
-  const completedRepairs = repairs.filter((r) => r.status === "completed");
+  // เรียงลำดับตามวันที่สร้าง (ใหม่สุดก่อน) และกรองเฉพาะที่มี serialNumber
+  const completedRepairs = repairs
+    .filter((r) => r.status === "completed" && r.serialNumber)
+    .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 
   const statusLabels: Record<string, string> = {
     pending: t("pendingReview"),
@@ -141,36 +144,35 @@ const Warranty = () => {
   const approvedCount = claims.filter((c) => c.status === "approved").length;
   const rejectedCount = claims.filter((c) => c.status === "rejected").length;
 
-  // ค้นหาด้วย Serial Number (SN / IMEI) — ใช้เป็นตัวระบุหลักสำหรับการรับประกัน
-  const [snSearchInput, setSnSearchInput] = useState("");
+  // เลือกงานซ่อมจาก dropdown (เฉพาะที่ completed)
+  const [selectedRepairId, setSelectedRepairId] = useState<string>("");
   const [newClaimReason, setNewClaimReason] = useState("");
 
-  /** หางานซ่อมล่าสุดจาก serial_number (เฉพาะที่ completed) */
-  const repairBySn = (() => {
-    const sn = snSearchInput.trim();
-    if (!sn) return null;
-    const withSn = repairs.filter(
-      (r) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase() && r.status === "completed"
-    );
-    if (withSn.length === 0) return null;
-    withSn.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    return withSn[0];
-  })();
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setSelectedRepairId("");
+      setNewClaimReason("");
+    }
+  }, [isDialogOpen]);
 
-  const snNotFound = snSearchInput.trim() !== "" && repairBySn === null;
+  /** หางานซ่อมที่เลือกจาก dropdown */
+  const repairBySn = selectedRepairId
+    ? repairs.find((r) => r.id === selectedRepairId && r.status === "completed")
+    : null;
   const repairDateBySn = repairBySn?.createdAt ?? "";
   const expiryDateBySn = repairBySn ? getWarrantyExpiryDate(repairBySn.createdAt, DEFAULT_WARRANTY_DAYS) : "";
   const remainingDaysBySn = expiryDateBySn ? getRemainingWarrantyDays(expiryDateBySn) : 0;
   const previousClaimCountBySn = repairBySn
     ? claims.filter((c) => c.repairId === repairBySn.id).length
     : 0;
-  const canSubmitClaim = !!repairBySn && !snNotFound && newClaimReason.trim().length > 0;
+  const canSubmitClaim = !!repairBySn && newClaimReason.trim().length > 0;
 
   const handleSubmitClaim = () => {
     if (!repairBySn) {
       toast({
         title: language === "th" ? "แจ้งเตือน" : "Notice",
-        description: language === "th" ? "ไม่พบงานซ่อมตามหมายเลข SN/IMEI" : "No repair found for this serial number.",
+        description: language === "th" ? "กรุณาเลือกงานซ่อม" : "Please select a repair.",
         variant: "destructive",
       });
       return;
@@ -194,7 +196,7 @@ const Warranty = () => {
       title: language === "th" ? "สำเร็จ" : "Success",
       description: t("submitClaim"),
     });
-    setSnSearchInput("");
+    setSelectedRepairId("");
     setNewClaimReason("");
     setIsDialogOpen(false);
   };
@@ -228,27 +230,41 @@ const Warranty = () => {
                 <DialogTitle>{t("createWarrantyClaim")}</DialogTitle>
                 <DialogDescription>
                   {language === "th"
-                    ? "ค้นหาด้วยหมายเลข IMEI / Serial Number ของเครื่องที่ซ่อม"
-                    : "Search by IMEI / Serial Number of the repaired device"}
+                    ? "เลือกงานซ่อมที่เสร็จแล้วเพื่อสร้างเคลมการรับประกัน"
+                    : "Select a completed repair to create a warranty claim"}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="snSearch">
-                    {language === "th" ? "หมายเลข IMEI / Serial Number (SN)" : "IMEI / Serial Number (SN)"}
+                  <Label htmlFor="repairSelect">
+                    {language === "th" ? "เลือกงานซ่อม" : "Select Repair"}
                   </Label>
-                  <Input
-                    id="snSearch"
-                    placeholder={language === "th" ? "กรอก 15 หลัก หรือหมายเลขเครื่อง" : "Enter 15 digits or serial"}
-                    value={snSearchInput}
-                    onChange={(e) => setSnSearchInput(e.target.value)}
-                    className={snNotFound ? "border-destructive" : ""}
-                  />
-                  {snNotFound && (
-                    <p className="text-sm text-destructive">
-                      {language === "th" ? "ไม่พบงานซ่อมตามหมายเลขนี้" : "No repair found for this serial number."}
-                    </p>
-                  )}
+                  <Select
+                    value={selectedRepairId}
+                    onValueChange={(value) => setSelectedRepairId(value)}
+                  >
+                    <SelectTrigger id="repairSelect">
+                      <SelectValue placeholder={language === "th" ? "เลือกงานซ่อมที่เสร็จแล้ว" : "Select completed repair"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {completedRepairs.length === 0 ? (
+                        <SelectItem value="no-repairs" disabled>
+                          {language === "th" ? "ไม่มีงานซ่อมที่เสร็จแล้ว" : "No completed repairs"}
+                        </SelectItem>
+                      ) : (
+                        completedRepairs.map((repair) => {
+                          const displayText = repair.serialNumber
+                            ? `${repair.serialNumber} - ${repair.customer}`
+                            : repair.customer;
+                          return (
+                            <SelectItem key={repair.id} value={repair.id}>
+                              {displayText}
+                            </SelectItem>
+                          );
+                        })
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {repairBySn && (
                   <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">

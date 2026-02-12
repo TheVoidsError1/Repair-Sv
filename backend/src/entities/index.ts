@@ -3,3 +3,5 @@ export { Personnel } from './Personnel.js';
 export { Part } from './Part.js';
 export { Repair } from './Repair.js';
 export { RepairStatus } from './Repair.js';
+export { WarrantyClaim } from './WarrantyClaim.js';
+export { WarrantyClaimStatus } from './WarrantyClaim.js';
