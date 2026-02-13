@@ -2,12 +2,15 @@ import {
   BarChart3,
   DollarSign,
   FileText,
+  Home,
   LayoutDashboard,
   List,
   Package,
   Settings,
   ShieldCheck,
   Store,
+  UserCog,
+  UserPlus,
   Users,
   Wrench,
   type LucideIcon,
@@ -217,8 +220,8 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
   admin: {
     id: "admin",
     titleTh: "จัดการระบบ",
-    titleEn: "Admin",
-    basePath: "/admin",
+    titleEn: "System Management",
+    basePath: "/system",
     icon: Users,
     iconBg: "bg-amber-500/20 text-amber-400",
     sections: [
@@ -227,6 +230,27 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
         labelTh: "หลัก",
         labelEn: "Main",
         items: [
+          {
+            id: "system",
+            href: "/system",
+            labelTh: "จัดการระบบ",
+            labelEn: "System Management",
+            icon: Settings,
+          },
+          {
+            id: "account",
+            href: "/system/account",
+            labelTh: "จัดการบัญชี",
+            labelEn: "Account Management",
+            icon: UserCog,
+          },
+          {
+            id: "register",
+            href: "/system/register",
+            labelTh: "สมัครสมาชิก",
+            labelEn: "Register",
+            icon: UserPlus,
+          },
           {
             id: "users",
             href: "/admin/users",
@@ -255,6 +279,8 @@ export const SUBJECT_ORDER: string[] = [
 export function getSubjectIdFromPath(pathname: string): string | null {
   if (pathname === "/subjects") return null;
   if (pathname === "/" || pathname.startsWith("/") && pathname.length <= 1) return "dashboard";
+  // Check /admin paths for admin subject
+  if (pathname.startsWith("/admin")) return "admin";
   for (const subject of Object.values(SUBJECTS_CONFIG)) {
     if (pathname === subject.basePath || (subject.basePath !== "/" && pathname.startsWith(subject.basePath)))
       return subject.id;

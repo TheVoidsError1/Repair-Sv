@@ -1,12 +1,12 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddSelectedPartIds1771000000000 implements MigrationInterface {
+export class AddTokenToPersonnel1773000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add selectedPartIds column to store JSON array of part IDs
+    // Add token column to personnel table
     await queryRunner.addColumn(
-      'repairs',
+      'personnel',
       new TableColumn({
-        name: 'selectedPartIds',
+        name: 'token',
         type: 'text',
         isNullable: true,
       })
@@ -14,7 +14,7 @@ export class AddSelectedPartIds1771000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Remove selectedPartIds column
-    await queryRunner.dropColumn('repairs', 'selectedPartIds');
+    // Remove token column
+    await queryRunner.dropColumn('personnel', 'token');
   }
 }

@@ -1,8 +1,73 @@
 import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { AppDataSource } from '../config/data-source.js';
 import { Part } from '../entities/Part.js';
 
 const router = Router();
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(process.cwd(), 'uploads', 'parts');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: timestamp-random-originalname
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `part-${uniqueSuffix}${ext}`);
+  }
+});
+
+// File filter - only allow images
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
+
+// Error handling middleware for multer
+const handleMulterError = (err: any, req: any, res: any, next: any) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'File too large. Maximum size is 5MB',
+      });
+    }
+    return res.status(400).json({
+      status: 'error',
+      message: err.message,
+    });
+  }
+  if (err) {
+    return res.status(400).json({
+      status: 'error',
+      message: err.message || 'File upload error',
+    });
+  }
+  next();
+};
 
 // Validation helper functions
 const validatePrice = (price: any): boolean => {
@@ -65,8 +130,38 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Upload image endpoint
+router.post('/upload-image', upload.single('image'), handleMulterError, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No image file provided',
+      });
+    }
+
+    const imageUrl = `/uploads/parts/${req.file.filename}`;
+
+    res.json({
+      status: 'success',
+      data: {
+        imageUrl: imageUrl,
+        filename: req.file.filename,
+      },
+      message: 'Image uploaded successfully',
+    });
+  } catch (error) {
+    console.error('Upload image error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload image',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Create part
-router.post('/', async (req, res) => {
+router.post('/', upload.single('image'), handleMulterError, async (req, res) => {
   try {
     const { 
       name,
@@ -84,6 +179,12 @@ router.post('/', async (req, res) => {
       location, 
       notes 
     } = req.body;
+
+    // Handle image upload
+    let imageUrl: string | undefined = undefined;
+    if (req.file) {
+      imageUrl = `/uploads/parts/${req.file.filename}`;
+    }
 
     // Validation
     if (!name || !name.trim()) {
@@ -164,6 +265,7 @@ router.post('/', async (req, res) => {
       categoryTh: categoryTh?.trim() || null,
       location: location?.trim() || null,
       notes: notes?.trim() || null,
+      imageUrl: imageUrl || null,
     });
 
     const savedPart = await partRepository.save(newPart);
@@ -193,7 +295,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update part
-router.put('/:id', async (req, res) => {
+router.put('/:id', upload.single('image'), handleMulterError, async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -210,7 +312,8 @@ router.put('/:id', async (req, res) => {
       category,
       categoryTh,
       location, 
-      notes 
+      notes,
+      imageUrl: imageUrlFromBody
     } = req.body;
     
     const partRepository = AppDataSource.getRepository(Part);
@@ -269,6 +372,32 @@ router.put('/:id', async (req, res) => {
           status: 'error',
           message: 'Part number already exists',
         });
+      }
+    }
+
+    // Handle image upload - if new file is uploaded, delete old one
+    if (req.file) {
+      // Delete old image if exists
+      if (part.imageUrl) {
+        const oldImagePath = path.join(process.cwd(), part.imageUrl);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      part.imageUrl = `/uploads/parts/${req.file.filename}`;
+    } else if (imageUrlFromBody !== undefined) {
+      // If imageUrl is explicitly set to null/empty, delete the old image
+      if (imageUrlFromBody === null || imageUrlFromBody === '') {
+        if (part.imageUrl) {
+          const oldImagePath = path.join(process.cwd(), part.imageUrl);
+          if (fs.existsSync(oldImagePath)) {
+            fs.unlinkSync(oldImagePath);
+          }
+        }
+        part.imageUrl = null;
+      } else if (imageUrlFromBody !== part.imageUrl) {
+        // If imageUrl is provided and different, update it
+        part.imageUrl = imageUrlFromBody;
       }
     }
 
@@ -338,6 +467,14 @@ router.delete('/:id', async (req, res) => {
         status: 'error',
         message: 'Part not found',
       });
+    }
+
+    // Delete associated image file if exists
+    if (part.imageUrl) {
+      const imagePath = path.join(process.cwd(), part.imageUrl);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
     }
 
     await partRepository.remove(part);

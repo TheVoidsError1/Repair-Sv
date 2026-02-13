@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AppDataSource } from '../config/data-source.js';
 import { Customer } from '../entities/Customer.js';
+import { Like } from 'typeorm';
 
 const router = Router();
 
@@ -32,6 +33,95 @@ router.get('/', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch customers',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Search customers by name or phone (if no query, return all customers)
+router.get('/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    const customerRepository = AppDataSource.getRepository(Customer);
+    
+    // If no query or empty query, return all customers (limited to 20)
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      const customers = await customerRepository.find({
+        relations: ['repairs'],
+        order: { createdAt: 'DESC' },
+        take: 20, // Limit to 20 results
+      });
+
+      return res.json({
+        status: 'success',
+        data: customers,
+        count: customers.length,
+      });
+    }
+
+    const searchTerm = q.trim();
+    
+    // Search by name (firstName, lastName, fullName) or phone
+    const customers = await customerRepository.find({
+      where: [
+        { firstName: Like(`%${searchTerm}%`) },
+        { lastName: Like(`%${searchTerm}%`) },
+        { fullName: Like(`%${searchTerm}%`) },
+        { phone: Like(`%${searchTerm}%`) },
+      ],
+      relations: ['repairs'],
+      order: { createdAt: 'DESC' },
+      take: 20, // Limit to 20 results
+    });
+
+    res.json({
+      status: 'success',
+      data: customers,
+      count: customers.length,
+    });
+  } catch (error) {
+    console.error('Search customers error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to search customers',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get customer by ID with all repair history
+router.get('/:id/with-repairs', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id },
+      relations: ['repairs'],
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Customer not found',
+      });
+    }
+
+    // Sort repairs by creation date (newest first)
+    if (customer.repairs) {
+      customer.repairs.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
+    res.json({
+      status: 'success',
+      data: customer,
+    });
+  } catch (error) {
+    console.error('Get customer with repairs error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch customer with repairs',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -107,12 +197,12 @@ router.post('/', async (req, res) => {
     // Check if email already exists
     if (email) {
       const existingCustomer = await customerRepository.findOne({
-        where: { email },
+        where: { phone },
       });
       if (existingCustomer) {
         return res.status(400).json({
           status: 'error',
-          message: 'Email already exists',
+          message: 'Phone number already exists',
         });
       }
     }
@@ -121,7 +211,6 @@ router.post('/', async (req, res) => {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phone: phone?.trim() || null,
-      email: email?.trim() || null,
       lineId: lineId?.trim() || null,
     });
 
@@ -197,23 +286,12 @@ router.put('/:id', async (req, res) => {
     }
 
     // Check if email already exists (excluding current customer)
-    if (email && email !== customer.email) {
-      const existingCustomer = await customerRepository.findOne({
-        where: { email },
-      });
-      if (existingCustomer) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Email already exists',
-        });
-      }
-    }
+
 
     // Update only provided fields
     if (firstName !== undefined) customer.firstName = firstName.trim();
     if (lastName !== undefined) customer.lastName = lastName.trim();
     if (phone !== undefined) customer.phone = phone?.trim() || null;
-    if (email !== undefined) customer.email = email?.trim() || null;
     if (lineId !== undefined) customer.lineId = lineId?.trim() || null;
 
     const updatedCustomer = await customerRepository.save(customer);

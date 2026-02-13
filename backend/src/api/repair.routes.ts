@@ -7,14 +7,73 @@ import { Between, In } from 'typeorm';
 
 const router = Router();
 
+// Helper function to reduce stock for parts
+async function reducePartStock(partIds: string[]): Promise<void> {
+  if (!partIds || partIds.length === 0) return;
+  
+  const partRepository = AppDataSource.getRepository(Part);
+  
+  // Count occurrences of each part ID (in case same part is used multiple times)
+  const partCounts: Record<string, number> = {};
+  partIds.forEach(id => {
+    partCounts[id] = (partCounts[id] || 0) + 1;
+  });
+  
+  // Update stock for each unique part
+  for (const [partId, quantity] of Object.entries(partCounts)) {
+    const part = await partRepository.findOne({ where: { id: partId } });
+    if (part) {
+      const newStock = Math.max(0, part.stockQuantity - quantity); // Ensure stock doesn't go below 0
+      part.stockQuantity = newStock;
+      await partRepository.save(part);
+      console.log(`[Stock] Reduced stock for part ${partId} by ${quantity}. New stock: ${newStock}`);
+    }
+  }
+}
+
+// Helper function to restore stock for parts
+async function restorePartStock(partIds: string[]): Promise<void> {
+  if (!partIds || partIds.length === 0) return;
+  
+  const partRepository = AppDataSource.getRepository(Part);
+  
+  // Count occurrences of each part ID
+  const partCounts: Record<string, number> = {};
+  partIds.forEach(id => {
+    partCounts[id] = (partCounts[id] || 0) + 1;
+  });
+  
+  // Restore stock for each unique part
+  for (const [partId, quantity] of Object.entries(partCounts)) {
+    const part = await partRepository.findOne({ where: { id: partId } });
+    if (part) {
+      part.stockQuantity = part.stockQuantity + quantity;
+      await partRepository.save(part);
+      console.log(`[Stock] Restored stock for part ${partId} by ${quantity}. New stock: ${part.stockQuantity}`);
+    }
+  }
+}
+
 // Get all repairs
 router.get('/', async (req, res) => {
   try {
     const repairRepository = AppDataSource.getRepository(Repair);
     const partRepository = AppDataSource.getRepository(Part);
+    
+    // Get pagination parameters from query string
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 8;
+    const skip = (page - 1) * limit;
+
+    // Get total count for pagination
+    const totalCount = await repairRepository.count();
+
+    // Get repairs with pagination
     const repairs = await repairRepository.find({
       relations: ['customer', 'assignedTo', 'selectedPart'],
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
 
     // ดึงข้อมูล parts ทั้งหมดจาก selectedPartIds สำหรับแต่ละ repair
@@ -47,9 +106,17 @@ router.get('/', async (req, res) => {
       })
     );
 
+    const totalPages = Math.ceil(totalCount / limit);
+
     res.json({
       status: 'success',
       data: repairsWithParts,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+      },
     });
   } catch (error) {
     console.error('Get repairs error:', error);
@@ -102,6 +169,8 @@ router.post('/', async (req, res) => {
     const {
       customer: customerName,
       phone,
+      lineId,
+      lineIdRes,
       // Repair data
       serialNumber,
       model,
@@ -149,33 +218,66 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Find or create customer
-    let customer = await customerRepository.findOne({
-      where: { phone: phone.trim() },
-    });
+    // Validate Serial Number: must be exactly 15 digits (numbers only)
+    if (serialNumber) {
+      const trimmedSerial = serialNumber.trim();
+      if (trimmedSerial && (!/^\d{15}$/.test(trimmedSerial))) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Serial Number must be exactly 15 digits (numbers only)',
+        });
+      }
+    }
 
+    // Find or create customer
+    // Check if customer exists with both phone AND name (to avoid updating existing customers)
+    const trimmedCustomerName = customerName.trim();
+    const trimmedPhone = phone.trim();
+    
+    // Parse customer name - support both fullName and firstName/lastName
+    const nameParts = trimmedCustomerName.split(/\s+/);
+    const firstName = nameParts[0] || trimmedCustomerName;
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    // Try to find customer with matching phone AND name
+    let customer = await customerRepository.findOne({
+      where: { 
+        phone: trimmedPhone,
+        fullName: trimmedCustomerName,
+      },
+    });
+    
+    // If not found by fullName, try to match by firstName + lastName
     if (!customer) {
-      // Parse customer name - support both fullName and firstName/lastName
-      const nameParts = customerName.trim().split(/\s+/);
-      const firstName = nameParts[0] || customerName.trim();
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
+      customer = await customerRepository.findOne({
+        where: { 
+          phone: trimmedPhone,
+          firstName: firstName,
+          lastName: lastName || undefined,
+        },
+      });
+    }
+    
+    // If still not found, create a new customer
+    if (!customer) {
       customer = customerRepository.create({
         firstName: firstName,
         lastName: lastName || undefined,
-        fullName: customerName.trim(),
-        phone: phone.trim(),
+        fullName: trimmedCustomerName,
+        phone: trimmedPhone,
+        lineId: lineId?.trim() || undefined,
+        lineIdRes: lineIdRes?.trim() || undefined,
       });
       customer = await customerRepository.save(customer);
     } else {
-      // Update customer name if provided and different
-      if (customerName.trim() && customerName.trim() !== (customer.fullName || `${customer.firstName} ${customer.lastName || ''}`.trim())) {
-        const nameParts = customerName.trim().split(/\s+/);
-        customer.firstName = nameParts[0] || customerName.trim();
-        customer.lastName = nameParts.slice(1).join(' ') || undefined;
-        customer.fullName = customerName.trim();
-        customer = await customerRepository.save(customer);
+      // If customer found, update lineId and lineIdRes if provided
+      if (lineId !== undefined) {
+        customer.lineId = lineId?.trim() || undefined;
       }
+      if (lineIdRes !== undefined) {
+        customer.lineIdRes = lineIdRes?.trim() || undefined;
+      }
+      customer = await customerRepository.save(customer);
     }
 
     // Generate repair number if not provided (REP-YYYY-001, REP-YYYY-002, ...)
@@ -262,6 +364,23 @@ router.post('/', async (req, res) => {
     const newRepair = repairRepository.create(repairData);
     const savedRepair = await repairRepository.save(newRepair);
     
+    // Reduce stock for selected parts
+    const partsToDeduct: string[] = [];
+    if (selectedPartIds && Array.isArray(selectedPartIds) && selectedPartIds.length > 0) {
+      partsToDeduct.push(...selectedPartIds);
+    } else if (selectedPartId) {
+      partsToDeduct.push(selectedPartId);
+    }
+    
+    if (partsToDeduct.length > 0) {
+      try {
+        await reducePartStock(partsToDeduct);
+      } catch (error) {
+        console.error('Error reducing part stock:', error);
+        // Continue even if stock reduction fails
+      }
+    }
+    
     // Load relations - handle both single entity and array cases
     const repairId = Array.isArray(savedRepair) 
       ? (savedRepair[0] as Repair).id 
@@ -340,6 +459,21 @@ router.put('/:id', async (req, res) => {
     console.log(`[Update Repair] Found repair: ${repair.id} (${repair.repairNumber}), current status: ${repair.status}`);
     console.log(`[Update Repair] Request body:`, JSON.stringify(req.body, null, 2));
 
+    // Get old part IDs before updating (for stock restoration)
+    const oldPartIds: string[] = [];
+    if (repair.selectedPartIds) {
+      try {
+        const parsed = JSON.parse(repair.selectedPartIds);
+        if (Array.isArray(parsed)) {
+          oldPartIds.push(...parsed);
+        }
+      } catch (error) {
+        console.error('Error parsing old selectedPartIds:', error);
+      }
+    } else if (repair.selectedPartId) {
+      oldPartIds.push(repair.selectedPartId);
+    }
+
     // Validate status if provided
     if (req.body.status !== undefined) {
       const validStatuses = Object.values(RepairStatus);
@@ -355,9 +489,97 @@ router.put('/:id', async (req, res) => {
     }
 
     // Update other fields (excluding status which we already handled)
-    const { status, ...otherFields } = req.body;
+    const { status, selectedPartIds: newSelectedPartIds, selectedPartId: newSelectedPartId, ...otherFields } = req.body;
+    
+    // Handle selectedPartIds update
+    if (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) {
+      if (newSelectedPartIds && Array.isArray(newSelectedPartIds) && newSelectedPartIds.length > 0) {
+        repair.selectedPartIds = JSON.stringify(newSelectedPartIds);
+        repair.selectedPartId = newSelectedPartIds[0]; // For backward compatibility
+      } else if (newSelectedPartId) {
+        repair.selectedPartId = newSelectedPartId;
+        repair.selectedPartIds = JSON.stringify([newSelectedPartId]);
+      }
+    }
+    
     if (Object.keys(otherFields).length > 0) {
       Object.assign(repair, otherFields);
+    }
+    
+    // Handle stock updates: restore old parts, deduct new parts
+    // Get new part IDs from the updated repair data
+    let newPartIds: string[] = [];
+    if (newSelectedPartIds && Array.isArray(newSelectedPartIds) && newSelectedPartIds.length > 0) {
+      newPartIds = [...newSelectedPartIds];
+    } else if (newSelectedPartId) {
+      newPartIds = [newSelectedPartId];
+    } else if (repair.selectedPartIds) {
+      // If not explicitly updated, use existing value
+      try {
+        const parsed = JSON.parse(repair.selectedPartIds);
+        if (Array.isArray(parsed)) {
+          newPartIds = [...parsed];
+        }
+      } catch (error) {
+        console.error('Error parsing existing selectedPartIds:', error);
+      }
+    } else if (repair.selectedPartId) {
+      newPartIds = [repair.selectedPartId];
+    }
+
+    // Calculate difference: count occurrences of each part ID
+    const oldCounts: Record<string, number> = {};
+    oldPartIds.forEach(id => {
+      oldCounts[id] = (oldCounts[id] || 0) + 1;
+    });
+
+    const newCounts: Record<string, number> = {};
+    newPartIds.forEach(id => {
+      newCounts[id] = (newCounts[id] || 0) + 1;
+    });
+
+    // Calculate parts to restore (old - new, only positive differences)
+    const partsToRestore: string[] = [];
+    for (const [partId, oldCount] of Object.entries(oldCounts)) {
+      const newCount = newCounts[partId] || 0;
+      const diff = oldCount - newCount;
+      if (diff > 0) {
+        // Need to restore this many units
+        for (let i = 0; i < diff; i++) {
+          partsToRestore.push(partId);
+        }
+      }
+    }
+
+    // Calculate parts to deduct (new - old, only positive differences)
+    const partsToDeduct: string[] = [];
+    for (const [partId, newCount] of Object.entries(newCounts)) {
+      const oldCount = oldCounts[partId] || 0;
+      const diff = newCount - oldCount;
+      if (diff > 0) {
+        // Need to deduct this many units
+        for (let i = 0; i < diff; i++) {
+          partsToDeduct.push(partId);
+        }
+      }
+    }
+
+    // Restore stock for parts that were removed or reduced
+    if (partsToRestore.length > 0) {
+      try {
+        await restorePartStock(partsToRestore);
+      } catch (error) {
+        console.error('Error restoring part stock:', error);
+      }
+    }
+
+    // Deduct stock for parts that were added or increased
+    if (partsToDeduct.length > 0) {
+      try {
+        await reducePartStock(partsToDeduct);
+      } catch (error) {
+        console.error('Error reducing part stock:', error);
+      }
     }
     
     console.log(`[Update Repair] Saving repair with status: ${repair.status}`);
@@ -401,6 +623,30 @@ router.delete('/:id', async (req, res) => {
         status: 'error',
         message: 'Repair not found',
       });
+    }
+
+    // Restore stock for parts used in this repair
+    const partIdsToRestore: string[] = [];
+    if (repair.selectedPartIds) {
+      try {
+        const parsed = JSON.parse(repair.selectedPartIds);
+        if (Array.isArray(parsed)) {
+          partIdsToRestore.push(...parsed);
+        }
+      } catch (error) {
+        console.error('Error parsing selectedPartIds for deletion:', error);
+      }
+    } else if (repair.selectedPartId) {
+      partIdsToRestore.push(repair.selectedPartId);
+    }
+
+    if (partIdsToRestore.length > 0) {
+      try {
+        await restorePartStock(partIdsToRestore);
+      } catch (error) {
+        console.error('Error restoring part stock on delete:', error);
+        // Continue with deletion even if stock restoration fails
+      }
     }
 
     await repairRepository.remove(repair);

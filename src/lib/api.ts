@@ -106,6 +106,15 @@ class ApiClient {
     return this.request<any>(`/api/customers/${id}`);
   }
 
+  async searchCustomers(query: string = "") {
+    const queryParam = query ? `?q=${encodeURIComponent(query)}` : "";
+    return this.request<any[]>(`/api/customers/search${queryParam}`);
+  }
+
+  async getCustomerWithRepairs(id: string) {
+    return this.request<any>(`/api/customers/${id}/with-repairs`);
+  }
+
   async createCustomer(data: any) {
     return this.request<any>('/api/customers', {
       method: 'POST',
@@ -127,8 +136,46 @@ class ApiClient {
   }
 
   // Repair
-  async getRepairs() {
-    return this.request<any[]>('/api/repairs');
+  async getRepairs(page: number = 1, limit: number = 8) {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    const url = `${this.baseURL}/api/repairs?${queryParams.toString()}`;
+    const token = localStorage.getItem('authToken');
+
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    };
+
+    try {
+      const response = await fetch(url, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          status: 'error' as const,
+          message: data.message || 'An error occurred',
+          error: data.error,
+        };
+      }
+
+      // Return both data and pagination
+      return {
+        status: 'success' as const,
+        data: data.data || [],
+        pagination: data.pagination,
+        message: data.message,
+      };
+    } catch (error) {
+      return {
+        status: 'error' as const,
+        message: error instanceof Error ? error.message : 'Network error',
+      };
+    }
   }
 
   async getRepairById(id: string) {

@@ -10,6 +10,8 @@ import {
 
 const STORAGE_USERS = "macfix_users";
 const STORAGE_AUTH = "macfix_auth";
+// Session expiration time: 3 hours in milliseconds
+const SESSION_EXPIRY_TIME = 3 * 60 * 60 * 1000; // 3 hours
 
 function loadUsers(): User[] {
   try {
@@ -116,10 +118,26 @@ function getInitialCurrentUser(): User | null {
   return userList.find((u) => u.username === session.username) ?? null;
 }
 
+// Check if session is expired
+function isSessionExpired(session: AuthSession | null): boolean {
+  if (!session || !session.loginAt) return true;
+  const loginTime = new Date(session.loginAt).getTime();
+  const now = Date.now();
+  return now - loginTime > SESSION_EXPIRY_TIME;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(loadUsers);
   const [session, setSession] = useState<AuthSession | null>(loadSession);
   const [currentUser, setCurrentUser] = useState<User | null>(getInitialCurrentUser);
+
+  // Define logout early so it can be used in useEffect hooks
+  const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_AUTH);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setSession(null);
+  }, []);
 
   useEffect(() => {
     persistUsers(users);
@@ -130,9 +148,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentUser(null);
       return;
     }
+    // Check if session is expired on load
+    if (isSessionExpired(session)) {
+      logout();
+      return;
+    }
     const user = users.find((u) => u.username === session.username);
     setCurrentUser(user ?? null);
-  }, [session, users]);
+  }, [session, users, logout]);
+
+  // Check session expiration periodically (every minute)
+  useEffect(() => {
+    if (!session) return;
+
+    const checkExpiration = () => {
+      // Read session from localStorage to get the latest value
+      const currentSession = loadSession();
+      if (!currentSession || isSessionExpired(currentSession)) {
+        logout();
+      }
+    };
+
+    // Check immediately
+    checkExpiration();
+
+    // Check every minute
+    const interval = setInterval(checkExpiration, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [session, logout]);
 
   const login = useCallback(
     (username: string, password: string) => {
@@ -208,11 +252,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [users]
   );
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_AUTH);
-    setSession(null);
-  }, []);
 
   const addUser = useCallback(
     (data: Omit<User, "id" | "lastLogin">) => {

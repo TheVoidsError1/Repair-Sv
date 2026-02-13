@@ -25,6 +25,9 @@ export class Personnel {
   @Column({ type: 'varchar', length: 255 })
   password!: string; // Should be hashed in production
 
+  @Column({ type: 'text', nullable: true })
+  token?: string; // JWT token for authentication
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone?: string;
 

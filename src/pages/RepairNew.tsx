@@ -36,9 +36,24 @@ import { getPartStockStatus, type Part } from "@/lib/partsData";
 import { cn } from "@/lib/utils";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, X } from "lucide-react";
+import { Calendar as CalendarIcon, X, Search, User, Phone, History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 /** อ่าน type จาก URL: in-store → walk_in, leave-device → drop_off */
 function getServiceTypeFromSearchParams(searchParams: URLSearchParams): ServiceType {
@@ -72,12 +87,17 @@ function roundTimeTo30Min(timeStr: string): string {
   return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 }
 
-/** IMEI/Serial: ถ้าเป็นตัวเลขเท่านั้นต้อง 15 หลัก */
+/** IMEI/Serial: ต้องเป็นตัวเลขเท่านั้น และต้อง 15 หลัก */
 function validateSerialNumber(value: string): { valid: boolean; message?: string } {
   const trimmed = value.trim();
   if (!trimmed) return { valid: false, message: "กรุณากรอกหมายเลข IMEI / Serial Number" };
-  if (/^\d+$/.test(trimmed) && trimmed.length !== 15) {
-    return { valid: false, message: "หมายเลข IMEI ต้องเป็นตัวเลข 15 หลัก" };
+  // ต้องเป็นตัวเลขเท่านั้น
+  if (!/^\d+$/.test(trimmed)) {
+    return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องเป็นตัวเลขเท่านั้น" };
+  }
+  // ต้องเป็น 15 หลักเท่านั้น
+  if (trimmed.length !== 15) {
+    return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องเป็นตัวเลข 15 หลัก" };
   }
   return { valid: true };
 }
@@ -115,6 +135,8 @@ const initialFormData = {
   serialNumber: "",
   customer: "",
   phone: "",
+  lineId: "",
+  lineIdRes: "",
   model: "",
   color: "",
   screenLockCode: "",
@@ -140,6 +162,15 @@ const RepairNew = () => {
   const [partsList, setPartsList] = useState<Part[]>([]);
   const [isLoadingParts, setIsLoadingParts] = useState(true);
   const { toast } = useToast();
+
+  // Customer search states
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [isRepairHistoryDialogOpen, setIsRepairHistoryDialogOpen] = useState(false);
+  const [customerRepairHistory, setCustomerRepairHistory] = useState<any[]>([]);
 
   /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
   const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
@@ -186,33 +217,33 @@ const RepairNew = () => {
   }, []);
 
   // Load parts from API
-  useEffect(() => {
-    const loadParts = async () => {
-      setIsLoadingParts(true);
-      try {
-        const response = await apiClient.getParts();
-        if (response.status === 'success' && response.data) {
-          const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
-          setPartsList(convertedParts);
-        } else {
-          toast({
-            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-            description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts"),
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Error loading parts:', error);
+  const loadParts = async () => {
+    setIsLoadingParts(true);
+    try {
+      const response = await apiClient.getParts();
+      if (response.status === 'success' && response.data) {
+        const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
+        setPartsList(convertedParts);
+      } else {
         toast({
           title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-          description: language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts",
+          description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts"),
           variant: "destructive",
         });
-      } finally {
-        setIsLoadingParts(false);
       }
-    };
+    } catch (error) {
+      console.error('Error loading parts:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถโหลดข้อมูลอะไหล่ได้" : "Failed to load parts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingParts(false);
+    }
+  };
 
+  useEffect(() => {
     loadParts();
   }, [language, toast]);
 
@@ -281,6 +312,8 @@ const RepairNew = () => {
       const repairData = {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
+        lineId: formData.lineId.trim() || undefined,
+        lineIdRes: formData.lineIdRes.trim() || undefined,
         serialNumber: sn,
         model: formData.model.trim(),
         color: formData.color.trim(),
@@ -310,6 +343,9 @@ const RepairNew = () => {
 
         // Refresh repairs list
         await refreshRepairs();
+
+        // Refresh parts list to update stock quantities
+        await loadParts();
 
         // Reset form
         setFormData(initialFormData);
@@ -378,6 +414,8 @@ const RepairNew = () => {
       const repairData = {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
+        lineId: formData.lineId.trim() || undefined,
+        lineIdRes: formData.lineIdRes.trim() || undefined,
         serialNumber: sn,
         model: formData.model.trim(),
         color: formData.color.trim(),
@@ -407,6 +445,9 @@ const RepairNew = () => {
 
         // Refresh repairs list
         await refreshRepairs();
+
+        // Refresh parts list to update stock quantities
+        await loadParts();
 
         // Reset form
         setFormData(initialFormData);
@@ -455,6 +496,111 @@ const RepairNew = () => {
     setSelectedPartIds(selectedPartIds.filter((id) => id !== partId));
   };
 
+  // Customer search functions
+  const handleSearchCustomers = async (query: string) => {
+    setIsSearching(true);
+    try {
+      // If query is empty or less than 2 characters, still search (will return all customers)
+      const searchQuery = query.trim();
+      const response = await apiClient.searchCustomers(searchQuery);
+      if (response.status === 'success' && response.data) {
+        setSearchResults(response.data);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching customers:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectCustomer = async (customer: any) => {
+    setSelectedCustomer(customer);
+    setIsSearchDialogOpen(false);
+    setSearchQuery("");
+
+    // Load customer data with repair history to get complete information
+    let customerData = customer;
+    let latestSerialNumber = "";
+    let repairs: any[] = [];
+    
+    try {
+      const response = await apiClient.getCustomerWithRepairs(customer.id);
+      if (response.status === 'success' && response.data) {
+        // Use the complete customer data from API (includes lineId, lineIdRes)
+        customerData = response.data;
+        repairs = response.data.repairs || [];
+        setCustomerRepairHistory(repairs);
+        
+        // Get serial number from the latest repair (first item since sorted by newest)
+        if (repairs.length > 0) {
+          const latestRepair = repairs[0];
+          latestSerialNumber = latestRepair.serialNumber || "";
+        }
+        
+        if (repairs.length > 0) {
+          toast({
+            title: language === "th" ? "พบประวัติการซ่อม" : "Repair history found",
+            description: language === "th" 
+              ? `พบประวัติการซ่อม ${repairs.length} รายการ${latestSerialNumber ? ` - Serial Number ล่าสุด: ${latestSerialNumber}` : ''}`
+              : `Found ${repairs.length} repair history${latestSerialNumber ? ` - Latest Serial: ${latestSerialNumber}` : ''}`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading customer repair history:', error);
+    }
+
+    // Load customer data into form (use customerData which has complete info)
+    const customerName = customerData.fullName || `${customerData.firstName} ${customerData.lastName || ''}`.trim();
+    
+    // Update form with customer data including Line ID and latest serial number
+    setFormData((prev) => ({
+      ...prev,
+      customer: customerName,
+      phone: customerData.phone || "",
+      lineId: customerData.lineId || "", // Line ID หลัก
+      lineIdRes: customerData.lineIdRes || "", // Line ID สำรอง
+      serialNumber: latestSerialNumber, // Serial Number จากประวัติการซ่อมล่าสุด
+    }));
+  };
+
+  const handleOpenSearchDialog = async () => {
+    setIsSearchDialogOpen(true);
+    setSearchQuery("");
+    // Load all customers when dialog opens
+    setIsSearching(true);
+    try {
+      const response = await apiClient.searchCustomers("");
+      if (response.status === 'success' && response.data) {
+        setSearchResults(response.data);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error loading customers:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleViewRepairHistory = () => {
+    if (selectedCustomer && customerRepairHistory.length > 0) {
+      setIsRepairHistoryDialogOpen(true);
+    } else {
+      toast({
+        title: language === "th" ? "ไม่มีประวัติการซ่อม" : "No repair history",
+        description: language === "th" 
+          ? "ลูกค้ารายนี้ยังไม่มีประวัติการซ่อม"
+          : "This customer has no repair history",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <MainLayout>
       <div className="w-full max-w-5xl mx-auto space-y-6">
@@ -489,7 +635,33 @@ const RepairNew = () => {
           <CardContent className="pt-6 px-6 pb-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="customer">{t("customerName")}</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="customer">{t("customerName")}</Label>
+                  <div className="flex gap-2">
+                    {selectedCustomer && customerRepairHistory.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleViewRepairHistory}
+                        className="h-7 text-xs"
+                      >
+                        <History className="h-3 w-3 mr-1" />
+                        {language === "th" ? "ประวัติ" : "History"}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenSearchDialog}
+                      className="h-7 text-xs"
+                    >
+                      <Search className="h-3 w-3 mr-1" />
+                      {language === "th" ? "ค้นหา" : "Search"}
+                    </Button>
+                  </div>
+                </div>
                 <Input
                   id="customer"
                   placeholder={t("enterCustomerName")}
@@ -506,6 +678,28 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lineId">
+                  {language === "th" ? "Line ID (หลัก)" : "Line ID (Primary)"}
+                </Label>
+                <Input
+                  id="lineId"
+                  placeholder={language === "th" ? "กรอก Line ID หลัก" : "Enter primary Line ID"}
+                  value={formData.lineId}
+                  onChange={(e) => handleInputChange("lineId", e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lineIdRes">
+                  {language === "th" ? "Line ID (สำรอง)" : "Line ID (Reserve)"}
+                </Label>
+                <Input
+                  id="lineIdRes"
+                  placeholder={language === "th" ? "กรอก Line ID สำรอง" : "Enter reserve Line ID"}
+                  value={formData.lineIdRes}
+                  onChange={(e) => handleInputChange("lineIdRes", e.target.value)}
+                />
+              </div>
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="serialNumber">
                   {language === "th" ? "หมายเลข IMEI / Serial Number" : "IMEI / Serial Number"}
@@ -513,10 +707,13 @@ const RepairNew = () => {
                 </Label>
                 <Input
                   id="serialNumber"
-                  placeholder={language === "th" ? "กรอก 15 หลัก (ตัวเลข)" : "15 digits (numeric)"}
+                  placeholder={language === "th" ? "กรอก 15 หลัก (ตัวเลขเท่านั้น)" : "15 digits (numbers only)"}
                   value={formData.serialNumber}
+                  maxLength={15}
                   onChange={(e) => {
-                    handleInputChange("serialNumber", e.target.value);
+                    // อนุญาตเฉพาะตัวเลขเท่านั้น
+                    const value = e.target.value.replace(/\D/g, '');
+                    handleInputChange("serialNumber", value);
                     setSerialError("");
                   }}
                   className={serialError ? "border-destructive" : ""}
@@ -767,6 +964,148 @@ const RepairNew = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Customer Search Dialog */}
+        <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{language === "th" ? "ค้นหาลูกค้า" : "Search Customer"}</DialogTitle>
+              <DialogDescription>
+                {language === "th" 
+                  ? "ค้นหาด้วยชื่อหรือเบอร์โทรศัพท์" 
+                  : "Search by name or phone number"}
+              </DialogDescription>
+            </DialogHeader>
+            <Command className="rounded-lg border shadow-md">
+              <CommandInput
+                placeholder={language === "th" ? "พิมพ์ชื่อหรือเบอร์โทร..." : "Type name or phone..."}
+                value={searchQuery}
+                onValueChange={(value) => {
+                  setSearchQuery(value);
+                  handleSearchCustomers(value);
+                }}
+              />
+              <CommandList>
+                <CommandEmpty>
+                  {isSearching 
+                    ? (language === "th" ? "กำลังค้นหา..." : "Searching...")
+                    : (language === "th" ? "ไม่พบผลลัพธ์" : "No results found")}
+                </CommandEmpty>
+                <CommandGroup heading={language === "th" ? "ผลการค้นหา" : "Search Results"}>
+                  {searchResults.map((customer) => {
+                    const customerName = customer.fullName || `${customer.firstName} ${customer.lastName || ''}`.trim();
+                    const repairCount = customer.repairs?.length || 0;
+                    return (
+                      <CommandItem
+                        key={customer.id}
+                        value={customer.id}
+                        onSelect={() => handleSelectCustomer(customer)}
+                        className="flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex flex-col">
+                            <span className="font-medium">{customerName}</span>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              {customer.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {customer.phone}
+                                </span>
+                              )}
+                              {repairCount > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <History className="h-3 w-3" />
+                                  {language === "th" 
+                                    ? `${repairCount} รายการ` 
+                                    : `${repairCount} repairs`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
+
+        {/* Repair History Dialog */}
+        <Dialog open={isRepairHistoryDialogOpen} onOpenChange={setIsRepairHistoryDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {language === "th" 
+                  ? `ประวัติการซ่อม - ${selectedCustomer ? (selectedCustomer.fullName || `${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim()) : ''}`
+                  : `Repair History - ${selectedCustomer ? (selectedCustomer.fullName || `${selectedCustomer.firstName} ${selectedCustomer.lastName || ''}`.trim()) : ''}`}
+              </DialogTitle>
+              <DialogDescription>
+                {language === "th" 
+                  ? `พบ ${customerRepairHistory.length} รายการ`
+                  : `Found ${customerRepairHistory.length} repair(s)`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {customerRepairHistory.map((repair) => (
+                <Card key={repair.id} className="border">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{repair.repairNumber}</CardTitle>
+                      <Badge variant="outline">
+                        {repair.status}
+                      </Badge>
+                    </div>
+                    <CardDescription>
+                      {new Date(repair.createdAt).toLocaleDateString(
+                        language === "th" ? "th-TH" : "en-GB",
+                        {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        }
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {repair.deviceModel && (
+                      <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <span className="text-muted-foreground">{language === "th" ? "รุ่น" : "Model"}:</span>
+                        <span>{repair.deviceModel}</span>
+                      </div>
+                    )}
+                    {repair.deviceColor && (
+                      <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <span className="text-muted-foreground">{language === "th" ? "สี" : "Color"}:</span>
+                        <span>{repair.deviceColor}</span>
+                      </div>
+                    )}
+                    {repair.serialNumber && (
+                      <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <span className="text-muted-foreground">{language === "th" ? "IMEI/SN" : "IMEI/SN"}:</span>
+                        <span className="font-mono">{repair.serialNumber}</span>
+                      </div>
+                    )}
+                    {repair.problemSymptoms && (
+                      <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <span className="text-muted-foreground">{language === "th" ? "อาการเสีย" : "Symptoms"}:</span>
+                        <span>{repair.problemSymptoms}</span>
+                      </div>
+                    )}
+                    {repair.totalCost > 0 && (
+                      <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <span className="text-muted-foreground">{language === "th" ? "ราคารวม" : "Total Cost"}:</span>
+                        <span className="font-semibold">{repair.totalCost.toLocaleString()} {language === "th" ? "บาท" : "THB"}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

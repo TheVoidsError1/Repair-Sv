@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../config/data-source.js';
 import { Personnel } from '../entities/Personnel.js';
 
@@ -57,14 +58,47 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create personnel
+// Create personnel (Register)
 router.post('/', async (req, res) => {
   try {
     const personnelRepository = AppDataSource.getRepository(Personnel);
-    const newPersonnel = personnelRepository.create(req.body);
+    
+    // Check if username or email already exists
+    if (req.body.username) {
+      const existingByUsername = await personnelRepository.findOne({
+        where: { username: req.body.username },
+      });
+      if (existingByUsername) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Username already exists',
+        });
+      }
+    }
+
+    if (req.body.email) {
+      const existingByEmail = await personnelRepository.findOne({
+        where: { email: req.body.email },
+      });
+      if (existingByEmail) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email already exists',
+        });
+      }
+    }
+
+    // Generate unique token for the new user
+    const token = uuidv4();
+
+    // Create new personnel with token
+    const newPersonnel = personnelRepository.create({
+      ...req.body,
+      token: token,
+    });
     await personnelRepository.save(newPersonnel);
 
-    // Fetch the saved personnel without password using the username from request
+    // Fetch the saved personnel without password and token using the username from request
     const savedPersonnel = await personnelRepository.findOne({
       where: { username: req.body.username },
       select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'createdAt', 'updatedAt'],
@@ -79,7 +113,10 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       status: 'success',
-      data: savedPersonnel,
+      data: {
+        ...savedPersonnel,
+        token: token, // Return token only on registration
+      },
       message: 'Personnel created successfully',
     });
   } catch (error) {

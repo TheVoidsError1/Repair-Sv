@@ -25,12 +25,11 @@ export class Customer {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone?: string;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  email?: string;
-
-
   @Column({ type: 'text', nullable: true })
   lineId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  lineIdRes?: string;
 
   @OneToMany(() => Repair, (repair) => repair.customer)
   repairs!: Repair[];

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { initializeDatabase, closeDatabase, AppDataSource } from './config/data-source.js';
 import authRoutes from './api/auth.routes.js';
 import personnelRoutes from './api/personnel.routes.js';
@@ -23,6 +24,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

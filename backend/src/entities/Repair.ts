@@ -69,8 +69,8 @@ export class Repair {
   @Column({ type: 'varchar', length: 50, nullable: true })
   deviceSerialNumber?: string;
 
-  @Column({ type: 'varchar', length: 15, nullable: true, unique: true })
-  serialNumber?: string; // IMEI/Serial Number (15 digits) - ใช้สำหรับการรับประกัน
+  @Column({ type: 'varchar', length: 15, nullable: true })
+  serialNumber?: string; // IMEI/Serial Number (15 digits) - ใช้สำหรับการรับประกัน (อนุญาตให้ซ้ำได้)
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   deviceColor?: string; // สีเครื่อง

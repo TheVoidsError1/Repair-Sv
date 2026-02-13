@@ -34,9 +34,18 @@ import { useRepairs, type RepairItem, type RepairTag } from "@/contexts/RepairsC
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { repairItemToBillData, type RepairOrderData } from "@/types/repairOrder";
-import { Eye, FileText, Filter, Pencil, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, FileText, Filter, Pencil, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
@@ -267,7 +276,7 @@ const Repairs = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { repairs, setRepairs, refreshRepairs, isLoading } = useRepairs();
+  const { repairs, setRepairs, refreshRepairs, isLoading, pagination, setPagination } = useRepairs();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState<"all" | "endOfDay" | "leaveDevice">("all");
@@ -318,6 +327,8 @@ const Repairs = () => {
     "picked-up": t("pickedUp"),
   };
 
+  // Filter repairs for display (client-side filtering for search/filter)
+  // Note: For better performance with large datasets, filtering should be done on the backend
   const filteredRepairs = repairs.filter((repair) => {
     const matchesSearch =
       repair.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -329,6 +340,14 @@ const Repairs = () => {
       tagFilter === "all" || repair.tag === tagFilter;
     return matchesSearch && matchesStatus && matchesTag;
   });
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination((prev) => ({ ...prev, page: newPage }));
+      refreshRepairs(newPage, pagination.limit);
+    }
+  };
 
   // ซิงค์ selectedRepair กับ repairs เมื่อเปลี่ยนสถานะจาก dropdown ในตาราง (ให้ Dialog แสดงสถานะล่าสุด)
   useEffect(() => {
@@ -758,6 +777,87 @@ const Repairs = () => {
             </table>
           )}
         </div>
+        
+        {/* Pagination */}
+        {!isLoading && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-4 border-t border-border">
+            <div className="text-sm text-muted-foreground">
+              {language === "th" 
+                ? `แสดง ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.totalCount)} จาก ${pagination.totalCount} รายการ`
+                : `Showing ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.totalCount)} of ${pagination.totalCount} items`}
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <Button
+                    variant="ghost"
+                    size="default"
+                    onClick={() => {
+                      if (pagination.page > 1) {
+                        handlePageChange(pagination.page - 1);
+                      }
+                    }}
+                    disabled={pagination.page <= 1}
+                    className="gap-1 pl-2.5"
+                    aria-label={language === "th" ? "หน้าก่อนหน้า" : "Go to previous page"}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span>{language === "th" ? "ก่อนหน้า" : "Previous"}</span>
+                  </Button>
+                </PaginationItem>
+                
+                {/* Page numbers */}
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    pageNum === 1 ||
+                    pageNum === pagination.totalPages ||
+                    (pageNum >= pagination.page - 1 && pageNum <= pagination.page + 1)
+                  ) {
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <Button
+                          variant={pageNum === pagination.page ? "outline" : "ghost"}
+                          size="icon"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="h-9 w-9"
+                          aria-current={pageNum === pagination.page ? "page" : undefined}
+                        >
+                          {pageNum}
+                        </Button>
+                      </PaginationItem>
+                    );
+                  } else if (pageNum === pagination.page - 2 || pageNum === pagination.page + 2) {
+                    return (
+                      <PaginationItem key={pageNum}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+                  return null;
+                })}
+                
+                <PaginationItem>
+                  <Button
+                    variant="ghost"
+                    size="default"
+                    onClick={() => {
+                      if (pagination.page < pagination.totalPages) {
+                        handlePageChange(pagination.page + 1);
+                      }
+                    }}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="gap-1 pr-2.5"
+                    aria-label={language === "th" ? "หน้าถัดไป" : "Go to next page"}
+                  >
+                    <span>{language === "th" ? "ถัดไป" : "Next"}</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
       {/* รายละเอียดงานซ่อม — ดู / แก้ไข / ลบ ได้ */}

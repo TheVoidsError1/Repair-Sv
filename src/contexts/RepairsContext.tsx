@@ -49,7 +49,19 @@ interface RepairsContextValue {
   endOfDayCount: number;
   leaveDeviceCount: number;
   isLoading: boolean;
-  refreshRepairs: () => Promise<void>;
+  refreshRepairs: (page?: number, limit?: number) => Promise<void>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  };
+  setPagination: React.Dispatch<React.SetStateAction<{
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+  }>>;
 }
 
 const RepairsContext = createContext<RepairsContextValue | null>(null);
@@ -95,14 +107,27 @@ function convertRepairFromAPI(repair: any): RepairItem {
 export function RepairsProvider({ children }: { children: ReactNode }) {
   const [repairs, setRepairs] = useState<RepairItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 8,
+    totalCount: 0,
+    totalPages: 0,
+  });
 
-  const refreshRepairs = async () => {
+  const refreshRepairs = async (page: number = 1, limit: number = 8) => {
     try {
       setIsLoading(true);
-      const response = await apiClient.getRepairs();
+      const response = await apiClient.getRepairs(page, limit) as any;
       if (response.status === 'success' && response.data) {
-        const convertedRepairs = response.data.map(convertRepairFromAPI);
+        const convertedRepairs = Array.isArray(response.data) 
+          ? response.data.map(convertRepairFromAPI)
+          : [];
         setRepairs(convertedRepairs);
+        
+        // Update pagination info if provided
+        if (response.pagination) {
+          setPagination(response.pagination);
+        }
       } else {
         console.error('Failed to load repairs:', response.message);
         setRepairs([]);
@@ -116,7 +141,7 @@ export function RepairsProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshRepairs();
+    refreshRepairs(pagination.page, pagination.limit);
   }, []);
 
   const value = useMemo(() => {
@@ -129,8 +154,10 @@ export function RepairsProvider({ children }: { children: ReactNode }) {
       leaveDeviceCount,
       isLoading,
       refreshRepairs,
+      pagination,
+      setPagination,
     };
-  }, [repairs, isLoading]);
+  }, [repairs, isLoading, pagination]);
 
   return (
     <RepairsContext.Provider value={value}>

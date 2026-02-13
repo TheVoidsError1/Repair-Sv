@@ -145,34 +145,55 @@ const Inventory = () => {
   });
 
   // Load parts from API
-  useEffect(() => {
-    const loadParts = async () => {
-      setIsLoading(true);
-      try {
-        const response = await apiClient.getParts();
-        if (response.status === "success" && response.data) {
-          const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
-          setParts(convertedParts);
-        } else {
-          toast({
-            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-            description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts"),
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Error loading parts:", error);
+  const loadParts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.getParts();
+      if (response.status === "success" && response.data) {
+        const convertedParts = (response.data as PartFromAPI[]).map(convertPartFromAPI);
+        setParts(convertedParts);
+      } else {
         toast({
           title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-          description: language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts",
+          description: response.message || (language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts"),
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Error loading parts:", error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถโหลดข้อมูลได้" : "Failed to load parts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadParts();
+  }, [language, toast]);
+
+  // Refresh parts when page becomes visible (user returns to this page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadParts();
       }
     };
 
-    loadParts();
+    const handleFocus = () => {
+      loadParts();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const filteredParts = parts.filter((part) => {

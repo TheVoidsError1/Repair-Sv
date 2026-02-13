@@ -2,15 +2,15 @@ import type { UserRole } from "@/types/user";
 
 /**
  * สิทธิ์การเข้าถึงตาม role
- * - owner: เจ้าของ — เข้าถึงได้ทุกอย่าง (รวมการเงิน, ตั้งค่า, จัดการผู้ใช้)
- * - staff: พนักงาน — เข้าถึง แดชบอร์ด, งานซ่อม, สินค้าคงคลัง, การรับประกัน (ไม่เห็นการเงินและตั้งค่า)
+ * - owner: เจ้าของ — เข้าถึงได้ทุกอย่าง (รวมการเงิน, ตั้งค่า, จัดการผู้ใช้, แดชบอร์ด)
+ * - staff: พนักงาน — เข้าถึงเฉพาะ งานซ่อม, สินค้าคงคลัง, การรับประกัน
  */
 
-/** path ที่เฉพาะเจ้าของ (owner) เท่านั้นที่เข้าได้ (พนักงานเข้า /settings ได้สำหรับเปลี่ยนรหัส/การแจ้งเตือน) */
-export const ROUTES_OWNER_ONLY: string[] = ["/finance", "/admin"];
+/** path ที่เฉพาะเจ้าของ (owner) เท่านั้นที่เข้าได้ */
+export const ROUTES_OWNER_ONLY: string[] = ["/finance", "/admin", "/settings", "/dashboard"];
 
 /** subject id ใน sidebar ที่เฉพาะเจ้าของเท่านั้นที่เห็น */
-export const SUBJECT_IDS_OWNER_ONLY: string[] = ["finance", "admin"];
+export const SUBJECT_IDS_OWNER_ONLY: string[] = ["dashboard", "finance", "settings", "admin"];
 
 /** เช็คว่า path นี้ต้องเป็น owner เท่านั้นหรือไม่ */
 export function isRouteOwnerOnly(pathname: string): boolean {

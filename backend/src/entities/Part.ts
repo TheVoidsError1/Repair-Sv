@@ -53,6 +53,9 @@ export class Part {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  imageUrl?: string; // URL path to part image
+
   @CreateDateColumn()
   createdAt!: Date;
 
