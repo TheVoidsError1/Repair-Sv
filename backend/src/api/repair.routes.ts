@@ -329,6 +329,44 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // คำนวณ partsCost, laborCost, totalCost อัตโนมัติจาก selectedPartIds
+    let calculatedPartsCost = parseFloat(String(partsCost)) || 0;
+    let calculatedLaborCost = parseFloat(String(laborCost)) || 0;
+    
+    // ถ้ามี selectedPartIds ให้คำนวณราคาอะไหล่จาก Part entity
+    if (selectedPartIds && Array.isArray(selectedPartIds) && selectedPartIds.length > 0) {
+      try {
+        const partRepository = AppDataSource.getRepository(Part);
+        const parts = await partRepository.findByIds(selectedPartIds);
+        
+        // นับจำนวนแต่ละ part (กรณีเลือก part เดียวกันหลายครั้ง)
+        const partCounts: Record<string, number> = {};
+        selectedPartIds.forEach((id: string) => {
+          partCounts[id] = (partCounts[id] || 0) + 1;
+        });
+        
+        // คำนวณราคารวมของอะไหล่
+        let autoPartsCost = 0;
+        parts.forEach((part: any) => {
+          const count = partCounts[part.id] || 1;
+          const partPrice = Number(part.price) || 0;
+          autoPartsCost += partPrice * count;
+        });
+        
+        // ใช้ค่าที่คำนวณได้ ถ้า Frontend ไม่ได้ส่งมา
+        if (calculatedPartsCost === 0 && autoPartsCost > 0) {
+          calculatedPartsCost = autoPartsCost;
+        }
+      } catch (error) {
+        console.error('Error calculating parts cost:', error);
+      }
+    }
+    
+    // คำนวณ totalCost (รวมภาษี 7%)
+    const subtotal = calculatedPartsCost + calculatedLaborCost;
+    const taxRate = 0.07; // ภาษี 7%
+    const calculatedTotalCost = subtotal * (1 + taxRate);
+
     // Create repair
     const repairData: any = {
       repairNumber,
@@ -345,9 +383,9 @@ router.post('/', async (req, res) => {
       diagnosis: diagnosis || undefined,
       repairNotes: repairNotes || undefined,
       status,
-      laborCost: parseFloat(String(laborCost)) || 0,
-      partsCost: parseFloat(String(partsCost)) || 0,
-      totalCost: parseFloat(String(totalCost)) || 0,
+      laborCost: calculatedLaborCost,
+      partsCost: calculatedPartsCost,
+      totalCost: calculatedTotalCost,
       deposit: deposit ? parseFloat(String(deposit)) : undefined,
       estimatedPrice: estimatedPrice ? parseFloat(String(estimatedPrice)) : undefined,
       repairSummaryPrice: repairSummaryPrice ? parseFloat(String(repairSummaryPrice)) : undefined,
@@ -503,8 +541,58 @@ router.put('/:id', async (req, res) => {
       }
     }
     
+    // คำนวณ partsCost, laborCost, totalCost อัตโนมัติ (ถ้ามีการเปลี่ยนแปลง selectedPartIds)
+    if (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) {
+      try {
+        const partIdsToCalculate = newSelectedPartIds || (newSelectedPartId ? [newSelectedPartId] : []);
+        
+        if (partIdsToCalculate.length > 0) {
+          const partRepository = AppDataSource.getRepository(Part);
+          const parts = await partRepository.findByIds(partIdsToCalculate);
+          
+          // นับจำนวนแต่ละ part
+          const partCounts: Record<string, number> = {};
+          partIdsToCalculate.forEach((partId: string) => {
+            partCounts[partId] = (partCounts[partId] || 0) + 1;
+          });
+          
+          // คำนวณราคารวมของอะไหล่
+          let autoPartsCost = 0;
+          parts.forEach((part: any) => {
+            const count = partCounts[part.id] || 1;
+            const partPrice = Number(part.price) || 0;
+            autoPartsCost += partPrice * count;
+          });
+          
+          // อัพเดทค่าถ้า Frontend ไม่ได้ส่งมา หรือเป็น 0
+          if (otherFields.partsCost === undefined || otherFields.partsCost === 0) {
+            otherFields.partsCost = autoPartsCost;
+          }
+          
+          // คำนวณ totalCost ใหม่ (รวมภาษี 7%)
+          const currentLaborCost = otherFields.laborCost !== undefined ? otherFields.laborCost : repair.laborCost;
+          const currentPartsCost = otherFields.partsCost !== undefined ? otherFields.partsCost : repair.partsCost;
+          const subtotal = Number(currentPartsCost) + Number(currentLaborCost);
+          const taxRate = 0.07; // ภาษี 7%
+          otherFields.totalCost = subtotal * (1 + taxRate);
+        }
+      } catch (error) {
+        console.error('Error calculating parts cost on update:', error);
+      }
+    }
+    
     if (Object.keys(otherFields).length > 0) {
       Object.assign(repair, otherFields);
+    }
+    
+    // คำนวณ totalCost อัตโนมัติ (รวมภาษี 7%) ถ้ามีการเปลี่ยนแปลง partsCost หรือ laborCost
+    // หรือถ้า totalCost ไม่ได้ถูกส่งมา
+    if (otherFields.partsCost !== undefined || otherFields.laborCost !== undefined || otherFields.totalCost === undefined) {
+      const finalPartsCost = otherFields.partsCost !== undefined ? Number(otherFields.partsCost) : Number(repair.partsCost);
+      const finalLaborCost = otherFields.laborCost !== undefined ? Number(otherFields.laborCost) : Number(repair.laborCost);
+      const subtotal = finalPartsCost + finalLaborCost;
+      const taxRate = 0.07; // ภาษี 7%
+      repair.totalCost = subtotal * (1 + taxRate);
     }
     
     // Handle stock updates: restore old parts, deduct new parts
@@ -618,13 +706,35 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const repairRepository = AppDataSource.getRepository(Repair);
     const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
+    
+    console.log(`[Delete Repair] Attempting to delete repair with id: ${id}`);
+    
     const repair = await repairRepository.findOne({ where: { id } });
 
     if (!repair) {
+      console.log(`[Delete Repair] Repair not found: ${id}`);
       return res.status(404).json({
         status: 'error',
         message: 'Repair not found',
       });
+    }
+
+    console.log(`[Delete Repair] Found repair: ${repair.id} (${repair.repairNumber})`);
+
+    // ลบ Bills ที่เชื่อมกับ Repair นี้ก่อน (ใช้ raw query เพราะไม่มี Bill entity)
+    try {
+      const billsResult = await AppDataSource.query(
+        'SELECT id FROM bills WHERE "repairId" = $1',
+        [repair.id]
+      );
+      if (billsResult && billsResult.length > 0) {
+        console.log(`[Delete Repair] Found ${billsResult.length} bill(s) to delete`);
+        await AppDataSource.query('DELETE FROM bills WHERE "repairId" = $1', [repair.id]);
+        console.log(`[Delete Repair] Deleted ${billsResult.length} bill(s) associated with repair ${repair.id}`);
+      }
+    } catch (error) {
+      console.error('[Delete Repair] Error deleting bills:', error);
+      // Continue with repair deletion even if bill deletion fails
     }
 
     // ลบ WarrantyClaim ที่เชื่อมกับ Repair นี้ก่อน (เพื่อหลีกเลี่ยง foreign key constraint error)
@@ -633,11 +743,13 @@ router.delete('/:id', async (req, res) => {
         where: { repairId: repair.id },
       });
       if (warrantyClaims.length > 0) {
-        await warrantyRepository.remove(warrantyClaims);
+        console.log(`[Delete Repair] Found ${warrantyClaims.length} warranty claim(s) to delete`);
+        // ใช้ delete() แทน remove() เพื่อให้ TypeORM จัดการ foreign keys
+        await warrantyRepository.delete({ repairId: repair.id });
         console.log(`[Delete Repair] Deleted ${warrantyClaims.length} warranty claim(s) associated with repair ${repair.id}`);
       }
     } catch (error) {
-      console.error('Error deleting warranty claims:', error);
+      console.error('[Delete Repair] Error deleting warranty claims:', error);
       // Continue with repair deletion even if warranty claim deletion fails
     }
 
@@ -650,7 +762,7 @@ router.delete('/:id', async (req, res) => {
           partIdsToRestore.push(...parsed);
         }
       } catch (error) {
-        console.error('Error parsing selectedPartIds for deletion:', error);
+        console.error('[Delete Repair] Error parsing selectedPartIds for deletion:', error);
       }
     } else if (repair.selectedPartId) {
       partIdsToRestore.push(repair.selectedPartId);
@@ -658,21 +770,30 @@ router.delete('/:id', async (req, res) => {
 
     if (partIdsToRestore.length > 0) {
       try {
+        console.log(`[Delete Repair] Restoring stock for ${partIdsToRestore.length} part(s)`);
         await restorePartStock(partIdsToRestore);
+        console.log(`[Delete Repair] Stock restored successfully`);
       } catch (error) {
-        console.error('Error restoring part stock on delete:', error);
+        console.error('[Delete Repair] Error restoring part stock on delete:', error);
         // Continue with deletion even if stock restoration fails
       }
     }
 
-    await repairRepository.remove(repair);
+    // ใช้ delete() แทน remove() เพื่อให้ TypeORM จัดการ foreign keys อัตโนมัติ
+    console.log(`[Delete Repair] Deleting repair ${repair.id}...`);
+    await repairRepository.delete(repair.id);
+    console.log(`[Delete Repair] Repair deleted successfully: ${repair.id}`);
 
     res.json({
       status: 'success',
       message: 'Repair deleted successfully',
     });
   } catch (error) {
-    console.error('Delete repair error:', error);
+    console.error('[Delete Repair] Error details:', error);
+    if (error instanceof Error) {
+      console.error('[Delete Repair] Error message:', error.message);
+      console.error('[Delete Repair] Error stack:', error.stack);
+    }
     res.status(500).json({
       status: 'error',
       message: 'Failed to delete repair',

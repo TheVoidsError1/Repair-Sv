@@ -271,6 +271,59 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Finance
+  async getFinancialSummary(timeRange: string = '6m') {
+    return this.request<{
+      totalIncome: number;
+      totalExpenses: number;
+      netProfit: number;
+      totalPartsCost: number; // ต้นทุนจริง
+      totalPartsSalePrice: number; // ราคาขายอะไหล่
+      partsMarkup: number; // กำไรจากอะไหล่
+      partsMarkupPercentage: number; // % กำไรจากอะไหล่
+      totalLaborCost: number;
+      incomeChange: number;
+      expensesChange: number;
+      profitChange: number;
+      profitMargin: number; // อัตรากำไร %
+      totalStockValue: number; // มูลค่าสต็อก
+      totalStockQuantity: number; // จำนวนสต็อกทั้งหมด
+      averageProfitPerRepair: number; // กำไรเฉลี่ยต่องาน
+      totalRepairs: number; // จำนวนงานที่เสร็จ
+    }>(`/api/finance/summary?timeRange=${timeRange}`);
+  }
+
+  async getIncomeExpensesChart(timeRange: string = '6m') {
+    return this.request<Array<{
+      month: string;
+      monthTh: string;
+      income: number;
+      expenses: number;
+    }>>(`/api/finance/chart/income-expenses?timeRange=${timeRange}`);
+  }
+
+  async getExpenseBreakdown(timeRange: string = '6m') {
+    return this.request<Array<{
+      name: string;
+      nameTh: string;
+      value: number;
+      amount: number;
+    }>>(`/api/finance/chart/expense-breakdown?timeRange=${timeRange}`);
+  }
+
+  async getTransactions(timeRange: string = '6m', type: string = 'all', limit: number = 50) {
+    return this.request<Array<{
+      id: string;
+      type: 'income' | 'expense';
+      description: string;
+      descriptionTh: string;
+      amount: number;
+      date: string;
+      method: string;
+      methodTh: string;
+    }>>(`/api/finance/transactions?timeRange=${timeRange}&type=${type}&limit=${limit}`);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
