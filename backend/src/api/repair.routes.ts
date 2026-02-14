@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/data-source.js';
 import { Repair, RepairStatus, ServiceType } from '../entities/Repair.js';
 import { Customer } from '../entities/Customer.js';
 import { Part } from '../entities/Part.js';
+import { WarrantyClaim } from '../entities/WarrantyClaim.js';
 import { Between, In } from 'typeorm';
 
 const router = Router();
@@ -616,6 +617,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const repairRepository = AppDataSource.getRepository(Repair);
+    const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
     const repair = await repairRepository.findOne({ where: { id } });
 
     if (!repair) {
@@ -623,6 +625,20 @@ router.delete('/:id', async (req, res) => {
         status: 'error',
         message: 'Repair not found',
       });
+    }
+
+    // ลบ WarrantyClaim ที่เชื่อมกับ Repair นี้ก่อน (เพื่อหลีกเลี่ยง foreign key constraint error)
+    try {
+      const warrantyClaims = await warrantyRepository.find({
+        where: { repairId: repair.id },
+      });
+      if (warrantyClaims.length > 0) {
+        await warrantyRepository.remove(warrantyClaims);
+        console.log(`[Delete Repair] Deleted ${warrantyClaims.length} warranty claim(s) associated with repair ${repair.id}`);
+      }
+    } catch (error) {
+      console.error('Error deleting warranty claims:', error);
+      // Continue with repair deletion even if warranty claim deletion fails
     }
 
     // Restore stock for parts used in this repair

@@ -2,10 +2,12 @@ import {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useMemo,
     useState,
     type ReactNode,
 } from "react";
+import { apiClient } from "@/lib/api";
 
 export type WarrantyClaimStatus =
   | "pending"
@@ -15,6 +17,7 @@ export type WarrantyClaimStatus =
 
 export interface WarrantyClaim {
   id: string;
+  claimNumber: string;
   repairId: string;
   /** Serial Number ของเครื่องตอนยื่นเคลม — ใช้ตรวจสอบว่าเครื่องตรงกับงานซ่อมเดิม */
   serialNumber?: string;
@@ -22,112 +25,150 @@ export interface WarrantyClaim {
   claimReasonTh: string;
   status: WarrantyClaimStatus;
   claimDate: string;
-}
-
-const initialClaims: WarrantyClaim[] = [
-  {
-    id: "WRN-001",
-    repairId: "REP-001",
-    serialNumber: "350001234567890",
-    claimReason: "Screen flickering after 2 weeks",
-    claimReasonTh: "หน้าจอกระพริบหลังจาก 2 สัปดาห์",
-    status: "pending",
-    claimDate: "2024-01-15",
-  },
-  {
-    id: "WRN-002",
-    repairId: "REP-003",
-    serialNumber: "352223456789012",
-    claimReason: "Device not charging properly",
-    claimReasonTh: "อุปกรณ์ชาร์จไม่เข้า",
-    status: "approved",
-    claimDate: "2024-01-14",
-  },
-  {
-    id: "WRN-003",
-    repairId: "REP-010",
-    serialNumber: "357778901234567",
-    claimReason: "Battery drains too fast",
-    claimReasonTh: "แบตเตอรี่หมดเร็วเกินไป",
-    status: "in-progress",
-    claimDate: "2024-01-13",
-  },
-  {
-    id: "WRN-004",
-    repairId: "REP-008",
-    serialNumber: "356667890123456",
-    claimReason: "Glass cracked again",
-    claimReasonTh: "กระจกแตกอีกครั้ง",
-    status: "rejected",
-    claimDate: "2024-01-12",
-  },
-];
-
-function nextClaimId(claims: WarrantyClaim[]): string {
-  const nums = claims
-    .map((c) => {
-      const m = c.id.match(/^WRN-(\d+)$/);
-      return m ? parseInt(m[1], 10) : 0;
-    })
-    .filter((n) => n > 0);
-  const max = nums.length ? Math.max(...nums) : 0;
-  return `WRN-${String(max + 1).padStart(3, "0")}`;
+  createdAt?: string;
+  updatedAt?: string;
+  repair?: any; // Populated repair data from backend
 }
 
 interface WarrantyContextValue {
   claims: WarrantyClaim[];
+  isLoading: boolean;
+  error: string | null;
+  fetchClaims: () => Promise<void>;
   addClaim: (params: {
     repairId: string;
     serialNumber?: string;
     claimReason: string;
     claimReasonTh: string;
-  }) => WarrantyClaim;
+  }) => Promise<WarrantyClaim | null>;
   updateClaimStatus: (
     claimId: string,
     status: WarrantyClaimStatus
-  ) => void;
+  ) => Promise<void>;
+  deleteClaim: (claimId: string) => Promise<void>;
 }
 
 const WarrantyContext = createContext<WarrantyContextValue | null>(null);
 
 export function WarrantyProvider({ children }: { children: ReactNode }) {
-  const [claims, setClaims] = useState<WarrantyClaim[]>(initialClaims);
+  const [claims, setClaims] = useState<WarrantyClaim[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch all warranty claims from backend
+  const fetchClaims = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.getWarrantyClaims();
+      if (response.status === "success" && response.data) {
+        // Transform backend data to match frontend interface
+        const transformedClaims = response.data.map((claim: any) => ({
+          id: claim.id, // Use UUID as ID
+          claimNumber: claim.claimNumber,
+          repairId: claim.repair?.repairNumber || claim.repairId,
+          serialNumber: claim.serialNumber || claim.repair?.serialNumber,
+          claimReason: claim.claimReason,
+          claimReasonTh: claim.claimReasonTh,
+          status: claim.status as WarrantyClaimStatus,
+          claimDate: claim.claimDate.split('T')[0], // Format date
+          createdAt: claim.createdAt,
+          updatedAt: claim.updatedAt,
+          repair: claim.repair,
+        }));
+        setClaims(transformedClaims);
+      } else {
+        setError(response.message || "Failed to fetch warranty claims");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Fetch claims on mount
+  useEffect(() => {
+    fetchClaims();
+  }, [fetchClaims]);
+
+  // Add new warranty claim
   const addClaim = useCallback(
-    (params: {
+    async (params: {
       repairId: string;
       serialNumber?: string;
       claimReason: string;
       claimReasonTh: string;
-    }) => {
-      const today = new Date().toISOString().slice(0, 10);
-      const newClaim: WarrantyClaim = {
-        id: nextClaimId(claims),
-        repairId: params.repairId,
-        serialNumber: params.serialNumber,
-        claimReason: params.claimReason,
-        claimReasonTh: params.claimReasonTh,
-        status: "pending",
-        claimDate: today,
-      };
-      setClaims((prev) => [...prev, newClaim]);
-      return newClaim;
-    },
-    [claims]
-  );
-
-  const updateClaimStatus = useCallback(
-    (claimId: string, status: WarrantyClaimStatus) => {
-      setClaims((prev) =>
-        prev.map((c) => (c.id === claimId ? { ...c, status } : c))
-      );
+    }): Promise<WarrantyClaim | null> => {
+      setError(null);
+      try {
+        const response = await apiClient.createWarrantyClaim(params);
+        if (response.status === "success" && response.data) {
+          const newClaim: WarrantyClaim = {
+            id: response.data.id,
+            claimNumber: response.data.claimNumber,
+            repairId: response.data.repair?.repairNumber || response.data.repairId,
+            serialNumber: response.data.serialNumber || response.data.repair?.serialNumber,
+            claimReason: response.data.claimReason,
+            claimReasonTh: response.data.claimReasonTh,
+            status: response.data.status as WarrantyClaimStatus,
+            claimDate: response.data.claimDate.split('T')[0],
+            createdAt: response.data.createdAt,
+            updatedAt: response.data.updatedAt,
+            repair: response.data.repair,
+          };
+          setClaims((prev) => [newClaim, ...prev]);
+          return newClaim;
+        } else {
+          setError(response.message || "Failed to create warranty claim");
+          return null;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+        return null;
+      }
     },
     []
   );
 
+  // Update warranty claim status
+  const updateClaimStatus = useCallback(
+    async (claimId: string, status: WarrantyClaimStatus) => {
+      setError(null);
+      try {
+        const response = await apiClient.updateWarrantyClaimStatus(claimId, status);
+        if (response.status === "success") {
+          setClaims((prev) =>
+            prev.map((c) => (c.id === claimId ? { ...c, status } : c))
+          );
+        } else {
+          setError(response.message || "Failed to update warranty claim status");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      }
+    },
+    []
+  );
+
+  // Delete warranty claim
+  const deleteClaim = useCallback(async (claimId: string) => {
+    setError(null);
+    try {
+      const response = await apiClient.deleteWarrantyClaim(claimId);
+      if (response.status === "success") {
+        setClaims((prev) => prev.filter((c) => c.id !== claimId));
+      } else {
+        setError(response.message || "Failed to delete warranty claim");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ claims, addClaim, updateClaimStatus }),
-    [claims, addClaim, updateClaimStatus]
+    () => ({ claims, isLoading, error, fetchClaims, addClaim, updateClaimStatus, deleteClaim }),
+    [claims, isLoading, error, fetchClaims, addClaim, updateClaimStatus, deleteClaim]
   );
 
   return (

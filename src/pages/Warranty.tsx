@@ -25,6 +25,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
 import { useWarranty, type WarrantyClaim } from "@/contexts/WarrantyContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
     CheckCircle,
@@ -86,7 +87,7 @@ const Warranty = () => {
   const { t, language } = useLanguage();
   const { currentUser } = useAuth();
   const { repairs } = useRepairs();
-  const { claims, addClaim, updateClaimStatus } = useWarranty();
+  const { claims, isLoading, addClaim, updateClaimStatus } = useWarranty();
   const { toast } = useToast();
   const isOwner = currentUser?.role === "owner";
   const pendingClaims = claims.filter((c) => c.status === "pending");
@@ -103,6 +104,44 @@ const Warranty = () => {
     customerVerified: false,
   });
   const [snMismatchClaim, setSnMismatchClaim] = useState<WarrantyClaim | null>(null);
+  
+  // State สำหรับงานซ่อมที่เสร็จแล้วทั้งหมด
+  const [allCompletedRepairs, setAllCompletedRepairs] = useState<any[]>([]);
+  const [loadingCompletedRepairs, setLoadingCompletedRepairs] = useState(false);
+
+  // โหลดงานซ่อมที่เสร็จแล้วทั้งหมดเมื่อเปิด dialog
+  useEffect(() => {
+    if (isDialogOpen) {
+      loadCompletedRepairs();
+    }
+  }, [isDialogOpen]);
+
+  const loadCompletedRepairs = async () => {
+    setLoadingCompletedRepairs(true);
+    try {
+      // โหลดหลายหน้าเพื่อให้ได้งานซ่อมที่ completed ทั้งหมด
+      const response = await apiClient.getRepairs(1, 1000) as any;
+      if (response.status === 'success' && response.data) {
+        // กรองเฉพาะงานที่ completed และมี serialNumber
+        const completed = response.data.filter((r: any) => 
+          r.status === 'completed' && r.serialNumber
+        );
+        console.log('Loaded completed repairs:', completed);
+        setAllCompletedRepairs(completed);
+      }
+    } catch (error) {
+      console.error('Failed to load completed repairs:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" 
+          ? "ไม่สามารถโหลดรายการงานซ่อมได้" 
+          : "Failed to load repairs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCompletedRepairs(false);
+    }
+  };
 
   const resetInspectionModal = () => {
     setInspectionClaim(null);
@@ -114,8 +153,13 @@ const Warranty = () => {
 
   // เลือกได้เฉพาะงานซ่อมที่เสร็จแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
   // เรียงลำดับตามวันที่สร้าง (ใหม่สุดก่อน) และกรองเฉพาะที่มี serialNumber
-  const completedRepairs = repairs
-    .filter((r) => r.status === "completed" && r.serialNumber)
+  const completedRepairs = allCompletedRepairs
+    .map((r) => ({
+      id: r.id,
+      serialNumber: r.serialNumber,
+      customer: r.customer?.fullName || `${r.customer?.firstName || ''} ${r.customer?.lastName || ''}`.trim() || 'Unknown',
+      createdAt: r.dateOfReport ? new Date(r.dateOfReport).toISOString().split('T')[0] : r.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+    }))
     .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 
   const statusLabels: Record<string, string> = {
@@ -126,13 +170,16 @@ const Warranty = () => {
   };
 
   const filteredClaims = claims.filter((claim) => {
-    const repair = repairs.find((r) => r.id === claim.repairId);
-    const customer = repair?.customer ?? "";
-    const sn = (repair?.serialNumber ?? claim.serialNumber ?? "").toLowerCase();
+    const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
+    const customer = repair?.customer?.firstName 
+      ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
+      : repair?.customer || "";
+    const sn = (claim.serialNumber ?? "").toLowerCase();
+    const claimNum = (claim.claimNumber ?? "").toLowerCase();
     const q = searchQuery.toLowerCase();
     const matchesSearch =
+      claimNum.includes(q) ||
       claim.repairId.toLowerCase().includes(q) ||
-      claim.id.toLowerCase().includes(q) ||
       customer.toLowerCase().includes(q) ||
       (sn && sn.includes(q));
     const matchesStatus =
@@ -158,17 +205,19 @@ const Warranty = () => {
 
   /** หางานซ่อมที่เลือกจาก dropdown */
   const repairBySn = selectedRepairId
-    ? repairs.find((r) => r.id === selectedRepairId && r.status === "completed")
+    ? allCompletedRepairs.find((r) => r.id === selectedRepairId)
     : null;
-  const repairDateBySn = repairBySn?.createdAt ?? "";
-  const expiryDateBySn = repairBySn ? getWarrantyExpiryDate(repairBySn.createdAt, DEFAULT_WARRANTY_DAYS) : "";
+  const repairDateBySn = repairBySn?.dateOfReport 
+    ? new Date(repairBySn.dateOfReport).toISOString().split('T')[0]
+    : repairBySn?.createdAt?.split('T')[0] || "";
+  const expiryDateBySn = repairDateBySn ? getWarrantyExpiryDate(repairDateBySn, DEFAULT_WARRANTY_DAYS) : "";
   const remainingDaysBySn = expiryDateBySn ? getRemainingWarrantyDays(expiryDateBySn) : 0;
   const previousClaimCountBySn = repairBySn
-    ? claims.filter((c) => c.repairId === repairBySn.id).length
+    ? claims.filter((c) => c.repairId === repairBySn.repairNumber || c.repairId === repairBySn.id).length
     : 0;
   const canSubmitClaim = !!repairBySn && newClaimReason.trim().length > 0;
 
-  const handleSubmitClaim = () => {
+  const handleSubmitClaim = async () => {
     if (!repairBySn) {
       toast({
         title: language === "th" ? "แจ้งเตือน" : "Notice",
@@ -186,19 +235,32 @@ const Warranty = () => {
       return;
     }
     const reason = newClaimReason.trim();
-    addClaim({
+    console.log('Submitting claim with repair:', repairBySn);
+    console.log('Repair ID:', repairBySn.id);
+    console.log('Serial Number:', repairBySn.serialNumber);
+    
+    const result = await addClaim({
       repairId: repairBySn.id,
       serialNumber: repairBySn.serialNumber,
       claimReason: reason,
       claimReasonTh: reason,
     });
-    toast({
-      title: language === "th" ? "สำเร็จ" : "Success",
-      description: t("submitClaim"),
-    });
-    setSelectedRepairId("");
-    setNewClaimReason("");
-    setIsDialogOpen(false);
+    
+    if (result) {
+      toast({
+        title: language === "th" ? "สำเร็จ" : "Success",
+        description: t("submitClaim"),
+      });
+      setSelectedRepairId("");
+      setNewClaimReason("");
+      setIsDialogOpen(false);
+    } else {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถสร้างเคลมได้" : "Failed to create claim",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleViewReport = (claim: WarrantyClaim) => {
@@ -206,9 +268,9 @@ const Warranty = () => {
     setReportDialogOpen(true);
   };
 
-  const selectedRepair = selectedClaim
+  const selectedRepair = selectedClaim?.repair || (selectedClaim
     ? repairs.find((r) => r.id === selectedClaim.repairId)
-    : null;
+    : null);
 
   return (
     <MainLayout>
@@ -247,7 +309,11 @@ const Warranty = () => {
                       <SelectValue placeholder={language === "th" ? "เลือกงานซ่อมที่เสร็จแล้ว" : "Select completed repair"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {completedRepairs.length === 0 ? (
+                      {loadingCompletedRepairs ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                        </div>
+                      ) : completedRepairs.length === 0 ? (
                         <SelectItem value="no-repairs" disabled>
                           {language === "th" ? "ไม่มีงานซ่อมที่เสร็จแล้ว" : "No completed repairs"}
                         </SelectItem>
@@ -269,7 +335,7 @@ const Warranty = () => {
                 {repairBySn && (
                   <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
                     <p className="font-medium text-foreground">
-                      {repairBySn.id} · {repairBySn.customer}
+                      {repairBySn.repairNumber || repairBySn.id} · {repairBySn.customer?.fullName || `${repairBySn.customer?.firstName || ''} ${repairBySn.customer?.lastName || ''}`.trim()}
                     </p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
                       <span>{language === "th" ? "วันที่ซ่อม" : "Repair date"}</span>
@@ -352,14 +418,16 @@ const Warranty = () => {
               </thead>
               <tbody>
                 {pendingClaims.map((claim) => {
-                  const repair = repairs.find((r) => r.id === claim.repairId);
+                  const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
                   const noRepairRecord = !repair;
                   const snMismatch =
                     !!repair &&
                     !!claim.serialNumber &&
                     !!repair.serialNumber &&
                     claim.serialNumber.trim().toLowerCase() !== repair.serialNumber.trim().toLowerCase();
-                  const customer = repair?.customer ?? "—";
+                  const customer = repair?.customer?.firstName 
+                    ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
+                    : repair?.customer || "—";
                   const reasonText = language === "th" ? claim.claimReasonTh : claim.claimReason;
                   const repairDate = repair?.createdAt ?? claim.claimDate;
                   const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
@@ -370,14 +438,14 @@ const Warranty = () => {
                     <tr key={claim.id}>
                       <td>
                         <div>
-                          <p className="font-medium text-foreground">{claim.id}</p>
+                          <p className="font-medium text-foreground">{claim.claimNumber}</p>
                           <p className="text-xs text-muted-foreground">{claim.repairId}</p>
                         </div>
                       </td>
                       <td>{customer}</td>
                       <td>
                         <span className="font-mono text-sm">
-                          {(claim.serialNumber || repair?.serialNumber) ?? "—"}
+                          {claim.serialNumber || repair?.serialNumber || "—"}
                         </span>
                       </td>
                       <td className="max-w-[200px] truncate">{reasonText}</td>
@@ -406,11 +474,11 @@ const Warranty = () => {
                             size="sm"
                             variant="destructive"
                             className="gap-1"
-                            onClick={() => {
-                              updateClaimStatus(claim.id, "rejected");
+                            onClick={async () => {
+                              await updateClaimStatus(claim.id, "rejected");
                               toast({
                                 title: language === "th" ? "ปฏิเสธแล้ว" : "Rejected",
-                                description: `${claim.id} ${language === "th" ? "ปฏิเสธเคลมแล้ว" : "claim rejected"}`,
+                                description: `${claim.claimNumber} ${language === "th" ? "ปฏิเสธเคลมแล้ว" : "claim rejected"}`,
                                 variant: "destructive",
                               });
                             }}
@@ -479,7 +547,7 @@ const Warranty = () => {
           {inspectionClaim && (
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
-                {language === "th" ? "เคลม" : "Claim"}: <span className="font-medium text-foreground">{inspectionClaim.id}</span>
+                {language === "th" ? "เคลม" : "Claim"}: <span className="font-medium text-foreground">{inspectionClaim.claimNumber}</span>
               </p>
               <div className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -522,12 +590,12 @@ const Warranty = () => {
             <Button
               disabled={!inspectionComplete}
               className="gap-1 bg-status-completed hover:bg-status-completed/90"
-              onClick={() => {
+              onClick={async () => {
                 if (!inspectionClaim || !inspectionComplete) return;
-                updateClaimStatus(inspectionClaim.id, "approved");
+                await updateClaimStatus(inspectionClaim.id, "approved");
                 toast({
                   title: language === "th" ? "อนุมัติแล้ว" : "Approved",
-                  description: `${inspectionClaim.id} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
+                  description: `${inspectionClaim.claimNumber} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
                 });
                 resetInspectionModal();
               }}
@@ -610,8 +678,18 @@ const Warranty = () => {
 
       {/* ตารางเคลม — แสดงข้อมูลจากงานซ่อมที่อ้างอิง */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="data-table">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+              <p className="text-sm text-muted-foreground">
+                {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t("claimId")}</th>
@@ -627,14 +705,16 @@ const Warranty = () => {
             </thead>
             <tbody>
               {filteredClaims.map((claim) => {
-                const repair = repairs.find((r) => r.id === claim.repairId);
+                const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
                 const originalRepairText = repair
                   ? language === "th"
-                    ? repair.issueTh
-                    : repair.issue
+                    ? repair.problemSymptoms || repair.problemDescription
+                    : repair.problemDescription
                   : "—";
-                const customer = repair?.customer ?? "—";
-                const device = repair?.device ?? "—";
+                const customer = repair?.customer?.firstName 
+                  ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
+                  : repair?.customer || "—";
+                const device = repair?.deviceModel || repair?.device || "—";
                 const reasonText =
                   language === "th" ? claim.claimReasonTh : claim.claimReason;
                 const repairDate = repair?.createdAt ?? claim.claimDate;
@@ -643,7 +723,7 @@ const Warranty = () => {
                   <tr key={claim.id}>
                     <td>
                       <div>
-                        <p className="font-medium text-foreground">{claim.id}</p>
+                        <p className="font-medium text-foreground">{claim.claimNumber}</p>
                         <p className="text-xs text-muted-foreground">
                           {claim.repairId}
                         </p>
@@ -653,7 +733,7 @@ const Warranty = () => {
                     <td>{device}</td>
                     <td>
                       <span className="font-mono text-sm">
-                        {(claim.serialNumber || repair?.serialNumber) ?? "—"}
+                        {claim.serialNumber || repair?.serialNumber || "—"}
                       </span>
                     </td>
                     <td>{originalRepairText}</td>
@@ -684,6 +764,7 @@ const Warranty = () => {
             </tbody>
           </table>
         </div>
+      )}
       </div>
 
       {/* Dialog ดูรายละเอียด — ขนาดใหญ่ อ่านง่าย */}
@@ -691,14 +772,14 @@ const Warranty = () => {
         <DialogContent className="sm:max-w-[560px] p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4">
             <DialogTitle className="text-xl">
-              {t("report")} · {selectedClaim?.id ?? ""}
+              {t("report")} · {selectedClaim?.claimNumber ?? ""}
             </DialogTitle>
             <DialogDescription className="text-sm">
               {language === "th" ? "รายละเอียดเคลม" : "Claim details"}
             </DialogDescription>
           </DialogHeader>
           {selectedClaim && (() => {
-            const repair = repairs.find((r) => r.id === selectedClaim.repairId);
+            const repair = selectedClaim.repair || repairs.find((r) => r.id === selectedClaim.repairId);
             const repairDate = repair?.createdAt ?? selectedClaim.claimDate;
             const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
             const remainingDays = getRemainingWarrantyDays(expiryDate);
@@ -721,13 +802,22 @@ const Warranty = () => {
                 <span className="text-sm text-foreground min-w-0">{value}</span>
               </div>
             );
+            const customer = repair?.customer?.firstName 
+              ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
+              : repair?.customer || "—";
+            const device = repair?.deviceModel || repair?.device || "—";
+            const originalRepair = repair
+              ? language === "th"
+                ? repair.problemSymptoms || repair.problemDescription
+                : repair.problemDescription
+              : "—";
             return (
               <div className="px-6 pb-6 space-y-0">
-                {row(t("claimId"), <span>{selectedClaim.id} <span className="text-muted-foreground">/ {selectedClaim.repairId}</span></span>)}
-                {row(t("customer"), repair?.customer ?? "—")}
-                {row(t("device"), repair?.device ?? "—")}
-                {row(t("serialOrImei"), <span className="font-mono">{(selectedClaim.serialNumber || repair?.serialNumber) ?? "—"}</span>)}
-                {row(t("originalRepair"), repair ? (language === "th" ? repair.issueTh : repair.issue) : "—")}
+                {row(t("claimId"), <span>{selectedClaim.claimNumber} <span className="text-muted-foreground">/ {selectedClaim.repairId}</span></span>)}
+                {row(t("customer"), customer)}
+                {row(t("device"), device)}
+                {row(t("serialOrImei"), <span className="font-mono">{selectedClaim.serialNumber || repair?.serialNumber || "—"}</span>)}
+                {row(t("originalRepair"), originalRepair)}
                 {row(t("claimReason"), language === "th" ? selectedClaim.claimReasonTh : selectedClaim.claimReason)}
                 {row(t("status"), (
                   <span className={`status-badge ${statusStyles[selectedClaim.status]} inline-flex items-center gap-1 w-fit`}>

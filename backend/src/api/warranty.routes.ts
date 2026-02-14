@@ -8,9 +8,12 @@ const router = Router();
 // Helper function to generate claim number (WRN-001, WRN-002, etc.)
 async function generateClaimNumber(): Promise<string> {
   const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
-  const lastClaim = await warrantyRepository.findOne({
+  const claims = await warrantyRepository.find({
     order: { createdAt: 'DESC' },
+    take: 1,
   });
+  
+  const lastClaim = claims[0];
 
   if (!lastClaim) {
     return 'WRN-001';

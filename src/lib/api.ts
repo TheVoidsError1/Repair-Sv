@@ -230,6 +230,47 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Warranty Claims
+  async getWarrantyClaims() {
+    return this.request<any[]>('/api/warranty');
+  }
+
+  async getWarrantyClaimById(id: string) {
+    return this.request<any>(`/api/warranty/${id}`);
+  }
+
+  async createWarrantyClaim(data: {
+    repairId: string;
+    serialNumber?: string;
+    claimReason: string;
+    claimReasonTh: string;
+  }) {
+    return this.request<any>('/api/warranty', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWarrantyClaimStatus(id: string, status: string) {
+    return this.request<any>(`/api/warranty/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async updateWarrantyClaim(id: string, data: any) {
+    return this.request<any>(`/api/warranty/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWarrantyClaim(id: string) {
+    return this.request<void>(`/api/warranty/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

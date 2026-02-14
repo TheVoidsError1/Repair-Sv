@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "react-router-dom";
-import { Home, UserCog, UserPlus } from "lucide-react";
+import { Home, UserCog, UserPlus, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SystemManagement = () => {
@@ -41,6 +41,17 @@ const SystemManagement = () => {
       path: "/system/register",
       iconBg: "bg-status-completed/10",
       iconColor: "text-status-completed",
+    },
+    {
+      id: "repair-items",
+      titleTh: "จัดการรายการซ่อม",
+      titleEn: "Repair Items Management",
+      descriptionTh: "จัดการ แก้ไข และลบรายการซ่อม",
+      descriptionEn: "Manage, edit, and delete repair items",
+      icon: Wrench,
+      path: "/system/repair-items",
+      iconBg: "bg-blue-500/10",
+      iconColor: "text-blue-500",
     },
   ];
 

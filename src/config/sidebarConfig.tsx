@@ -258,6 +258,13 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelEn: "User management",
             icon: Users,
           },
+          {
+            id: "repair-items",
+            href: "/system/repair-items",
+            labelTh: "จัดการรายการซ่อม",
+            labelEn: "Repair Items Management",
+            icon: Wrench,
+          },
         ],
       },
     ],

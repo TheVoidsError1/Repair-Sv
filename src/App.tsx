@@ -25,6 +25,7 @@ import NotFound from "./pages/NotFound";
 import SystemManagement from "./pages/SystemManagement";
 import Register from "./pages/Register";
 import AccountManagement from "./pages/AccountManagement";
+import RepairItemsManagement from "./pages/RepairItemsManagement";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +96,7 @@ const App = () => (
                   <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
                   <Route path="/system/register" element={<RoleProtectedRoute><Register /></RoleProtectedRoute>} />
                   <Route path="/system/account" element={<RoleProtectedRoute><AccountManagement /></RoleProtectedRoute>} />
+                  <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
                   <Route path="/login" element={<Login />} />
                   <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                 </Routes>

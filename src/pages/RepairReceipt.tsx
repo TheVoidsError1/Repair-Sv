@@ -14,9 +14,11 @@ import {
     getTodayIsoDate,
     roundTimeTo30Min,
 } from "@/types/repairOrder";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { useRepairs } from "@/contexts/RepairsContext";
 
 function getDefaultReportDateTime(language: "th" | "en") {
   const now = new Date();
@@ -49,6 +51,8 @@ const RepairReceipt = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
+  const { refreshRepairs } = useRepairs();
   const dataFromNav = location.state as (RepairOrderData & { repairId?: string }) | null | undefined;
   const [reportDate, setReportDate] = useState(() => getInitialReportDateTime().dateOfReport);
   const [reportTime, setReportTime] = useState(() => getInitialReportDateTime().timeOfReport);
@@ -57,6 +61,7 @@ const RepairReceipt = () => {
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
   const [selectedPart, setSelectedPart] = useState<{ partNumber?: string; name?: string; nameTh?: string; price?: number } | null>(null);
   const [selectedParts, setSelectedParts] = useState<Array<{ partNumber?: string; name?: string; nameTh?: string; price?: number }>>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load repair data from API if repairId is provided
   useEffect(() => {
@@ -181,6 +186,83 @@ const RepairReceipt = () => {
 
   const handlePrint = () => window.print();
 
+  const handleSaveBill = async () => {
+    if (!dataFromNav?.repairId) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่พบข้อมูลงานซ่อม" : "Repair data not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!receiptData) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่พบข้อมูลใบเสร็จ" : "Receipt data not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // คำนวณค่าใช้จ่ายจากใบเสร็จ
+      // partsCost = ราคาสินค้าไม่รวม VAT (subtotal)
+      const partsCost = receiptData.subtotal;
+      // laborCost = ค่าแรง (ถ้าไม่มีให้ใช้ 0)
+      const laborCost = 0; // ถ้าไม่มีค่าแรงแยก ให้ใช้ 0 หรือคำนวณจาก totalCost - partsCost
+      // totalCost = ราคารวม VAT (grandTotal)
+      const totalCost = receiptData.grandTotal;
+
+      // อัพเดท repair status เป็น completed และบันทึกข้อมูลบิล
+      const updateData: any = {
+        status: "completed",
+        completedDate: new Date().toISOString().split('T')[0], // วันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+        totalCost: totalCost,
+        partsCost: partsCost,
+        laborCost: laborCost,
+      };
+
+      // อัพเดท repairSummaryPrice ถ้ามี
+      if (effectiveData?.repairSummaryPrice) {
+        updateData.repairSummaryPrice = parseFloat(String(effectiveData.repairSummaryPrice).replace(/,/g, "")) || totalCost;
+      }
+
+      const response = await apiClient.updateRepair(dataFromNav.repairId, updateData);
+
+      if (response.status === 'success') {
+        toast({
+          title: language === "th" ? "บันทึกบิลสำเร็จ" : "Bill saved successfully",
+          description: language === "th" 
+            ? `บันทึกบิลสำหรับงานซ่อม ${dataFromNav.repairId} เรียบร้อยแล้ว`
+            : `Bill saved for repair ${dataFromNav.repairId}`,
+        });
+
+        // Refresh repairs list
+        await refreshRepairs();
+
+        // Navigate back to bill list
+        setTimeout(() => {
+          navigate("/repairs/bill");
+        }, 1000);
+      } else {
+        throw new Error(response.message || 'Failed to save bill');
+      }
+    } catch (error) {
+      console.error('Error saving bill:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: error instanceof Error 
+          ? error.message 
+          : (language === "th" ? "ไม่สามารถบันทึกบิลได้" : "Failed to save bill"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const effectiveData: RepairOrderData | null = (() => {
     if (!dataFromNav) return null;
     const todayIso = getTodayIsoDate();
@@ -249,10 +331,22 @@ const RepairReceipt = () => {
             <ArrowLeft className="w-4 h-4" />
             {language === "th" ? "กลับรายการ" : "Back to list"}
           </Button>
-          <Button onClick={handlePrint} className="gap-2 w-fit">
-            <Printer className="w-4 h-4" />
-            {t("printBill")}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSaveBill} 
+              className="gap-2 w-fit"
+              disabled={isSaving}
+            >
+              <Save className="w-4 h-4" />
+              {isSaving 
+                ? (language === "th" ? "กำลังบันทึก..." : "Saving...") 
+                : (language === "th" ? "บันทึกบิล" : "Save Bill")}
+            </Button>
+            <Button onClick={handlePrint} className="gap-2 w-fit">
+              <Printer className="w-4 h-4" />
+              {t("printBill")}
+            </Button>
+          </div>
         </div>
 
         <div className="receipt-print-wrapper hidden print:block">
