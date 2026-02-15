@@ -572,8 +572,37 @@ router.get('/chart/income-expenses', async (req, res) => {
           return sum + Number(repair.laborCost || 0);
         }, 0);
 
-        // ค่าใช้จ่ายรวมของเดือน = ต้นทุนอะไหล่จริง + ค่าแรง
-        const expenses = monthPartsCost + monthLaborCost;
+        // คำนวณค่าใช้จ่ายจากการซื้ออะไหล่ในเดือนนี้
+        const allPartsWithStock = await partRepository
+          .createQueryBuilder('part')
+          .where('part.stockQuantity > 0')
+          .andWhere('part.costPrice > 0')
+          .getMany();
+
+        let monthPartsPurchaseCost = 0;
+        allPartsWithStock.forEach((part) => {
+          const partCreatedDate = new Date(part.createdAt);
+          const partUpdatedDate = new Date(part.updatedAt);
+          
+          // ตรวจสอบว่าอะไหล่นี้สร้างหรืออัพเดทในเดือนนี้
+          const isCreatedThisMonth = 
+            partCreatedDate >= month.start && partCreatedDate <= month.end;
+          const isUpdatedThisMonth = 
+            partUpdatedDate >= month.start && partUpdatedDate <= month.end;
+          
+          if (isCreatedThisMonth || isUpdatedThisMonth) {
+            const costPrice = Number(part.costPrice || 0);
+            const stockQty = Number(part.stockQuantity || 0);
+            const totalCost = costPrice * stockQty;
+            
+            if (totalCost > 0) {
+              monthPartsPurchaseCost += totalCost;
+            }
+          }
+        });
+
+        // ค่าใช้จ่ายรวมของเดือน = ต้นทุนอะไหล่ที่ใช้ในงานซ่อม + ค่าแรง + ค่าใช้จ่ายจากการซื้ออะไหล่
+        const expenses = monthPartsCost + monthLaborCost + monthPartsPurchaseCost;
 
         return {
           month: month.month,
@@ -1141,8 +1170,41 @@ router.get('/chart/weekly', async (req, res) => {
           return sum + Number(repair.laborCost || 0);
         }, 0);
 
-        // รายจ่ายรวม = ต้นทุนอะไหล่จริง + ค่าแรง
-        const expenses = dayPartsCost + dayLaborCost;
+        // คำนวณค่าใช้จ่ายจากการซื้ออะไหล่ในวันนี้ (parts purchases)
+        // ดึงอะไหล่ทั้งหมดที่มีสต็อกและราคาทุน แล้วกรองว่าสร้างหรืออัพเดทในวันนี้
+        const allPartsWithStock = await partRepository
+          .createQueryBuilder('part')
+          .where('part.stockQuantity > 0')
+          .andWhere('part.costPrice > 0')
+          .getMany();
+
+        let dayPartsPurchaseCost = 0;
+        allPartsWithStock.forEach((part) => {
+          const partCreatedDate = new Date(part.createdAt);
+          const partUpdatedDate = new Date(part.updatedAt);
+          
+          // ตรวจสอบว่าอะไหล่นี้สร้างหรืออัพเดทในวันนี้
+          const isCreatedToday = 
+            partCreatedDate >= day.start && partCreatedDate <= day.end;
+          const isUpdatedToday = 
+            partUpdatedDate >= day.start && partUpdatedDate <= day.end;
+          
+          if (isCreatedToday || isUpdatedToday) {
+            const costPrice = Number(part.costPrice || 0);
+            const stockQty = Number(part.stockQuantity || 0);
+            const totalCost = costPrice * stockQty;
+            
+            if (totalCost > 0) {
+              // ถ้าสร้างในวันนี้ ใช้ stockQuantity ทั้งหมด
+              // ถ้าอัพเดทในวันนี้ (แต่สร้างก่อนหน้า) ก็ใช้ stockQuantity ทั้งหมด
+              // เพราะถือว่าเป็นการซื้ออะไหล่เพิ่มในวันนี้
+              dayPartsPurchaseCost += totalCost;
+            }
+          }
+        });
+
+        // ค่าใช้จ่ายรวม = ต้นทุนอะไหล่ที่ใช้ในงานซ่อม + ค่าแรง + ค่าใช้จ่ายจากการซื้ออะไหล่
+        const expenses = dayPartsCost + dayLaborCost + dayPartsPurchaseCost;
 
         return {
           name: day.name,
@@ -1162,6 +1224,170 @@ router.get('/chart/weekly', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch weekly chart data',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get daily income vs expenses chart data
+router.get('/chart/daily', async (req, res) => {
+  try {
+    const repairRepository = AppDataSource.getRepository(Repair);
+    const partRepository = AppDataSource.getRepository(Part);
+
+    // คำนวณวันเริ่มต้นและสิ้นสุดของสัปดาห์นี้ (7 วันล่าสุด)
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    
+    const daysOfWeek = [];
+    const dayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+    const dayNamesEn = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    // สร้าง array ของ 7 วันล่าสุด
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(today);
+      day.setDate(today.getDate() - i);
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(day);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      const dayOfWeek = day.getDay();
+      const dayNameIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // แปลงให้วันจันทร์เป็น 0
+      
+      daysOfWeek.push({
+        name: dayNames[dayNameIndex],
+        nameEn: dayNamesEn[dayNameIndex],
+        date: day.toISOString().split('T')[0],
+        start: dayStart,
+        end: dayEnd,
+      });
+    }
+
+    // คำนวณรายได้และรายจ่ายสำหรับแต่ละวัน
+    const chartData = await Promise.all(
+      daysOfWeek.map(async (day) => {
+        // ดึงงานซ่อมที่เสร็จแล้วในวันนี้
+        const repairs = await repairRepository
+          .createQueryBuilder('repair')
+          .where('repair.status = :status', { status: RepairStatus.COMPLETED })
+          .andWhere(
+            '(repair.completedDate BETWEEN :startDate AND :endDate OR (repair.completedDate IS NULL AND repair.updatedAt BETWEEN :startDate AND :endDate))',
+            { startDate: day.start, endDate: day.end }
+          )
+          .getMany();
+
+        // คำนวณรายได้
+        const income = repairs.reduce((sum, repair) => {
+          const repairIncome = repair.repairSummaryPrice || repair.totalCost || 0;
+          return sum + Number(repairIncome);
+        }, 0);
+
+        // คำนวณรายจ่าย (ต้นทุนจริงของอะไหล่ + ค่าแรง)
+        // ดึงอะไหล่ที่ใช้ในงานซ่อมของวันนี้
+        const dayPartIds: string[] = [];
+        repairs.forEach((repair) => {
+          if (repair.selectedPartIds) {
+            try {
+              const partIds = JSON.parse(repair.selectedPartIds);
+              if (Array.isArray(partIds)) {
+                dayPartIds.push(...partIds);
+              }
+            } catch (error) {
+              console.error('Error parsing selectedPartIds:', error);
+            }
+          } else if (repair.selectedPartId) {
+            dayPartIds.push(repair.selectedPartId);
+          }
+        });
+
+        // คำนวณต้นทุนจริงของอะไหล่ที่ใช้ในวันนี้
+        let dayPartsCost = 0;
+        if (dayPartIds.length > 0) {
+          const uniquePartIds = [...new Set(dayPartIds)];
+          const parts = await partRepository.find({
+            where: { id: In(uniquePartIds) },
+          });
+
+          const partCounts: Record<string, number> = {};
+          dayPartIds.forEach((id) => {
+            partCounts[id] = (partCounts[id] || 0) + 1;
+          });
+
+          parts.forEach((part) => {
+            const count = partCounts[part.id] || 0;
+            const partCost = Number(part.costPrice) || 0;
+            dayPartsCost += partCost * count;
+          });
+        }
+
+        // คำนวณจาก partsCost สำหรับงานที่ไม่มีอะไหล่ที่ระบุในระบบ
+        repairs.forEach((repair) => {
+          const hasPartsInSystem = (repair.selectedPartIds && repair.selectedPartIds.trim() !== '') || 
+                                    repair.selectedPartId;
+          
+          if (!hasPartsInSystem) {
+            const partsCost = Number(repair.partsCost || 0);
+            dayPartsCost += partsCost;
+          }
+        });
+
+        // ค่าแรงในวันนี้
+        const dayLaborCost = repairs.reduce((sum, repair) => {
+          return sum + Number(repair.laborCost || 0);
+        }, 0);
+
+        // คำนวณค่าใช้จ่ายจากการซื้ออะไหล่ในวันนี้ (parts purchases)
+        const allPartsWithStock = await partRepository
+          .createQueryBuilder('part')
+          .where('part.stockQuantity > 0')
+          .andWhere('part.costPrice > 0')
+          .getMany();
+
+        let dayPartsPurchaseCost = 0;
+        allPartsWithStock.forEach((part) => {
+          const partCreatedDate = new Date(part.createdAt);
+          const partUpdatedDate = new Date(part.updatedAt);
+          
+          // ตรวจสอบว่าอะไหล่นี้สร้างหรืออัพเดทในวันนี้
+          const isCreatedToday = 
+            partCreatedDate >= day.start && partCreatedDate <= day.end;
+          const isUpdatedToday = 
+            partUpdatedDate >= day.start && partUpdatedDate <= day.end;
+          
+          if (isCreatedToday || isUpdatedToday) {
+            const costPrice = Number(part.costPrice || 0);
+            const stockQty = Number(part.stockQuantity || 0);
+            const totalCost = costPrice * stockQty;
+            
+            if (totalCost > 0) {
+              dayPartsPurchaseCost += totalCost;
+            }
+          }
+        });
+
+        // ค่าใช้จ่ายรวม = ต้นทุนอะไหล่ที่ใช้ในงานซ่อม + ค่าแรง + ค่าใช้จ่ายจากการซื้ออะไหล่
+        const expenses = dayPartsCost + dayLaborCost + dayPartsPurchaseCost;
+
+        return {
+          name: day.name,
+          nameEn: day.nameEn,
+          date: day.date,
+          income: Number(income.toFixed(2)),
+          expenses: Number(expenses.toFixed(2)),
+        };
+      })
+    );
+
+    res.json({
+      status: 'success',
+      data: chartData,
+    });
+  } catch (error) {
+    console.error('Get daily income-expenses chart error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch daily chart data',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

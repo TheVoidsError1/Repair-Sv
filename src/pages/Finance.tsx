@@ -62,11 +62,13 @@ const Finance = () => {
 
   // Chart data state
   const [chartData, setChartData] = useState<Array<{
-    month: string;
-    monthTh: string;
+    month?: string;
+    monthTh?: string;
+    name: string;
+    nameEn?: string;
+    date?: string;
     income: number;
     expenses: number;
-    name: string;
   }>>([]);
 
   // Expense breakdown state
@@ -101,10 +103,18 @@ const Finance = () => {
       setError(null);
 
       try {
+        // Determine which chart API to call based on timeRange
+        let chartPromise;
+        if (timeRange === '1w') {
+          chartPromise = apiClient.getWeeklyIncomeExpenses();
+        } else {
+          chartPromise = apiClient.getIncomeExpensesChart(timeRange);
+        }
+
         // Fetch all data in parallel (always fetch all transactions, filter on frontend)
         const [summaryRes, chartRes, breakdownRes, transactionsRes] = await Promise.all([
           apiClient.getFinancialSummary(timeRange),
-          apiClient.getIncomeExpensesChart(timeRange),
+          chartPromise,
           apiClient.getExpenseBreakdown(timeRange),
           apiClient.getTransactions(timeRange, 'all', 100), // Fetch all, filter on frontend
         ]);
@@ -114,10 +124,20 @@ const Finance = () => {
         }
 
         if (chartRes.status === "success" && chartRes.data) {
-          const formattedChartData = chartRes.data.map((d) => ({
-            ...d,
-            name: language === "th" ? d.monthTh : d.month,
-          }));
+          let formattedChartData;
+          if (timeRange === '1w') {
+            // For weekly charts
+            formattedChartData = chartRes.data.map((d: any) => ({
+              ...d,
+              name: language === "th" ? d.name : (d.nameEn || d.name),
+            }));
+          } else {
+            // For monthly charts
+            formattedChartData = chartRes.data.map((d: any) => ({
+              ...d,
+              name: language === "th" ? d.monthTh : d.month,
+            }));
+          }
           setChartData(formattedChartData);
         }
 
@@ -256,7 +276,6 @@ const Finance = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1d">{t("daily")}</SelectItem>
                 <SelectItem value="1w">{t("weekly")}</SelectItem>
                 <SelectItem value="1m">{t("lastMonth")}</SelectItem>
                 <SelectItem value="3m">{t("last3Months")}</SelectItem>

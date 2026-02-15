@@ -341,6 +341,136 @@ class ApiClient {
       expenses: number;
     }>>('/api/finance/chart/weekly');
   }
+
+  async getDailyIncomeExpenses() {
+    return this.request<Array<{
+      name: string;
+      nameEn: string;
+      date: string;
+      income: number;
+      expenses: number;
+    }>>('/api/finance/chart/daily');
+  }
+
+  // LINE Management
+  async getLineStatus() {
+    return this.request<{
+      connected: boolean;
+      hasToken: boolean;
+      message?: string;
+    }>('/api/line/status');
+  }
+
+  async testLineNotification(userId: string, message: string) {
+    return this.request<{ success: boolean }>('/api/line/test', {
+      method: 'POST',
+      body: JSON.stringify({ userId, message }),
+    });
+  }
+
+  async getCustomersWithLine() {
+    return this.request<Array<{
+      id: string;
+      firstName: string;
+      lastName?: string;
+      fullName?: string;
+      phone?: string;
+      lineId?: string;
+      lineIdRes?: string;
+    }>>('/api/line/customers');
+  }
+
+  async getRecentWebhookEvents() {
+    return this.request<Array<{
+      timestamp: Date;
+      type: string;
+      userId: string;
+      message?: string;
+    }>>('/api/line/recent-events');
+  }
+
+  async linkLineToCustomer(customerId: string, lineUserId: string) {
+    return this.request<{
+      customerId: string;
+      customerName: string;
+      lineUserId: string;
+    }>('/api/line/link-customer', {
+      method: 'POST',
+      body: JSON.stringify({ customerId, lineUserId }),
+    });
+  }
+
+  async unlinkLineFromCustomer(customerId: string) {
+    return this.request<{
+      customerId: string;
+      customerName: string;
+      oldLineUserId: string;
+    }>('/api/line/unlink-customer', {
+      method: 'POST',
+      body: JSON.stringify({ customerId }),
+    });
+  }
+
+  // LINE Status Templates
+  async getLineStatusTemplates() {
+    return this.request<Record<string, {
+      status: string;
+      template: string;
+      description: string;
+    }>>('/api/line/status-templates');
+  }
+
+  async getLineStatusTemplate(status: string) {
+    return this.request<{
+      status: string;
+      template: string;
+      description: string;
+    }>(`/api/line/status-templates/${status}`);
+  }
+
+  async updateLineStatusTemplate(status: string, template: string) {
+    return this.request<{
+      status: string;
+      template: string;
+    }>(`/api/line/status-templates/${status}`, {
+      method: 'PUT',
+      body: JSON.stringify({ template }),
+    });
+  }
+
+  async resetLineStatusTemplate(status?: string) {
+    return this.request<{
+      resetStatus: string;
+    }>('/api/line/status-templates/reset', {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async testLineTemplate(
+    userId: string,
+    status: string,
+    customerName: string,
+    repairNumber: string,
+    deviceType: string,
+    additionalInfo?: string
+  ) {
+    return this.request<{
+      userId: string;
+      status: string;
+      previewMessage: string;
+    }>('/api/line/test-template', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId,
+        status,
+        customerName,
+        repairNumber,
+        deviceType,
+        additionalInfo,
+      }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

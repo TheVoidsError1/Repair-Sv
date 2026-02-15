@@ -11,6 +11,7 @@ import repairRoutes from './api/repair.routes.js';
 import partRoutes from './api/part.routes.js';
 import warrantyRoutes from './api/warranty.routes.js';
 import financeRoutes from './api/finance.routes.js';
+import lineRoutes from './api/line.routes.js';
 import { Personnel } from './entities/Personnel.js';
 
 dotenv.config();
@@ -84,6 +85,7 @@ app.use('/api/repairs', repairRoutes);
 app.use('/api/parts', partRoutes);
 app.use('/api/warranty', warrantyRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/line', lineRoutes);
 
 // Seed default admin user
 const seedDefaultAdmin = async () => {

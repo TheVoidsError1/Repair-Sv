@@ -5,6 +5,7 @@ import { Customer } from '../entities/Customer.js';
 import { Part } from '../entities/Part.js';
 import { WarrantyClaim } from '../entities/WarrantyClaim.js';
 import { Between, In } from 'typeorm';
+import { getLineNotificationService } from '../services/line-notification.service.js';
 
 const router = Router();
 
@@ -498,6 +499,9 @@ router.put('/:id', async (req, res) => {
     console.log(`[Update Repair] Found repair: ${repair.id} (${repair.repairNumber}), current status: ${repair.status}`);
     console.log(`[Update Repair] Request body:`, JSON.stringify(req.body, null, 2));
 
+    // Store old status for comparison (to send LINE notification)
+    const oldStatus = repair.status;
+
     // Get old part IDs before updating (for stock restoration)
     const oldPartIds: string[] = [];
     if (repair.selectedPartIds) {
@@ -674,6 +678,44 @@ router.put('/:id', async (req, res) => {
     console.log(`[Update Repair] Saving repair with status: ${repair.status}`);
     const updatedRepair = await repairRepository.save(repair);
     console.log(`[Update Repair] Saved successfully: ${updatedRepair.id}`);
+    
+    // Send LINE notification if status changed
+    if (req.body.status !== undefined && oldStatus !== updatedRepair.status) {
+      try {
+        // Load customer data with lineIdRes
+        const repairWithCustomer = await repairRepository.findOne({
+          where: { id: updatedRepair.id },
+          relations: ['customer'],
+        });
+
+        if (repairWithCustomer?.customer?.lineIdRes) {
+          const lineService = getLineNotificationService();
+          if (lineService) {
+            const customerName = repairWithCustomer.customer.fullName || 
+                                `${repairWithCustomer.customer.firstName} ${repairWithCustomer.customer.lastName || ''}`.trim();
+            const deviceType = repairWithCustomer.deviceBrand && repairWithCustomer.deviceModel
+              ? `${repairWithCustomer.deviceBrand} ${repairWithCustomer.deviceModel}`
+              : repairWithCustomer.deviceType;
+
+            // Send notification
+            await lineService.notifyRepairStatusChange(
+              repairWithCustomer.customer.lineIdRes,
+              customerName,
+              repairWithCustomer.repairNumber,
+              updatedRepair.status,
+              deviceType,
+              req.body.repairNotes // Optional additional info
+            );
+            console.log(`[LINE] Notification sent for repair ${repairWithCustomer.repairNumber} status change to ${updatedRepair.status}`);
+          }
+        } else {
+          console.log(`[LINE] Customer does not have LINE User ID, skipping notification`);
+        }
+      } catch (lineError) {
+        // Don't fail the request if LINE notification fails
+        console.error('[LINE] Error sending notification:', lineError);
+      }
+    }
     
     // Load relations
     const repairWithRelations = await repairRepository.findOne({
