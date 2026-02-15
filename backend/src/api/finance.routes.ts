@@ -606,92 +606,191 @@ router.get('/transactions', async (req, res) => {
           { startDate, endDate }
         )
         .leftJoinAndSelect('repair.customer', 'customer')
-        .orderBy('COALESCE(repair.completedDate, repair.updatedAt)', 'DESC')
+        .orderBy('repair.completedDate', 'DESC', 'NULLS LAST')
+        .addOrderBy('repair.updatedAt', 'DESC')
         .take(Number(limit))
         .getMany();
 
-          completedRepairs.forEach((repair) => {
-            const amount = repair.repairSummaryPrice || repair.totalCost || 0;
-            if (amount > 0) {
-              // Use completedDate if available, otherwise use updatedAt
-              const transactionDate = repair.completedDate 
-                ? new Date(repair.completedDate)
-                : new Date(repair.updatedAt);
-              
-              transactions.push({
-                id: `TXN-${repair.repairNumber}`,
-                type: 'income',
-                description: `Repair Payment - ${repair.repairNumber}`,
-                descriptionTh: `ชำระค่าซ่อม - ${repair.repairNumber}`,
-                amount: Number(amount.toFixed(2)),
-                date: transactionDate.toISOString().split('T')[0],
-                method: 'Cash', // Default, you can add payment method to Repair entity later
-                methodTh: 'เงินสด',
-                repairId: repair.id,
-              });
-            }
+      console.log(`[Transactions] Found ${completedRepairs.length} completed repairs for income transactions`);
+
+      completedRepairs.forEach((repair) => {
+        const amount = Number(repair.repairSummaryPrice || repair.totalCost || 0);
+        if (amount > 0) {
+          // Use completedDate if available, otherwise use updatedAt
+          const transactionDate = repair.completedDate 
+            ? new Date(repair.completedDate)
+            : new Date(repair.updatedAt);
+          
+          transactions.push({
+            id: `TXN-${repair.repairNumber || repair.id.substring(0, 8)}`,
+            type: 'income',
+            description: `Repair Payment - ${repair.repairNumber || 'N/A'}`,
+            descriptionTh: `ชำระค่าซ่อม - ${repair.repairNumber || 'N/A'}`,
+            amount: parseFloat(amount.toFixed(2)),
+            date: transactionDate.toISOString().split('T')[0],
+            method: 'Cash', // Default, you can add payment method to Repair entity later
+            methodTh: 'เงินสด',
+            repairId: repair.id,
           });
+        }
+      });
     }
 
     // Get parts purchases (expense transactions)
-    // Note: This is a simplified version. In a real system, you might have a separate Purchase/Expense entity
     if (type === 'all' || type === 'expense') {
-      // For now, we'll create expense transactions from parts that were used
-      // You might want to add a separate expense tracking system later
+      // 1. ดึงธุรกรรมจากอะไหล่ที่เพิ่มในคลัง (ราคาทุน)
+      // ดึงอะไหล่ทั้งหมดที่มีสต็อกและราคาทุน (ไม่จำกัดช่วงเวลา เพื่อให้มีข้อมูลแสดง)
+      // แต่จะกรองตามวันที่สร้างหรืออัพเดท
+      const allPartsWithStock = await partRepository
+        .createQueryBuilder('part')
+        .where('part.stockQuantity > 0')
+        .andWhere('part.costPrice > 0')
+        .orderBy('part.createdAt', 'DESC')
+        .getMany();
+
+      console.log(`[Transactions] Found ${allPartsWithStock.length} parts with stock`);
+
+      // สร้าง transaction สำหรับอะไหล่ที่สร้างหรืออัพเดทในช่วงเวลาที่เลือก
+      // หรือถ้าไม่มีอะไหล่ในช่วงเวลาที่เลือก ให้แสดงอะไหล่ทั้งหมดที่มีสต็อก (ใช้ createdAt เป็นวันที่)
+      let partsInTimeRange = 0;
+      allPartsWithStock.forEach((part) => {
+        const partCreatedDate = new Date(part.createdAt);
+        const partUpdatedDate = new Date(part.updatedAt);
+        
+        // ตรวจสอบว่าอะไหล่นี้สร้างหรืออัพเดทในช่วงเวลาที่เลือก
+        const isInTimeRange = 
+          (partCreatedDate >= startDate && partCreatedDate <= endDate) ||
+          (partUpdatedDate >= startDate && partUpdatedDate <= endDate);
+        
+        if (isInTimeRange) {
+          partsInTimeRange++;
+        }
+      });
+
+      // ถ้ามีอะไหล่ในช่วงเวลาที่เลือก ให้แสดงเฉพาะอะไหล่ในช่วงเวลานั้น
+      // ถ้าไม่มี ให้แสดงอะไหล่ทั้งหมดที่มีสต็อก (เพื่อให้มีข้อมูลแสดง)
+      const partsToShow = partsInTimeRange > 0 
+        ? allPartsWithStock.filter((part) => {
+            const partCreatedDate = new Date(part.createdAt);
+            const partUpdatedDate = new Date(part.updatedAt);
+            return (partCreatedDate >= startDate && partCreatedDate <= endDate) ||
+                   (partUpdatedDate >= startDate && partUpdatedDate <= endDate);
+          })
+        : allPartsWithStock.slice(0, 20); // แสดงสูงสุด 20 รายการถ้าไม่มีในช่วงเวลา
+
+      console.log(`[Transactions] Showing ${partsToShow.length} parts (${partsInTimeRange} in time range)`);
+
+      // ใช้ Map เพื่อนับลำดับของ transactions ต่อวัน
+      const partDateCounter = new Map<string, number>();
+
+      partsToShow.forEach((part) => {
+        const costPrice = Number(part.costPrice || 0);
+        const stockQty = Number(part.stockQuantity || 0);
+        const totalCost = costPrice * stockQty;
+        
+        if (totalCost > 0) {
+          const partName = part.nameTh || part.name;
+          const partCreatedDate = new Date(part.createdAt);
+          const partUpdatedDate = new Date(part.updatedAt);
+          
+          // ใช้วันที่ที่สร้างใหม่หรืออัพเดทล่าสุด
+          let transactionDate: Date;
+          if (partCreatedDate >= startDate && partCreatedDate <= endDate) {
+            transactionDate = partCreatedDate;
+          } else if (partUpdatedDate >= startDate && partUpdatedDate <= endDate) {
+            transactionDate = partUpdatedDate;
+          } else {
+            // ถ้าไม่อยู่ในช่วงเวลา ให้ใช้ createdAt
+            transactionDate = partCreatedDate;
+          }
+          
+          // สร้าง Transaction ID ที่สั้นและอ่านง่าย (ใช้วันที่ + ลำดับ) รูปแบบเหมือน TXN-REP-2026-001
+          const dateStr = transactionDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          const dateKey = dateStr.replace(/-/g, ''); // YYYYMMDD สำหรับนับลำดับ
+          const counter = (partDateCounter.get(dateKey) || 0) + 1;
+          partDateCounter.set(dateKey, counter);
+          
+          transactions.push({
+            id: `PART-${dateStr}-${counter}`,
+            type: 'expense',
+            description: `Part Purchase - ${part.name} (${stockQty} units)`,
+            descriptionTh: `ซื้ออะไหล่ - ${partName} (${stockQty} ชิ้น)`,
+            amount: parseFloat(totalCost.toFixed(2)),
+            date: transactionDate.toISOString().split('T')[0],
+            method: 'Transfer',
+            methodTh: 'โอนเงิน',
+            partId: part.id,
+          });
+        }
+      });
+
+      // 2. ดึงธุรกรรมจากอะไหล่ที่ใช้ในงานซ่อม (ต้นทุนจริง)
       const allRepairs = await repairRepository
         .createQueryBuilder('repair')
         .where(
           '(repair.completedDate BETWEEN :startDate AND :endDate OR (repair.completedDate IS NULL AND repair.updatedAt BETWEEN :startDate AND :endDate))',
           { startDate, endDate }
         )
-        .orderBy('COALESCE(repair.completedDate, repair.updatedAt)', 'DESC')
+        .orderBy('repair.completedDate', 'DESC', 'NULLS LAST')
+        .addOrderBy('repair.updatedAt', 'DESC')
         .take(Number(limit))
         .getMany();
 
-      const partIds: string[] = [];
-      allRepairs.forEach((repair) => {
+      // วนลูปผ่านงานซ่อมแต่ละงานเพื่อสร้าง transaction สำหรับอะไหล่ที่ใช้
+      for (const repair of allRepairs) {
+        const repairDate = repair.completedDate 
+          ? new Date(repair.completedDate)
+          : new Date(repair.updatedAt);
+        
+        let repairPartIds: string[] = [];
         if (repair.selectedPartIds) {
           try {
             const ids = JSON.parse(repair.selectedPartIds);
             if (Array.isArray(ids)) {
-              partIds.push(...ids);
+              repairPartIds = ids;
             }
           } catch (error) {
             console.error('Error parsing selectedPartIds:', error);
           }
         } else if (repair.selectedPartId) {
-          partIds.push(repair.selectedPartId);
+          repairPartIds = [repair.selectedPartId];
         }
-      });
 
-      if (partIds.length > 0) {
-        const uniquePartIds = [...new Set(partIds)];
-        const parts = await partRepository.find({
-          where: { id: In(uniquePartIds) },
-        });
+        if (repairPartIds.length > 0) {
+          const uniquePartIds = [...new Set(repairPartIds)];
+          const parts = await partRepository.find({
+            where: { id: In(uniquePartIds) },
+          });
 
-        const partCounts: Record<string, number> = {};
-        partIds.forEach((id) => {
-          partCounts[id] = (partCounts[id] || 0) + 1;
-        });
+          const partCounts: Record<string, number> = {};
+          repairPartIds.forEach((id) => {
+            partCounts[id] = (partCounts[id] || 0) + 1;
+          });
 
-        parts.forEach((part) => {
-          const count = partCounts[part.id] || 0;
-          if (count > 0) {
-            const totalCost = Number(part.costPrice) * count;
-            transactions.push({
-              id: `EXP-${part.id.substring(0, 8)}`,
-              type: 'expense',
-              description: `${part.name} (${count} units)`,
-              descriptionTh: `${part.nameTh || part.name} (${count} ชิ้น)`,
-              amount: Number(totalCost.toFixed(2)),
-              date: new Date().toISOString().split('T')[0], // You might want to track actual purchase date
-              method: 'Transfer',
-              methodTh: 'โอนเงิน',
-              partId: part.id,
-            });
-          }
-        });
+          // นับลำดับของ parts ที่ใช้ใน repair เดียวกัน
+          let partIndex = 0;
+          parts.forEach((part) => {
+            const count = partCounts[part.id] || 0;
+            if (count > 0) {
+              partIndex++;
+              const costPrice = Number(part.costPrice || 0);
+              const totalCost = costPrice * count;
+              const partName = part.nameTh || part.name;
+              transactions.push({
+                id: `EXP-${repair.repairNumber || 'N/A'}-${partIndex}`,
+                type: 'expense',
+                description: `Parts Used - ${part.name} (${count} units) - Repair ${repair.repairNumber || 'N/A'}`,
+                descriptionTh: `อะไหล่ที่ใช้ - ${partName} (${count} ชิ้น) - งานซ่อม ${repair.repairNumber || 'N/A'}`,
+                amount: parseFloat(totalCost.toFixed(2)),
+                date: repairDate.toISOString().split('T')[0],
+                method: 'Transfer',
+                methodTh: 'โอนเงิน',
+                partId: part.id,
+                repairId: repair.id,
+              });
+            }
+          });
+        }
       }
     }
 
@@ -703,6 +802,8 @@ router.get('/transactions', async (req, res) => {
     });
 
     const limitedTransactions = transactions.slice(0, Number(limit));
+
+    console.log(`[Transactions] Total transactions found: ${transactions.length}, returning ${limitedTransactions.length} transactions`);
 
     res.json({
       status: 'success',

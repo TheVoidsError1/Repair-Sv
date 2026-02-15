@@ -8,6 +8,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
     ArrowDownRight,
@@ -90,6 +91,8 @@ const Finance = () => {
   }>>([]);
 
   const [transactionTab, setTransactionTab] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   // Fetch financial data
   useEffect(() => {
@@ -135,7 +138,11 @@ const Finance = () => {
         }
 
         if (transactionsRes.status === "success" && transactionsRes.data) {
+          console.log('[Finance] Transactions received:', transactionsRes.data.length, 'transactions');
+          console.log('[Finance] Transactions data:', transactionsRes.data);
           setTransactions(transactionsRes.data);
+        } else {
+          console.error('[Finance] Transactions response:', transactionsRes);
         }
       } catch (err) {
         console.error("Error fetching financial data:", err);
@@ -152,6 +159,21 @@ const Finance = () => {
   const filteredTransactions = transactionTab === 'all' 
     ? transactions 
     : transactions.filter(t => t.type === transactionTab);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // Reset to page 1 when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [transactionTab]);
+
+  console.log('[Finance] Current transactions:', transactions.length);
+  console.log('[Finance] Filtered transactions:', filteredTransactions.length);
+  console.log('[Finance] Transaction tab:', transactionTab);
 
   // Create financial breakdown data for pie chart (based on total expenses to ensure percentages don't exceed 100%)
   // Calculate percentages relative to total expenses to ensure they sum to 100% or less
@@ -603,8 +625,8 @@ const Finance = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((txn) => (
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((txn) => (
                       <tr key={txn.id}>
                         <td className="font-medium text-foreground">{txn.id}</td>
                         <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
@@ -631,6 +653,51 @@ const Finance = () => {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="border-t border-border p-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          if (currentPage > 1) {
+                            setCurrentPage(currentPage - 1);
+                          }
+                        }}
+                        className={
+                          currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          if (currentPage < totalPages) {
+                            setCurrentPage(currentPage + 1);
+                          }
+                        }}
+                        className={
+                          currentPage === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="income" className="mt-0">
             <div className="overflow-x-auto">
@@ -645,8 +712,8 @@ const Finance = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((txn) => (
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((txn) => (
                         <tr key={txn.id}>
                           <td className="font-medium text-foreground">{txn.id}</td>
                           <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
@@ -667,6 +734,51 @@ const Finance = () => {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="border-t border-border p-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          if (currentPage > 1) {
+                            setCurrentPage(currentPage - 1);
+                          }
+                        }}
+                        className={
+                          currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          if (currentPage < totalPages) {
+                            setCurrentPage(currentPage + 1);
+                          }
+                        }}
+                        className={
+                          currentPage === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="expense" className="mt-0">
             <div className="overflow-x-auto">
@@ -681,8 +793,8 @@ const Finance = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((txn) => (
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((txn) => (
                         <tr key={txn.id}>
                           <td className="font-medium text-foreground">{txn.id}</td>
                           <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
@@ -703,6 +815,51 @@ const Finance = () => {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="border-t border-border p-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          if (currentPage > 1) {
+                            setCurrentPage(currentPage - 1);
+                          }
+                        }}
+                        className={
+                          currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          if (currentPage < totalPages) {
+                            setCurrentPage(currentPage + 1);
+                          }
+                        }}
+                        className={
+                          currentPage === totalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
