@@ -20,6 +20,7 @@ import Warranty from "./pages/Warranty";
 import Finance from "./pages/Finance";
 import Settings from "./pages/Settings";
 import LineManagement from "./pages/LineManagement";
+import NetworkManagement from "./pages/NetworkManagement";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -27,6 +28,7 @@ import SystemManagement from "./pages/SystemManagement";
 import Register from "./pages/Register";
 import AccountManagement from "./pages/AccountManagement";
 import RepairItemsManagement from "./pages/RepairItemsManagement";
+import CustomerManagement from "./pages/CustomerManagement";
 
 const queryClient = new QueryClient();
 
@@ -94,11 +96,13 @@ const App = () => (
                   <Route path="/settings" element={<RoleProtectedRoute><Settings /></RoleProtectedRoute>} />
                   <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
                   <Route path="/system/line" element={<RoleProtectedRoute><LineManagement /></RoleProtectedRoute>} />
+                  <Route path="/system/network" element={<RoleProtectedRoute><NetworkManagement /></RoleProtectedRoute>} />
                   <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
                   <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
                   <Route path="/system/register" element={<RoleProtectedRoute><Register /></RoleProtectedRoute>} />
                   <Route path="/system/account" element={<RoleProtectedRoute><AccountManagement /></RoleProtectedRoute>} />
                   <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
+                  <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
                   <Route path="/login" element={<Login />} />
                   <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                 </Routes>

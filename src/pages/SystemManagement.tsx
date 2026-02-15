@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "react-router-dom";
-import { Home, UserCog, UserPlus, Wrench } from "lucide-react";
+import { Home, UserCog, UserPlus, Wrench, Users, MessageSquare, Network, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SystemManagement = () => {
@@ -52,6 +52,50 @@ const SystemManagement = () => {
       path: "/system/repair-items",
       iconBg: "bg-blue-500/10",
       iconColor: "text-blue-500",
+    },
+    {
+      id: "users",
+      titleTh: "จัดการผู้ใช้",
+      titleEn: "User Management",
+      descriptionTh: "จัดการข้อมูลผู้ใช้ในระบบ",
+      descriptionEn: "Manage user information in the system",
+      icon: Users,
+      path: "/admin/users",
+      iconBg: "bg-purple-500/10",
+      iconColor: "text-purple-500",
+    },
+    {
+      id: "line",
+      titleTh: "จัดการLINE",
+      titleEn: "LINE Management",
+      descriptionTh: "จัดการ LINE Official Account",
+      descriptionEn: "Manage LINE Official Account",
+      icon: MessageSquare,
+      path: "/system/line",
+      iconBg: "bg-green-500/10",
+      iconColor: "text-green-500",
+    },
+    {
+      id: "network",
+      titleTh: "Network",
+      titleEn: "Network",
+      descriptionTh: "จัดการ Network และ ngrok",
+      descriptionEn: "Manage Network and ngrok",
+      icon: Network,
+      path: "/system/network",
+      iconBg: "bg-orange-500/10",
+      iconColor: "text-orange-500",
+    },
+    {
+      id: "customers",
+      titleTh: "ดูข้อมูลลูกค้า",
+      titleEn: "Customer Management",
+      descriptionTh: "ดูและค้นหาข้อมูลลูกค้าทั้งหมด",
+      descriptionEn: "View and search all customer information",
+      icon: UserCircle,
+      path: "/system/customers",
+      iconBg: "bg-cyan-500/10",
+      iconColor: "text-cyan-500",
     },
   ];
 
