@@ -693,9 +693,8 @@ router.put('/:id', async (req, res) => {
           if (lineService) {
             const customerName = repairWithCustomer.customer.fullName || 
                                 `${repairWithCustomer.customer.firstName} ${repairWithCustomer.customer.lastName || ''}`.trim();
-            const deviceType = repairWithCustomer.deviceBrand && repairWithCustomer.deviceModel
-              ? `${repairWithCustomer.deviceBrand} ${repairWithCustomer.deviceModel}`
-              : repairWithCustomer.deviceType;
+            // ใช้ deviceModel หรือ deviceType เป็น fallback
+            const deviceType = repairWithCustomer.deviceModel || repairWithCustomer.deviceType;
 
             // Send notification
             await lineService.notifyRepairStatusChange(

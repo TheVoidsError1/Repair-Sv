@@ -202,10 +202,23 @@ export class LineNotificationService {
     deviceType: string,
     additionalInfo?: string
   ): string {
+    // ดู custom templates ที่มี
+    console.log('[LINE Template] Creating message for status:', status);
+    console.log('[LINE Template] Available custom templates:', Object.keys(customStatusTemplates));
+    console.log('[LINE Template] Has custom template for', status, ':', !!customStatusTemplates[status]);
+    
     // ใช้เทมเพลตที่ผู้ใช้กำหนด หรือเทมเพลตเริ่มต้น
     let template = customStatusTemplates[status] || DEFAULT_STATUS_TEMPLATES[status]?.template;
     
+    if (customStatusTemplates[status]) {
+      console.log('[LINE Template] ✅ Using CUSTOM template for', status);
+      console.log('[LINE Template] Preview:', template.substring(0, 150) + '...');
+    } else {
+      console.log('[LINE Template] ℹ️ Using DEFAULT template for', status);
+    }
+    
     if (!template) {
+      console.warn('[LINE Template] ⚠️ No template found for status:', status);
       return `แจ้งเตือน: สถานะงานซ่อม ${repairNumber} เปลี่ยนเป็น ${status}`;
     }
 
@@ -223,6 +236,7 @@ export class LineNotificationService {
       message = message.replace(/{additionalInfo}/g, '');
     }
 
+    console.log('[LINE Template] Final message preview:', message.substring(0, 150) + '...');
     return message;
   }
 
@@ -247,10 +261,15 @@ export class LineNotificationService {
    */
   static updateTemplate(status: string, newTemplate: string): boolean {
     if (!DEFAULT_STATUS_TEMPLATES[status]) {
+      console.error('[LINE Template Update] ❌ Invalid status:', status);
       return false;
     }
     
+    console.log('[LINE Template Update] 📝 Updating template for status:', status);
+    console.log('[LINE Template Update] New template preview:', newTemplate.substring(0, 150) + '...');
     customStatusTemplates[status] = newTemplate;
+    console.log('[LINE Template Update] ✅ Updated successfully!');
+    console.log('[LINE Template Update] Current custom templates:', Object.keys(customStatusTemplates));
     return true;
   }
 
@@ -259,10 +278,18 @@ export class LineNotificationService {
    */
   static resetTemplate(status?: string): void {
     if (status) {
+      console.log('[LINE Template Reset] 🔄 Resetting template for:', status);
       delete customStatusTemplates[status];
+      console.log('[LINE Template Reset] ✅ Reset completed for:', status);
     } else {
-      customStatusTemplates = {};
+      console.log('[LINE Template Reset] 🔄 Resetting ALL templates');
+      // ลบทุก key แทนการ assign ใหม่ เพื่อให้ reference เดิมยังใช้ได้
+      for (const key in customStatusTemplates) {
+        delete customStatusTemplates[key];
+      }
+      console.log('[LINE Template Reset] ✅ All templates reset');
     }
+    console.log('[LINE Template Reset] Current custom templates:', Object.keys(customStatusTemplates));
   }
 
   /**
