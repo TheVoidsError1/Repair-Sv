@@ -14,8 +14,11 @@ const Dashboard = () => {
   const { repairs } = useRepairs();
   const [parts, setParts] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [todayRevenue, setTodayRevenue] = useState<number>(0);
+  const [revenueChange, setRevenueChange] = useState<number>(0);
   const [isLoadingParts, setIsLoadingParts] = useState(true);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(true);
 
   // ดึงข้อมูล parts จาก API
   useEffect(() => {
@@ -61,6 +64,32 @@ const Dashboard = () => {
     };
 
     loadCustomers();
+  }, []);
+
+  // ดึงข้อมูลรายได้วันนี้
+  useEffect(() => {
+    const loadTodayRevenue = async () => {
+      setIsLoadingRevenue(true);
+      try {
+        const response = await apiClient.getTodayRevenue();
+        if (response.status === "success" && response.data) {
+          setTodayRevenue(response.data.todayRevenue);
+          setRevenueChange(response.data.revenueChange);
+        } else {
+          console.error("Failed to load today revenue:", response.message);
+          setTodayRevenue(0);
+          setRevenueChange(0);
+        }
+      } catch (error) {
+        console.error("Error loading today revenue:", error);
+        setTodayRevenue(0);
+        setRevenueChange(0);
+      } finally {
+        setIsLoadingRevenue(false);
+      }
+    };
+
+    loadTodayRevenue();
   }, []);
 
   // นับจำนวนงานซ่อมที่กำลังดำเนินการ
@@ -141,8 +170,8 @@ const Dashboard = () => {
         />
         <StatCard
           title={t("todaysRevenue")}
-          value="฿12,450"
-          change={8}
+          value={isLoadingRevenue ? "..." : `฿${todayRevenue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          change={revenueChange}
           changeLabel={t("vsYesterday")}
           icon={<DollarSign className="w-5 h-5 text-status-completed" />}
           iconBg="bg-status-completed/10"

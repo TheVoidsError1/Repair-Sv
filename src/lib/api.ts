@@ -324,6 +324,23 @@ class ApiClient {
       methodTh: string;
     }>>(`/api/finance/transactions?timeRange=${timeRange}&type=${type}&limit=${limit}`);
   }
+
+  async getTodayRevenue() {
+    return this.request<{
+      todayRevenue: number;
+      yesterdayRevenue: number;
+      revenueChange: number;
+    }>('/api/finance/today');
+  }
+
+  async getWeeklyIncomeExpenses() {
+    return this.request<Array<{
+      name: string;
+      nameEn: string;
+      income: number;
+      expenses: number;
+    }>>('/api/finance/chart/weekly');
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

@@ -175,38 +175,39 @@ const Finance = () => {
   console.log('[Finance] Filtered transactions:', filteredTransactions.length);
   console.log('[Finance] Transaction tab:', transactionTab);
 
-  // Create financial breakdown data for pie chart (based on total expenses to ensure percentages don't exceed 100%)
-  // Calculate percentages relative to total expenses to ensure they sum to 100% or less
-  const financialBreakdown = summary.totalExpenses > 0 ? [
+  // Create financial breakdown data for pie chart
+  // Calculate percentages relative to a base that ensures correct percentage distribution
+  // Base = totalIncome + totalExpenses to get proper percentage distribution
+  // This ensures totalExpenses is not 100% but a percentage of the total financial activity
+  const totalBase = summary.totalIncome + summary.totalExpenses > 0
+    ? summary.totalIncome + summary.totalExpenses
+    : summary.totalExpenses + summary.partsMarkup + summary.averageProfitPerRepair;
+  const financialBreakdown = totalBase > 0 ? [
     {
       name: language === "th" ? "ต้นทุนอะไหล่" : "Cost of Parts",
       nameTh: "ต้นทุนอะไหล่",
-      value: Math.min((summary.totalPartsCost / summary.totalExpenses) * 100, 100),
+      value: (summary.totalPartsCost / totalBase) * 100,
       amount: summary.totalPartsCost,
       color: "hsl(217, 91%, 60%)", // Blue
     },
     {
       name: language === "th" ? "ค่าใช้จ่ายรวม" : "Total Expenses",
       nameTh: "ค่าใช้จ่ายรวม",
-      value: 100.0,
+      value: (summary.totalExpenses / totalBase) * 100,
       amount: summary.totalExpenses,
       color: "hsl(0, 84%, 60%)", // Red
     },
     {
       name: language === "th" ? "กำไรจากอะไหล่" : "Profit from Parts",
       nameTh: "กำไรจากอะไหล่",
-      value: summary.totalExpenses > 0
-        ? Math.min((summary.partsMarkup / summary.totalExpenses) * 100, 100)
-        : 0,
+      value: (summary.partsMarkup / totalBase) * 100,
       amount: summary.partsMarkup,
       color: "hsl(142, 71%, 45%)", // Green
     },
     {
       name: language === "th" ? "กำไรเฉลี่ยต่องาน" : "Avg Profit per Job",
       nameTh: "กำไรเฉลี่ยต่องาน",
-      value: summary.totalExpenses > 0
-        ? Math.min((summary.averageProfitPerRepair / summary.totalExpenses) * 100, 100)
-        : 0,
+      value: (summary.averageProfitPerRepair / totalBase) * 100,
       amount: summary.averageProfitPerRepair,
       color: "hsl(45, 93%, 47%)", // Yellow/Orange
     },
