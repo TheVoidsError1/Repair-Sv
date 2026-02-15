@@ -43,6 +43,14 @@ import { type ReactNode, useState, useEffect } from "react";
 /** จำนวนวันรับประกันเริ่มต้น (ใช้จาก repair.createdAt ของงานซ่อมที่ completed) */
 const DEFAULT_WARRANTY_DAYS = 90;
 
+/** แปลงวันที่เป็นรูปแบบ YYYY-MM-DD */
+function formatDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return "";
+  const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split('T')[0];
+}
+
 /** คำนวณวันหมดประกันจากวันที่ซ่อม (YYYY-MM-DD) + จำนวนวัน */
 function getWarrantyExpiryDate(repairDateStr: string, warrantyDays: number): string {
   const d = new Date(repairDateStr + "T00:00:00");
@@ -158,7 +166,7 @@ const Warranty = () => {
       id: r.id,
       serialNumber: r.serialNumber,
       customer: r.customer?.fullName || `${r.customer?.firstName || ''} ${r.customer?.lastName || ''}`.trim() || 'Unknown',
-      createdAt: r.dateOfReport ? new Date(r.dateOfReport).toISOString().split('T')[0] : r.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+      createdAt: formatDate(r.dateOfReport ?? r.createdAt) || formatDate(new Date()),
     }))
     .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 
@@ -207,9 +215,7 @@ const Warranty = () => {
   const repairBySn = selectedRepairId
     ? allCompletedRepairs.find((r) => r.id === selectedRepairId)
     : null;
-  const repairDateBySn = repairBySn?.dateOfReport 
-    ? new Date(repairBySn.dateOfReport).toISOString().split('T')[0]
-    : repairBySn?.createdAt?.split('T')[0] || "";
+  const repairDateBySn = formatDate(repairBySn?.dateOfReport ?? repairBySn?.createdAt);
   const expiryDateBySn = repairDateBySn ? getWarrantyExpiryDate(repairDateBySn, DEFAULT_WARRANTY_DAYS) : "";
   const remainingDaysBySn = expiryDateBySn ? getRemainingWarrantyDays(expiryDateBySn) : 0;
   const previousClaimCountBySn = repairBySn
@@ -429,9 +435,9 @@ const Warranty = () => {
                     ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
                     : repair?.customer || "—";
                   const reasonText = language === "th" ? claim.claimReasonTh : claim.claimReason;
-                  const repairDate = repair?.createdAt ?? claim.claimDate;
-                  const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
-                  const remainingDays = getRemainingWarrantyDays(expiryDate);
+                  const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
+                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+                  const remainingDays = expiryDate ? getRemainingWarrantyDays(expiryDate) : 0;
                   const isExpired = remainingDays < 0;
                   const approveDisabled = isExpired || noRepairRecord || snMismatch;
                   return (
@@ -449,7 +455,7 @@ const Warranty = () => {
                         </span>
                       </td>
                       <td className="max-w-[200px] truncate">{reasonText}</td>
-                      <td>{claim.claimDate}</td>
+                      <td>{formatDate(claim.claimDate)}</td>
                       <td>{expiryDate}</td>
                       <td>
                         <div className="flex gap-2">
@@ -717,8 +723,8 @@ const Warranty = () => {
                 const device = repair?.deviceModel || repair?.device || "—";
                 const reasonText =
                   language === "th" ? claim.claimReasonTh : claim.claimReason;
-                const repairDate = repair?.createdAt ?? claim.claimDate;
-                const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
+                const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
+                const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
                 return (
                   <tr key={claim.id}>
                     <td>
@@ -780,9 +786,9 @@ const Warranty = () => {
           </DialogHeader>
           {selectedClaim && (() => {
             const repair = selectedClaim.repair || repairs.find((r) => r.id === selectedClaim.repairId);
-            const repairDate = repair?.createdAt ?? selectedClaim.claimDate;
-            const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
-            const remainingDays = getRemainingWarrantyDays(expiryDate);
+            const repairDate = formatDate(repair?.createdAt ?? selectedClaim.claimDate);
+            const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+            const remainingDays = expiryDate ? getRemainingWarrantyDays(expiryDate) : 0;
             const warrantyStatus = getWarrantyBadgeStatus(remainingDays);
             const warrantyBadgeClass =
               warrantyStatus === "valid"
@@ -832,7 +838,7 @@ const Warranty = () => {
                     {warrantyBadgeLabel}
                   </span>
                 ))}
-                {row(t("date"), selectedClaim.claimDate)}
+                {row(t("date"), formatDate(selectedClaim.claimDate))}
               </div>
             );
           })()}

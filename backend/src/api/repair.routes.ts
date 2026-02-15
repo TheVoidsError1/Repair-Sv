@@ -3,11 +3,76 @@ import { AppDataSource } from '../config/data-source.js';
 import { Repair, RepairStatus, ServiceType } from '../entities/Repair.js';
 import { Customer } from '../entities/Customer.js';
 import { Part } from '../entities/Part.js';
-import { WarrantyClaim } from '../entities/WarrantyClaim.js';
+import { WarrantyClaim, WarrantyClaimStatus } from '../entities/WarrantyClaim.js';
 import { Between, In } from 'typeorm';
 import { getLineNotificationService } from '../services/line-notification.service.js';
 
 const router = Router();
+
+// Helper function to generate warranty claim number (WRN-001, WRN-002, etc.)
+async function generateClaimNumber(): Promise<string> {
+  const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
+  const claims = await warrantyRepository.find({
+    order: { createdAt: 'DESC' },
+    take: 1,
+  });
+  
+  const lastClaim = claims[0];
+
+  if (!lastClaim) {
+    return 'WRN-001';
+  }
+
+  const match = lastClaim.claimNumber.match(/^WRN-(\d+)$/);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    return `WRN-${String(num + 1).padStart(3, '0')}`;
+  }
+
+  // Fallback if format doesn't match
+  const allClaims = await warrantyRepository.find();
+  return `WRN-${String(allClaims.length + 1).padStart(3, '0')}`;
+}
+
+// Helper function to create warranty claim automatically when repair is completed
+async function createAutoWarrantyClaim(repair: Repair): Promise<void> {
+  try {
+    const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
+    
+    // ตรวจสอบว่ามี warranty claim สำหรับ repair นี้อยู่แล้วหรือไม่
+    const existingClaim = await warrantyRepository.findOne({
+      where: { repairId: repair.id },
+    });
+
+    if (existingClaim) {
+      console.log(`[Warranty] Warranty claim already exists for repair ${repair.repairNumber}, skipping auto-creation`);
+      return;
+    }
+
+    // สร้าง warranty claim อัตโนมัติ
+    const claimNumber = await generateClaimNumber();
+    
+    // ใช้ problemDescription หรือ problemSymptoms เป็น claimReason
+    const claimReason = repair.problemDescription || 'Auto-generated warranty claim';
+    const claimReasonTh = repair.problemSymptoms || repair.problemDescription || 'เคลมการรับประกันอัตโนมัติ';
+
+    const newClaim = warrantyRepository.create({
+      claimNumber,
+      repairId: repair.id,
+      serialNumber: repair.serialNumber,
+      claimReason: claimReason.trim(),
+      claimReasonTh: claimReasonTh.trim(),
+      status: WarrantyClaimStatus.PENDING,
+      claimDate: new Date(),
+    });
+
+    await warrantyRepository.save(newClaim);
+    console.log(`[Warranty] Auto-created warranty claim ${claimNumber} for repair ${repair.repairNumber}`);
+  } catch (error) {
+    // ไม่ให้ error นี้ทำให้การอัพเดท repair ล้มเหลว
+    console.error('[Warranty] Error creating auto warranty claim:', error);
+  }
+}
 
 // Helper function to reduce stock for parts
 async function reducePartStock(partIds: string[]): Promise<void> {
@@ -529,6 +594,12 @@ router.put('/:id', async (req, res) => {
       }
       repair.status = req.body.status as RepairStatus;
       console.log(`[Update Repair] Setting status to: ${repair.status}`);
+      
+      // ตั้งค่า completedDate เมื่อสถานะเปลี่ยนเป็น completed
+      if (repair.status === RepairStatus.COMPLETED && oldStatus !== RepairStatus.COMPLETED) {
+        repair.completedDate = new Date();
+        console.log(`[Update Repair] Setting completedDate to: ${repair.completedDate}`);
+      }
     }
 
     // Update other fields (excluding status which we already handled)
@@ -678,6 +749,14 @@ router.put('/:id', async (req, res) => {
     console.log(`[Update Repair] Saving repair with status: ${repair.status}`);
     const updatedRepair = await repairRepository.save(repair);
     console.log(`[Update Repair] Saved successfully: ${updatedRepair.id}`);
+    
+    // สร้าง warranty claim อัตโนมัติเมื่อสถานะเปลี่ยนเป็น completed
+    if (req.body.status !== undefined && 
+        oldStatus !== RepairStatus.COMPLETED && 
+        updatedRepair.status === RepairStatus.COMPLETED) {
+      console.log(`[Warranty] Repair ${updatedRepair.repairNumber} completed, creating auto warranty claim...`);
+      await createAutoWarrantyClaim(updatedRepair);
+    }
     
     // Send LINE notification if status changed
     if (req.body.status !== undefined && oldStatus !== updatedRepair.status) {

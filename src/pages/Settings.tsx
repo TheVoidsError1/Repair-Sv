@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiClient } from "@/lib/api";
 import {
     Bell,
     Globe,
@@ -34,9 +35,14 @@ const Settings = () => {
   });
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  const handleUpdatePassword = () => {
-    if (!currentUser) return;
+  const handleUpdatePassword = async () => {
+    if (!currentUser) {
+      toast.error(language === "th" ? "ไม่พบข้อมูลผู้ใช้" : "User not found");
+      return;
+    }
+
     if (!newPassword || newPassword.length < 4) {
       toast.error(language === "th" ? "รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร" : "New password must be at least 4 characters");
       return;
@@ -45,10 +51,45 @@ const Settings = () => {
       toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
       return;
     }
-    updateUser(currentUser.id, { password: newPassword });
-    setNewPassword("");
-    setConfirmPassword("");
-    toast.success(language === "th" ? "เปลี่ยนรหัสผ่านแล้ว" : "Password updated");
+
+    setIsUpdatingPassword(true);
+    try {
+      // ดึง user data จาก localStorage เพื่อใช้ id จาก backend
+      const storedUser = localStorage.getItem('user');
+      let userId: string | null = null;
+
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          userId = userData.id;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+
+      if (!userId) {
+        toast.error(language === "th" ? "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่" : "User data not found. Please login again");
+        setIsUpdatingPassword(false);
+        return;
+      }
+
+      const response = await apiClient.changePassword(userId, newPassword);
+
+      if (response.status === 'success') {
+        toast.success(language === "th" ? "เปลี่ยนรหัสผ่านสำเร็จ" : "Password updated successfully");
+        setNewPassword("");
+        setConfirmPassword("");
+        // อัปเดตใน local state ด้วย
+        updateUser(currentUser.id, { password: newPassword });
+      } else {
+        toast.error(response.message || (language === "th" ? "เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน" : "Failed to update password"));
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      toast.error(language === "th" ? "เกิดข้อผิดพลาดในการเชื่อมต่อ" : "Connection error");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   return (
@@ -214,9 +255,16 @@ const Settings = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
-              <Button className="gap-2" onClick={handleUpdatePassword}>
+              <Button 
+                className="gap-2" 
+                onClick={handleUpdatePassword}
+                disabled={isUpdatingPassword}
+              >
                 <Lock className="w-4 h-4" />
-                {t("updatePassword")}
+                {isUpdatingPassword 
+                  ? (language === "th" ? "กำลังอัปเดต..." : "Updating...")
+                  : t("updatePassword")
+                }
               </Button>
             </div>
           </div>

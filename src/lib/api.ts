@@ -68,6 +68,13 @@ class ApiClient {
     localStorage.removeItem('user');
   }
 
+  async changePassword(userId: string, newPassword: string) {
+    return this.request<void>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, newPassword }),
+    });
+  }
+
   // Personnel (Staff/Technician)
   async getPersonnel() {
     return this.request<any[]>('/api/personnel');

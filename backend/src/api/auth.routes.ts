@@ -100,5 +100,54 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// Change password endpoint
+router.post('/change-password', async (req, res) => {
+  try {
+    const { userId, newPassword } = req.body;
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'User ID and new password are required',
+      });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password must be at least 4 characters',
+      });
+    }
+
+    const personnelRepository = AppDataSource.getRepository(Personnel);
+    const user = await personnelRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found',
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await personnelRepository.save(user);
+
+    res.json({
+      status: 'success',
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 export default router;
 
