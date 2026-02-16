@@ -28,7 +28,7 @@ const Register = () => {
     phone: "",
     password: "",
     confirmPassword: "",
-    role: "technician",
+    role: "staff",
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -126,7 +126,7 @@ const Register = () => {
           phone: "",
           password: "",
           confirmPassword: "",
-          role: "technician",
+          role: "staff",
         });
 
         // Navigate to login or system management
@@ -286,9 +286,6 @@ const Register = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="technician">
-                    {language === "th" ? "ช่างเทคนิค" : "Technician"}
-                  </SelectItem>
                   <SelectItem value="staff">
                     {language === "th" ? "พนักงาน" : "Staff"}
                   </SelectItem>
