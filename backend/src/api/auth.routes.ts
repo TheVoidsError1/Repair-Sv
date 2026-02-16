@@ -149,5 +149,100 @@ router.post('/change-password', async (req, res) => {
   }
 });
 
+// Check email exists endpoint
+router.post('/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email is required',
+      });
+    }
+
+    const personnelRepository = AppDataSource.getRepository(Personnel);
+    const user = await personnelRepository.findOne({
+      where: { email, isActive: true },
+      select: ['id', 'email'],
+    });
+
+    if (user) {
+      res.json({
+        status: 'success',
+        data: {
+          exists: true,
+          userId: user.id,
+        },
+        message: 'Email found in system',
+      });
+    } else {
+      res.json({
+        status: 'success',
+        data: {
+          exists: false,
+        },
+        message: 'Email not found in system',
+      });
+    }
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Reset password by email endpoint
+router.post('/reset-password-by-email', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and new password are required',
+      });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Password must be at least 4 characters',
+      });
+    }
+
+    const personnelRepository = AppDataSource.getRepository(Personnel);
+    const user = await personnelRepository.findOne({
+      where: { email, isActive: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Email not found in system',
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await personnelRepository.save(user);
+
+    res.json({
+      status: 'success',
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    console.error('Reset password by email error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 export default router;
 

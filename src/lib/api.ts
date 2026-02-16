@@ -75,6 +75,34 @@ class ApiClient {
     });
   }
 
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
+  async checkEmailExists(email: string) {
+    return this.request<{ exists: boolean; userId?: string }>('/api/auth/check-email', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPasswordByEmail(email: string, newPassword: string) {
+    return this.request<{ message: string }>('/api/auth/reset-password-by-email', {
+      method: 'POST',
+      body: JSON.stringify({ email, newPassword }),
+    });
+  }
+
   // Personnel (Staff/Technician)
   async getPersonnel() {
     return this.request<any[]>('/api/personnel');

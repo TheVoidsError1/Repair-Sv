@@ -24,6 +24,7 @@ import LineManagement from "./pages/LineManagement";
 import NetworkManagement from "./pages/NetworkManagement";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 import SystemManagement from "./pages/SystemManagement";
 import Register from "./pages/Register";
@@ -110,6 +111,7 @@ const App = () => (
                     <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
                     <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
                     <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                   </Routes>
                 </WarrantyProvider>
