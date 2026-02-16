@@ -87,17 +87,13 @@ function roundTimeTo30Min(timeStr: string): string {
   return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 }
 
-/** IMEI/Serial: ต้องเป็นตัวเลขเท่านั้น และต้อง 15 หลัก */
+/** IMEI/Serial: รับอักษรและตัวเลขได้ และต้องไม่เกิน 15 หลัก */
 function validateSerialNumber(value: string): { valid: boolean; message?: string } {
   const trimmed = value.trim();
   if (!trimmed) return { valid: false, message: "กรุณากรอกหมายเลข IMEI / Serial Number" };
-  // ต้องเป็นตัวเลขเท่านั้น
-  if (!/^\d+$/.test(trimmed)) {
-    return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องเป็นตัวเลขเท่านั้น" };
-  }
-  // ต้องเป็น 15 หลักเท่านั้น
-  if (trimmed.length !== 15) {
-    return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องเป็นตัวเลข 15 หลัก" };
+  // ต้องไม่เกิน 15 หลัก
+  if (trimmed.length > 15) {
+    return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องไม่เกิน 15 หลัก" };
   }
   return { valid: true };
 }
@@ -252,7 +248,7 @@ const RepairNew = () => {
     const sn = formData.serialNumber.trim();
     const validation = validateSerialNumber(formData.serialNumber);
     if (!validation.valid) {
-      setSerialError(language === "th" ? (validation.message ?? "กรุณากรอก IMEI 15 หลัก") : "Enter 15-digit IMEI / Serial");
+      setSerialError(language === "th" ? (validation.message ?? "กรุณากรอก IMEI / Serial Number") : (validation.message ?? "Please enter IMEI / Serial Number"));
       return;
     }
     
@@ -692,12 +688,12 @@ const RepairNew = () => {
                 </Label>
                 <Input
                   id="serialNumber"
-                  placeholder={language === "th" ? "กรอก 15 หลัก (ตัวเลขเท่านั้น)" : "15 digits (numbers only)"}
+                  placeholder={language === "th" ? "กรอก IMEI / Serial Number (ไม่เกิน 15 หลัก)" : "Enter IMEI / Serial Number (max 15 characters)"}
                   value={formData.serialNumber}
                   maxLength={15}
                   onChange={(e) => {
-                    // อนุญาตเฉพาะตัวเลขเท่านั้น
-                    const value = e.target.value.replace(/\D/g, '');
+                    // อนุญาตทั้งตัวเลขและอักษร
+                    const value = e.target.value;
                     handleInputChange("serialNumber", value);
                     setSerialError("");
                   }}

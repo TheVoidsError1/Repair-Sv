@@ -28,6 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
+    ArrowLeft,
+    ArrowRight,
     CheckCircle,
     CheckCircle2,
     Clock,
@@ -36,6 +38,8 @@ import {
     Plus,
     Search,
     ShieldCheck,
+    User,
+    Wrench,
     XCircle,
 } from "lucide-react";
 import { type ReactNode, useState, useEffect } from "react";
@@ -124,6 +128,13 @@ const Warranty = () => {
   // State สำหรับงานซ่อมที่เสร็จแล้วทั้งหมด
   const [allCompletedRepairs, setAllCompletedRepairs] = useState<any[]>([]);
   const [loadingCompletedRepairs, setLoadingCompletedRepairs] = useState(false);
+  
+  // State สำหรับ 2-step dialog
+  const [dialogStep, setDialogStep] = useState<"customer" | "repair">("customer");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
 
   // State สำหรับ pagination
   const [pendingApprovalPage, setPendingApprovalPage] = useState(1);
@@ -131,12 +142,65 @@ const Warranty = () => {
   const ITEMS_PER_PAGE_PENDING = 4; // คำขอที่รออนุมัติ ไม่เกิน 4 รายการต่อหน้า
   const ITEMS_PER_PAGE_WARRANTY = 6; // รายการรับประกัน ไม่เกิน 6 รายการต่อหน้า
 
-  // โหลดงานซ่อมที่เสร็จแล้วทั้งหมดเมื่อเปิด dialog
+  // โหลดลูกค้าทั้งหมดเมื่อเปิด dialog
   useEffect(() => {
-    if (isDialogOpen) {
-      loadCompletedRepairs();
+    if (isDialogOpen && dialogStep === "customer") {
+      loadCustomers();
     }
-  }, [isDialogOpen]);
+  }, [isDialogOpen, dialogStep]);
+
+  // โหลดงานซ่อมของลูกค้าที่เลือก
+  useEffect(() => {
+    if (isDialogOpen && dialogStep === "repair" && selectedCustomerId) {
+      loadCustomerRepairs(selectedCustomerId);
+    }
+  }, [isDialogOpen, dialogStep, selectedCustomerId]);
+
+  const loadCustomers = async () => {
+    setLoadingCustomers(true);
+    try {
+      const response = await apiClient.getCustomers();
+      if (response.status === 'success' && response.data) {
+        setCustomers(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load customers:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" 
+          ? "ไม่สามารถโหลดรายการลูกค้าได้" 
+          : "Failed to load customers",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const loadCustomerRepairs = async (customerId: string) => {
+    setLoadingCompletedRepairs(true);
+    try {
+      const response = await apiClient.getCustomerWithRepairs(customerId);
+      if (response.status === 'success' && response.data) {
+        // กรองเฉพาะงานที่ completed และมี serialNumber
+        const completed = (response.data.repairs || []).filter((r: any) => 
+          r.status === 'completed' && r.serialNumber
+        );
+        setAllCompletedRepairs(completed);
+      }
+    } catch (error) {
+      console.error('Failed to load customer repairs:', error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" 
+          ? "ไม่สามารถโหลดรายการงานซ่อมได้" 
+          : "Failed to load repairs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCompletedRepairs(false);
+    }
+  };
 
   const loadCompletedRepairs = async () => {
     setLoadingCompletedRepairs(true);
@@ -253,6 +317,9 @@ const Warranty = () => {
     if (!isDialogOpen) {
       setSelectedRepairId("");
       setNewClaimReason("");
+      setDialogStep("customer");
+      setSelectedCustomerId("");
+      setCustomerSearchTerm("");
     }
   }, [isDialogOpen]);
 
@@ -338,47 +405,160 @@ const Warranty = () => {
                 {t("newClaim")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{t("createWarrantyClaim")}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  {dialogStep === "customer" ? (
+                    <>
+                      <User className="w-5 h-5" />
+                      {language === "th" ? "ขั้นตอนที่ 1: เลือกลูกค้า" : "Step 1: Select Customer"}
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="w-5 h-5" />
+                      {language === "th" ? "ขั้นตอนที่ 2: เลือกงานซ่อม" : "Step 2: Select Repair"}
+                    </>
+                  )}
+                </DialogTitle>
                 <DialogDescription>
-                  {language === "th"
-                    ? "เลือกงานซ่อมที่เสร็จแล้วเพื่อสร้างเคลมการรับประกัน"
-                    : "Select a completed repair to create a warranty claim"}
+                  {dialogStep === "customer"
+                    ? (language === "th"
+                        ? "เลือกลูกค้าที่ต้องการสร้างเคลมการรับประกัน"
+                        : "Select the customer to create a warranty claim")
+                    : (language === "th"
+                        ? "เลือกงานซ่อมที่เสร็จแล้วของลูกค้านี้"
+                        : "Select a completed repair for this customer")}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="repairSelect" className="text-base font-semibold">
-                    {language === "th" ? "เลือกงานซ่อม" : "Select Repair"}
-                    <span className="text-destructive ml-1">*</span>
-                  </Label>
-                  <p className="text-sm text-muted-foreground -mt-1">
-                    {language === "th" 
-                      ? "เลือกงานซ่อมที่เสร็จแล้วเพื่อสร้างเคลมการรับประกัน" 
-                      : "Select a completed repair to create a warranty claim"}
-                  </p>
-                  <Select
-                    value={selectedRepairId}
-                    onValueChange={(value) => setSelectedRepairId(value)}
-                  >
-                    <SelectTrigger id="repairSelect" className="h-auto min-h-[44px]">
-                      <SelectValue placeholder={language === "th" ? "🔍 คลิกเพื่อเลือกงานซ่อม..." : "🔍 Click to select repair..."}>
-                        {selectedRepairId && (() => {
-                          const selected = completedRepairs.find(r => r.id === selectedRepairId);
-                          if (!selected) return null;
-                          return (
-                            <div className="flex flex-col items-start text-left">
-                              <span className="font-medium">{selected.repairNumber}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {selected.customer} · {selected.device}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[400px]">
+              
+              {dialogStep === "customer" ? (
+                <div className="grid gap-4 py-4">
+                  {/* Search Customer */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="customerSearch" className="text-base font-semibold">
+                      {language === "th" ? "ค้นหาลูกค้า" : "Search Customer"}
+                    </Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="customerSearch"
+                        placeholder={language === "th" ? "🔍 ค้นหาด้วยชื่อหรือเบอร์โทร..." : "🔍 Search by name or phone..."}
+                        value={customerSearchTerm}
+                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Customer List */}
+                  <div className="border border-border rounded-lg max-h-[400px] overflow-y-auto">
+                    {loadingCustomers ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          <p className="text-sm text-muted-foreground">
+                            {language === "th" ? "กำลังโหลด..." : "Loading..."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (() => {
+                      const filteredCustomers = customers.filter((c) => {
+                        if (!customerSearchTerm.trim()) return true;
+                        const term = customerSearchTerm.toLowerCase();
+                        const fullName = c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim();
+                        return (
+                          fullName.toLowerCase().includes(term) ||
+                          c.firstName?.toLowerCase().includes(term) ||
+                          c.lastName?.toLowerCase().includes(term) ||
+                          c.phone?.includes(term)
+                        );
+                      });
+
+                      if (filteredCustomers.length === 0) {
+                        return (
+                          <div className="py-8 text-center">
+                            <User className="w-12 h-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              {language === "th" ? "ไม่พบลูกค้า" : "No customers found"}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="divide-y divide-border">
+                          {filteredCustomers.map((customer) => {
+                            const fullName = customer.fullName || `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+                            return (
+                              <button
+                                key={customer.id}
+                                onClick={() => {
+                                  setSelectedCustomerId(customer.id);
+                                  setDialogStep("repair");
+                                }}
+                                className="w-full p-4 text-left hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex-1">
+                                    <p className="font-semibold text-foreground">{fullName}</p>
+                                    {customer.phone && (
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        📞 {customer.phone}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4 py-4">
+                  {/* Selected Customer Info */}
+                  {(() => {
+                    const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+                    if (!selectedCustomer) return null;
+                    const fullName = selectedCustomer.fullName || `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim();
+                    return (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <User className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-foreground">{fullName}</p>
+                            {selectedCustomer.phone && (
+                              <p className="text-sm text-muted-foreground">📞 {selectedCustomer.phone}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDialogStep("customer");
+                            setSelectedCustomerId("");
+                            setSelectedRepairId("");
+                          }}
+                        >
+                          {language === "th" ? "เปลี่ยน" : "Change"}
+                        </Button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Repair List */}
+                  <div className="grid gap-2">
+                    <Label className="text-base font-semibold">
+                      {language === "th" ? "เลือกงานซ่อม" : "Select Repair"}
+                      <span className="text-destructive ml-1">*</span>
+                    </Label>
+                    <div className="border border-border rounded-lg max-h-[400px] overflow-y-auto">
                       {loadingCompletedRepairs ? (
                         <div className="flex items-center justify-center py-8">
                           <div className="flex flex-col items-center gap-2">
@@ -390,156 +570,207 @@ const Warranty = () => {
                         </div>
                       ) : completedRepairs.length === 0 ? (
                         <div className="py-8 text-center">
+                          <Wrench className="w-12 h-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">
-                            {language === "th" ? "ไม่มีงานซ่อมที่เสร็จแล้ว" : "No completed repairs"}
+                            {language === "th" ? "ลูกค้านี้ยังไม่มีงานซ่อมที่เสร็จแล้ว" : "This customer has no completed repairs"}
                           </p>
                         </div>
                       ) : (
-                        completedRepairs.map((repair) => {
-                          const statusColor = 
-                            repair.warrantyStatus === "valid" ? "text-emerald-600" :
-                            repair.warrantyStatus === "expiring_soon" ? "text-amber-600" :
-                            "text-red-600";
-                          const statusIcon = 
-                            repair.warrantyStatus === "valid" ? "✓" :
-                            repair.warrantyStatus === "expiring_soon" ? "⚠" :
-                            "✗";
-                          return (
-                            <SelectItem 
-                              key={repair.id} 
-                              value={repair.id}
-                              className="py-3"
-                            >
-                              <div className="flex flex-col gap-1 w-full">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-semibold text-foreground">
-                                    {repair.repairNumber}
-                                  </span>
-                                  <span className={`text-xs font-medium ${statusColor}`}>
+                        <div className="divide-y divide-border">
+                          {completedRepairs.map((repair) => {
+                            const statusColor = 
+                              repair.warrantyStatus === "valid" ? "text-emerald-600" :
+                              repair.warrantyStatus === "expiring_soon" ? "text-amber-600" :
+                              "text-red-600";
+                            const statusIcon = 
+                              repair.warrantyStatus === "valid" ? "✓" :
+                              repair.warrantyStatus === "expiring_soon" ? "⚠" :
+                              "✗";
+                            const isSelected = selectedRepairId === repair.id;
+                            return (
+                              <button
+                                key={repair.id}
+                                onClick={() => setSelectedRepairId(repair.id)}
+                                className={cn(
+                                  "w-full p-4 text-left transition-colors",
+                                  isSelected
+                                    ? "bg-primary/10 border-l-4 border-l-primary"
+                                    : "hover:bg-muted/50"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="font-bold text-foreground">{repair.repairNumber}</span>
+                                      {isSelected && (
+                                        <CheckCircle className="w-4 h-4 text-primary" />
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      📱 {repair.device}
+                                      {repair.serialNumber && (
+                                        <span className="ml-2 font-mono">· SN: {repair.serialNumber}</span>
+                                      )}
+                                    </p>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      <span>📅 {language === "th" ? "ซ่อม" : "Repair"}: {repair.createdAt}</span>
+                                      <span>⏰ {language === "th" ? "หมดอายุ" : "Expiry"}: {repair.expiryDate}</span>
+                                    </div>
+                                  </div>
+                                  <span className={cn("text-xs font-medium px-2 py-1 rounded", statusColor, "bg-current/10")}>
                                     {statusIcon} {repair.remainingDays >= 0 
                                       ? `${repair.remainingDays} ${language === "th" ? "วัน" : "days"}`
                                       : language === "th" ? "หมดอายุ" : "Expired"}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>👤 {repair.customer}</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                                  {repair.serialNumber && (
-                                    <span>📱 {repair.device} · SN: {repair.serialNumber}</span>
-                                  )}
-                                  {!repair.serialNumber && (
-                                    <span>📱 {repair.device}</span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span>📅 {language === "th" ? "ซ่อม" : "Repair"}: {repair.createdAt}</span>
-                                  <span>⏰ {language === "th" ? "หมดอายุ" : "Expiry"}: {repair.expiryDate}</span>
-                                </div>
-                              </div>
-                            </SelectItem>
-                          );
-                        })
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {repairBySn && (
-                  <div className="rounded-lg border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg font-bold text-foreground">
-                            {repairBySn.repairNumber || repairBySn.id}
-                          </span>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-xs font-semibold",
-                            getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
-                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
-                              : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
-                                ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                                : "bg-red-500/20 text-red-700 dark:text-red-400"
-                          )}>
-                            {getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
-                              ? "✓ " + (language === "th" ? "ภายในประกัน" : "In warranty")
-                              : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
-                                ? "⚠ " + (language === "th" ? "ใกล้หมด" : "Expiring soon")
-                                : "✗ " + (language === "th" ? "หมดอายุ" : "Expired")}
-                          </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                        <p className="text-sm font-medium text-foreground mb-1">
-                          👤 {repairBySn.customer?.fullName || `${repairBySn.customer?.firstName || ''} ${repairBySn.customer?.lastName || ''}`.trim()}
-                        </p>
-                        {(repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device) && (
-                          <p className="text-sm text-muted-foreground">
-                            📱 {repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device}
-                            {repairBySn.serialNumber && (
-                              <span className="ml-2 font-mono">· SN: {repairBySn.serialNumber}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          📅 {language === "th" ? "วันที่ซ่อม" : "Repair date"}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground">{repairDateBySn}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          ⏰ {language === "th" ? "วันหมดประกัน" : "Expiry date"}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground">{expiryDateBySn}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          {remainingDaysBySn >= 0 ? "⏳" : "❌"} {language === "th" ? "วันคงเหลือ" : "Remaining days"}
-                        </p>
-                        <p className={cn(
-                          "text-sm font-semibold",
-                          remainingDaysBySn < 0
-                            ? "text-red-600 dark:text-red-400"
-                            : remainingDaysBySn <= 30
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                        )}>
-                          {remainingDaysBySn < 0
-                            ? (language === "th" ? "หมดอายุแล้ว" : "Expired")
-                            : `${remainingDaysBySn} ${language === "th" ? "วัน" : "days"}`}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          📋 {language === "th" ? "จำนวนเคลมก่อนหน้า" : "Previous claims"}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {previousClaimCountBySn} {language === "th" ? "ครั้ง" : "times"}
-                        </p>
-                      </div>
+                      )}
                     </div>
                   </div>
-                )}
-                <div className="grid gap-2">
-                  <Label htmlFor="claimReason">{t("claimReason")}</Label>
-                  <Textarea
-                    id="claimReason"
-                    placeholder={t("describeIssue")}
-                    value={newClaimReason}
-                    onChange={(e) => setNewClaimReason(e.target.value)}
-                    rows={3}
-                  />
+
+                  {/* Selected Repair Info */}
+                  {repairBySn && (
+                    <div className="rounded-lg border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg font-bold text-foreground">
+                              {repairBySn.repairNumber || repairBySn.id}
+                            </span>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-xs font-semibold",
+                              getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                                : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
+                            )}>
+                              {getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                                ? "✓ " + (language === "th" ? "ภายในประกัน" : "In warranty")
+                                : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                                  ? "⚠ " + (language === "th" ? "ใกล้หมด" : "Expiring soon")
+                                  : "✗ " + (language === "th" ? "หมดอายุ" : "Expired")}
+                            </span>
+                          </div>
+                          {(repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device) && (
+                            <p className="text-sm text-muted-foreground">
+                              📱 {repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device}
+                              {repairBySn.serialNumber && (
+                                <span className="ml-2 font-mono">· SN: {repairBySn.serialNumber}</span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50">
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            📅 {language === "th" ? "วันที่ซ่อม" : "Repair date"}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">{repairDateBySn}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            ⏰ {language === "th" ? "วันหมดประกัน" : "Expiry date"}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">{expiryDateBySn}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            {remainingDaysBySn >= 0 ? "⏳" : "❌"} {language === "th" ? "วันคงเหลือ" : "Remaining days"}
+                          </p>
+                          <p className={cn(
+                            "text-sm font-semibold",
+                            remainingDaysBySn < 0
+                              ? "text-red-600 dark:text-red-400"
+                              : remainingDaysBySn <= 30
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {remainingDaysBySn < 0
+                              ? (language === "th" ? "หมดอายุแล้ว" : "Expired")
+                              : `${remainingDaysBySn} ${language === "th" ? "วัน" : "days"}`}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            📋 {language === "th" ? "จำนวนเคลมก่อนหน้า" : "Previous claims"}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {previousClaimCountBySn} {language === "th" ? "ครั้ง" : "times"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Claim Reason */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="claimReason" className="text-base font-semibold">
+                      {t("claimReason")}
+                      <span className="text-destructive ml-1">*</span>
+                    </Label>
+                    <Textarea
+                      id="claimReason"
+                      placeholder={t("describeIssue")}
+                      value={newClaimReason}
+                      onChange={(e) => setNewClaimReason(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  {t("cancel")}
-                </Button>
-                <Button onClick={handleSubmitClaim} disabled={!canSubmitClaim || (repairBySn ? getRemainingWarrantyDays(expiryDateBySn) < 0 : true)}>
-                  {t("submitClaim")}
-                </Button>
+                {dialogStep === "customer" ? (
+                  <>
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
+                      {t("cancel")}
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        if (selectedCustomerId) {
+                          setDialogStep("repair");
+                        }
+                      }}
+                      disabled={!selectedCustomerId}
+                      className="w-full sm:w-auto"
+                    >
+                      {language === "th" ? "ถัดไป" : "Next"} <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setDialogStep("customer");
+                        setSelectedRepairId("");
+                      }}
+                      className="w-full sm:w-auto"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      {language === "th" ? "กลับ" : "Back"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsDialogOpen(false)}
+                      className="w-full sm:w-auto"
+                    >
+                      {t("cancel")}
+                    </Button>
+                    <Button 
+                      onClick={handleSubmitClaim} 
+                      disabled={!canSubmitClaim || (repairBySn ? getRemainingWarrantyDays(expiryDateBySn) < 0 : true)}
+                      className="w-full sm:w-auto"
+                    >
+                      {t("submitClaim")}
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

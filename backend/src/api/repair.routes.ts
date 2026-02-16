@@ -293,13 +293,13 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate Serial Number: must be exactly 15 digits (numbers only)
+    // Validate Serial Number: must not exceed 15 characters (allows letters and numbers)
     if (serialNumber) {
       const trimmedSerial = serialNumber.trim();
-      if (trimmedSerial && (!/^\d{15}$/.test(trimmedSerial))) {
+      if (trimmedSerial && trimmedSerial.length > 15) {
         return res.status(400).json({
           status: 'error',
-          message: 'Serial Number must be exactly 15 digits (numbers only)',
+          message: 'Serial Number must not exceed 15 characters',
         });
       }
     }

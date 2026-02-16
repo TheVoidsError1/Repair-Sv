@@ -1,5 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -16,22 +17,97 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
+  ArrowLeft,
+  Battery,
   CheckCircle,
+  ChevronsUpDown,
   Edit,
   Filter,
+  Grid3x3,
+  Image as ImageIcon,
+  LayoutList,
+  Layers,
   Package,
+  Plus,
   PlusCircle,
   Search,
+  Smartphone,
+  Upload,
+  Usb,
+  X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "@/lib/api";
+
+// Component for displaying part image in table cell
+const PartImageCell = ({ imageUrl, alt }: { imageUrl?: string; alt: string }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+  
+  // Build image URL
+  let imageSrc: string | null = null;
+  if (imageUrl) {
+    // Ensure imageUrl starts with /
+    const normalizedUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+    imageSrc = `${API_BASE_URL}${normalizedUrl}`;
+  }
+
+  // Show default icon if no image URL or if image failed to load
+  if (!imageUrl || imageError) {
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted border border-border">
+        <Package className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden border border-border bg-muted">
+      {imageLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Package className="h-4 w-4 text-muted-foreground animate-pulse" />
+        </div>
+      )}
+      <img
+        src={imageSrc || ''}
+        alt={alt}
+        className={cn(
+          "w-full h-full object-cover transition-opacity duration-200",
+          imageLoading ? "opacity-0" : "opacity-100"
+        )}
+        onError={() => {
+          setImageError(true);
+          setImageLoading(false);
+        }}
+        onLoad={() => {
+          setImageLoading(false);
+          setImageError(false);
+        }}
+      />
+    </div>
+  );
+};
 
 /** สถานะตามสต็อก: หมด = 0, ใกล้หมด = 1..minStock, พร้อมขาย = > minStock */
 function getPartStatus(stock: number, minStock: number): "out" | "low" | "ready" {
@@ -48,8 +124,8 @@ function getPartType(category: string): "screen" | "battery" | "others" {
   return "others";
 }
 
-const categoriesEn = ["All", "Screens", "Batteries", "Ports", "Glass"];
-const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบตเตอรี่", "พอร์ต", "กระจก"];
+const categoriesEn = ["All", "Screens", "Batteries", "Ports", "Glass", "Others"];
+const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบตเตอรี่", "พอร์ต", "กระจก", "อื่นๆ"];
 
 // Type for Part from API (backend format)
 interface PartFromAPI {
@@ -63,6 +139,7 @@ interface PartFromAPI {
   minStockLevel: number;
   category?: string;
   categoryTh?: string;
+  imageUrl?: string;
   [key: string]: any;
 }
 
@@ -78,6 +155,7 @@ interface PartFrontend {
   minStock: number;
   cost: number;
   sellPrice: number;
+  imageUrl?: string;
 }
 
 // Helper function to convert API format to frontend format
@@ -93,6 +171,7 @@ function convertPartFromAPI(part: PartFromAPI): PartFrontend {
     minStock: part.minStockLevel,
     cost: Number(part.costPrice),
     sellPrice: Number(part.price),
+    imageUrl: part.imageUrl,
   };
 }
 
@@ -128,8 +207,18 @@ const Inventory = () => {
   const [parts, setParts] = useState<PartFrontend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "screen" | "battery" | "others">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "screen" | "battery" | "port" | "glass" | "others">("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  
+  // Get category from URL parameter
+  const categoryParam = searchParams.get("category");
+  const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
+  const [selectedPartForStock, setSelectedPartForStock] = useState<string>("");
+  const [stockToAdd, setStockToAdd] = useState<string>("");
+  const [partSearchOpen, setPartSearchOpen] = useState(false);
+  const [partSearchQuery, setPartSearchQuery] = useState("");
+  const [selectedCategoryForStock, setSelectedCategoryForStock] = useState<"all" | "screen" | "battery" | "port" | "glass" | "others">("all");
+  const stockInputRef = useRef<HTMLInputElement>(null);
   /** รหัสอะไหล่ที่กำลังแก้ไข (null = โหมดเพิ่มใหม่) */
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
 
@@ -143,6 +232,10 @@ const Inventory = () => {
     cost: "",
     sellPrice: "",
   });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
 
   // Load parts from API
   const loadParts = async () => {
@@ -175,6 +268,15 @@ const Inventory = () => {
     loadParts();
   }, [language, toast]);
 
+  // Update filter when category parameter changes
+  useEffect(() => {
+    if (categoryParam) {
+      setTypeFilter(categoryParam as typeof typeFilter);
+    } else {
+      setTypeFilter("all");
+    }
+  }, [categoryParam]);
+
   // Refresh parts when page becomes visible (user returns to this page)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -206,16 +308,81 @@ const Inventory = () => {
       part.displayId.toLowerCase().includes(search) ||
       searchCategory.includes(search);
 
+    // Handle category filtering
+    if (typeFilter === "all") {
+      return matchesSearch;
+    }
+    
+    if (typeFilter === "port") {
+      const cat = (part.category || "").toLowerCase();
+      const catTh = (part.categoryTh || "").toLowerCase();
+      return matchesSearch && (cat.includes("port") || catTh.includes("พอร์ต"));
+    }
+    
+    if (typeFilter === "glass") {
+      const cat = (part.category || "").toLowerCase();
+      const catTh = (part.categoryTh || "").toLowerCase();
+      return matchesSearch && (cat.includes("glass") || catTh.includes("กระจก"));
+    }
+    
+    if (typeFilter === "others") {
+      // Others: ไม่ใช่ screen, battery, port, หรือ glass
+      const partType = getPartType(part.category);
+      const cat = (part.category || "").toLowerCase();
+      const catTh = (part.categoryTh || "").toLowerCase();
+      const isPort = cat.includes("port") || catTh.includes("พอร์ต");
+      const isGlass = cat.includes("glass") || catTh.includes("กระจก");
+      const isScreen = partType === "screen";
+      const isBattery = partType === "battery";
+      
+      return matchesSearch && !isScreen && !isBattery && !isPort && !isGlass;
+    }
+    
     const partType = getPartType(part.category);
-    const matchesType = typeFilter === "all" || typeFilter === partType;
+    const matchesType = typeFilter === partType;
 
     return matchesSearch && matchesType;
   });
+
+  // Count parts by category for grid view
+  const getCategoryCount = (categoryType: "screen" | "battery" | "port" | "glass" | "others") => {
+    return parts.filter((part) => {
+      if (categoryType === "port") {
+        // Check if category contains "port" or "พอร์ต"
+        const cat = (part.category || "").toLowerCase();
+        const catTh = (part.categoryTh || "").toLowerCase();
+        return cat.includes("port") || catTh.includes("พอร์ต");
+      }
+      if (categoryType === "glass") {
+        // Check if category contains "glass" or "กระจก"
+        const cat = (part.category || "").toLowerCase();
+        const catTh = (part.categoryTh || "").toLowerCase();
+        return cat.includes("glass") || catTh.includes("กระจก");
+      }
+      const partType = getPartType(part.category);
+      if (categoryType === "others") {
+        // Others: ไม่ใช่ screen, battery, port, หรือ glass
+        const cat = (part.category || "").toLowerCase();
+        const catTh = (part.categoryTh || "").toLowerCase();
+        const isPort = cat.includes("port") || catTh.includes("พอร์ต");
+        const isGlass = cat.includes("glass") || catTh.includes("กระจก");
+        const isScreen = partType === "screen";
+        const isBattery = partType === "battery";
+        
+        return !isScreen && !isBattery && !isPort && !isGlass;
+      }
+      return partType === categoryType;
+    }).length;
+  };
 
   useEffect(() => {
     if (searchParams.get("add") === "1") {
       setEditingPartId(null);
       setIsAddDialogOpen(true);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setExistingImageUrl(null);
+      setImageRemoved(false);
       const catParam = searchParams.get("cat");
       if (catParam) {
         const idxEn = categoriesEn.indexOf(catParam);
@@ -234,6 +401,10 @@ const Inventory = () => {
     } else {
       setIsAddDialogOpen(false);
       setEditingPartId(null);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setExistingImageUrl(null);
+      setImageRemoved(false);
     }
   }, [searchParams]);
 
@@ -249,6 +420,10 @@ const Inventory = () => {
       cost: String(part.cost),
       sellPrice: String(part.sellPrice),
     });
+    setSelectedImage(null);
+    setImagePreview(null);
+    setExistingImageUrl(part.imageUrl || null);
+    setImageRemoved(false);
     setIsAddDialogOpen(true);
   };
 
@@ -265,6 +440,10 @@ const Inventory = () => {
       cost: "",
       sellPrice: "",
     });
+    setSelectedImage(null);
+    setImagePreview(null);
+    setExistingImageUrl(null);
+    setImageRemoved(false);
     navigate("/inventory", { replace: true });
   };
 
@@ -285,6 +464,37 @@ const Inventory = () => {
     const catTh = categoriesTh[idx];
     handleNewPartChange("category", catEn);
     handleNewPartChange("categoryTh", catTh);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: language === "th" ? "ไฟล์ใหญ่เกินไป" : "File too large",
+          description: language === "th" ? "ขนาดไฟล์ต้องไม่เกิน 5MB" : "File size must be less than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setExistingImageUrl(null);
+      setImageRemoved(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (existingImageUrl) {
+      setImageRemoved(true);
+    }
+    setExistingImageUrl(null);
   };
 
   const handleSavePart = async () => {
@@ -312,27 +522,76 @@ const Inventory = () => {
 
         // Use the UUID from backend
         const backendId = originalPart.id;
-        const response = await apiClient.updatePart(backendId, partData);
-
-        if (response.status === "success" && response.data) {
-          const updatedPart = convertPartFromAPI(response.data as PartFromAPI);
-          setParts((prev) =>
-            prev.map((p) => (p.id === editingPartId ? updatedPart : p))
-          );
-          toast({
-            title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
-            description:
-              language === "th"
-                ? "บันทึกการแก้ไขอะไหล่แล้ว"
-                : "Part has been updated.",
+        
+        // If there's a new image or image was removed, use FormData
+        if (selectedImage || imageRemoved) {
+          const formData = new FormData();
+          if (selectedImage) {
+            formData.append('image', selectedImage);
+          } else if (imageRemoved) {
+            // Send empty string to delete the image
+            formData.append('imageUrl', '');
+          }
+          Object.keys(partData).forEach(key => {
+            formData.append(key, String(partData[key]));
           });
-          closeFormDialog();
+          
+          const token = localStorage.getItem('authToken');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+          const response = await fetch(`${API_BASE_URL}/api/parts/${backendId}`, {
+            method: 'PUT',
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            body: formData,
+          });
+          
+          const result = await response.json();
+          
+          if (result.status === "success" && result.data) {
+            const updatedPart = convertPartFromAPI(result.data as PartFromAPI);
+            setParts((prev) =>
+              prev.map((p) => (p.id === editingPartId ? updatedPart : p))
+            );
+            toast({
+              title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
+              description:
+                language === "th"
+                  ? "บันทึกการแก้ไขอะไหล่แล้ว"
+                  : "Part has been updated.",
+            });
+            closeFormDialog();
+          } else {
+            toast({
+              title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+              description: result.message || (language === "th" ? "ไม่สามารถแก้ไขข้อมูลได้" : "Failed to update part"),
+              variant: "destructive",
+            });
+          }
         } else {
-          toast({
-            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-            description: response.message || (language === "th" ? "ไม่สามารถแก้ไขข้อมูลได้" : "Failed to update part"),
-            variant: "destructive",
-          });
+          // No new image and no removal, update normally
+          const response = await apiClient.updatePart(backendId, partData);
+
+          if (response.status === "success" && response.data) {
+            const updatedPart = convertPartFromAPI(response.data as PartFromAPI);
+            setParts((prev) =>
+              prev.map((p) => (p.id === editingPartId ? updatedPart : p))
+            );
+            toast({
+              title: language === "th" ? "แก้ไขสินค้าเรียบร้อย" : "Part updated",
+              description:
+                language === "th"
+                  ? "บันทึกการแก้ไขอะไหล่แล้ว"
+                  : "Part has been updated.",
+            });
+            closeFormDialog();
+          } else {
+            toast({
+              title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+              description: response.message || (language === "th" ? "ไม่สามารถแก้ไขข้อมูลได้" : "Failed to update part"),
+              variant: "destructive",
+            });
+          }
         }
       } else {
         // Generate partNumber if not provided
@@ -341,25 +600,66 @@ const Inventory = () => {
           partData.partNumber = `PART-${count.toString().padStart(3, "0")}`;
         }
 
-        const response = await apiClient.createPart(partData);
-
-        if (response.status === "success" && response.data) {
-          const newPartConverted = convertPartFromAPI(response.data as PartFromAPI);
-          setParts((prev) => [newPartConverted, ...prev]);
-          toast({
-            title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
-            description:
-              language === "th"
-                ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
-                : "New part has been added to inventory.",
+        // If there's an image, upload it using FormData
+        if (selectedImage) {
+          const formData = new FormData();
+          formData.append('image', selectedImage);
+          Object.keys(partData).forEach(key => {
+            formData.append(key, String(partData[key]));
           });
-          closeFormDialog();
+          
+          const token = localStorage.getItem('authToken');
+          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+          const response = await fetch(`${API_BASE_URL}/api/parts`, {
+            method: 'POST',
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            body: formData,
+          });
+          
+          const result = await response.json();
+          
+          if (result.status === "success" && result.data) {
+            const newPartConverted = convertPartFromAPI(result.data as PartFromAPI);
+            setParts((prev) => [newPartConverted, ...prev]);
+            toast({
+              title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
+              description:
+                language === "th"
+                  ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
+                  : "New part has been added to inventory.",
+            });
+            closeFormDialog();
+          } else {
+            toast({
+              title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+              description: result.message || (language === "th" ? "ไม่สามารถเพิ่มข้อมูลได้" : "Failed to create part"),
+              variant: "destructive",
+            });
+          }
         } else {
-          toast({
-            title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-            description: response.message || (language === "th" ? "ไม่สามารถเพิ่มข้อมูลได้" : "Failed to create part"),
-            variant: "destructive",
-          });
+          // No image, create normally
+          const response = await apiClient.createPart(partData);
+
+          if (response.status === "success" && response.data) {
+            const newPartConverted = convertPartFromAPI(response.data as PartFromAPI);
+            setParts((prev) => [newPartConverted, ...prev]);
+            toast({
+              title: language === "th" ? "เพิ่มสินค้าเรียบร้อย" : "Part added",
+              description:
+                language === "th"
+                  ? "บันทึกสินค้าใหม่ลงในคลังแล้ว"
+                  : "New part has been added to inventory.",
+            });
+            closeFormDialog();
+          } else {
+            toast({
+              title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+              description: response.message || (language === "th" ? "ไม่สามารถเพิ่มข้อมูลได้" : "Failed to create part"),
+              variant: "destructive",
+            });
+          }
         }
       }
     } catch (error) {
@@ -384,8 +684,86 @@ const Inventory = () => {
       cost: "",
       sellPrice: "",
     });
+    setSelectedImage(null);
+    setImagePreview(null);
+    setExistingImageUrl(null);
+    setImageRemoved(false);
     setIsAddDialogOpen(true);
     navigate("/inventory", { replace: true });
+  };
+
+  const handleAddStock = async () => {
+    if (!selectedPartForStock) {
+      toast({
+        title: language === "th" ? "กรุณาเลือกอะไหล่" : "Please select a part",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const stockAmount = Number(stockToAdd);
+    if (isNaN(stockAmount) || stockAmount <= 0) {
+      toast({
+        title: language === "th" ? "กรุณากรอกจำนวนที่ถูกต้อง" : "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const part = parts.find((p) => p.id === selectedPartForStock);
+      if (!part) {
+        toast({
+          title: language === "th" ? "ไม่พบข้อมูลอะไหล่" : "Part not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newStock = part.stock + stockAmount;
+      const partData = convertPartToAPI({
+        name: part.name,
+        nameTh: part.nameTh,
+        category: part.category,
+        categoryTh: part.categoryTh,
+        stock: String(newStock),
+        minStock: String(part.minStock),
+        cost: String(part.cost),
+        sellPrice: String(part.sellPrice),
+      });
+
+      const response = await apiClient.updatePart(part.id, partData);
+
+      if (response.status === "success" && response.data) {
+        const updatedPart = convertPartFromAPI(response.data as PartFromAPI);
+        setParts((prev) =>
+          prev.map((p) => (p.id === selectedPartForStock ? updatedPart : p))
+        );
+        toast({
+          title: language === "th" ? "เพิ่มจำนวนสต็อกเรียบร้อย" : "Stock updated",
+          description:
+            language === "th"
+              ? `เพิ่มจำนวนสต็อก ${stockAmount} ชิ้น (รวม: ${newStock} ชิ้น)`
+              : `Added ${stockAmount} items (Total: ${newStock} items)`,
+        });
+        setIsAddStockDialogOpen(false);
+        setSelectedPartForStock("");
+        setStockToAdd("");
+      } else {
+        toast({
+          title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+          description: response.message || (language === "th" ? "ไม่สามารถอัปเดตสต็อกได้" : "Failed to update stock"),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error adding stock:", error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถเพิ่มจำนวนสต็อกได้" : "Failed to add stock",
+        variant: "destructive",
+      });
+    }
   };
 
   const outCount = parts.filter((p) => getPartStatus(p.stock, p.minStock) === "out").length;
@@ -404,10 +782,16 @@ const Inventory = () => {
                 : "Manage your inventory to be always ready for sale."}
             </p>
           </div>
-          <Button className="gap-2 shrink-0" onClick={openAddDialog}>
-            <PlusCircle className="w-4 h-4" />
-            {language === "th" ? "เพิ่มสินค้า" : t("addPart")}
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" className="gap-2" onClick={() => setIsAddStockDialogOpen(true)}>
+              <Plus className="w-4 h-4" />
+              {language === "th" ? "เพิ่มจำนวนอะไหล่" : "Add Stock"}
+            </Button>
+            <Button className="gap-2" onClick={openAddDialog}>
+              <PlusCircle className="w-4 h-4" />
+              {language === "th" ? "เพิ่มสินค้า" : t("addPart")}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -448,41 +832,28 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* ค้นหา + กรองประเภท */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder={language === "th" ? "Enter เพื่อค้นหาสินค้า" : "Enter to search parts"}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      {/* ค้นหา + กรองประเภท (แสดงเฉพาะเมื่ออยู่ในหน้าประเภทสินค้า) */}
+      {categoryParam && (
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <Button
+            variant="outline"
+            className="gap-2 w-fit"
+            onClick={() => navigate("/inventory")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {language === "th" ? "กลับหมวดหมู่" : "Back to Categories"}
+          </Button>
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={language === "th" ? "Enter เพื่อค้นหาสินค้า" : "Enter to search parts"}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
-        <Select
-          value={typeFilter}
-          onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}
-        >
-          <SelectTrigger className="w-[200px]">
-            <Filter className="w-4 h-4 mr-2 shrink-0" />
-            <SelectValue placeholder={language === "th" ? "ประเภท" : t("category")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              {language === "th" ? "ทั้งหมด" : "All"}
-            </SelectItem>
-            <SelectItem value="screen">
-              {language === "th" ? "หน้าจอ" : "Screens"}
-            </SelectItem>
-            <SelectItem value="battery">
-              {language === "th" ? "แบตเตอรี่" : "Batteries"}
-            </SelectItem>
-            <SelectItem value="others">
-              {language === "th" ? "อะไหล่อื่นๆ" : "Other parts"}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      )}
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => !open && closeFormDialog()}>
         <DialogContent className="sm:max-w-[640px]">
@@ -604,6 +975,63 @@ const Inventory = () => {
                 />
               </div>
             </div>
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="partImage">
+                {language === "th" ? "รูปภาพสินค้า" : "Product Image"}
+              </Label>
+              <div className="space-y-3">
+                {/* Image Preview */}
+                {(imagePreview || existingImageUrl) && (
+                  <div className="relative w-full max-w-xs">
+                    <div className="relative aspect-square rounded-lg border border-border overflow-hidden bg-muted">
+                      <img
+                        src={imagePreview || (existingImageUrl ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}${existingImageUrl}` : '')}
+                        alt={language === "th" ? "รูปภาพสินค้า" : "Part image"}
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload Button */}
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="partImage"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <Label
+                    htmlFor="partImage"
+                    className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm">
+                      {imagePreview || existingImageUrl
+                        ? (language === "th" ? "เปลี่ยนรูปภาพ" : "Change Image")
+                        : (language === "th" ? "อัปโหลดรูปภาพ" : "Upload Image")}
+                    </span>
+                  </Label>
+                  {!imagePreview && !existingImageUrl && (
+                    <p className="text-xs text-muted-foreground">
+                      {language === "th" ? "(ถ้าไม่ใส่จะแสดงรูป default)" : "(Leave empty to show default image)"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={closeFormDialog}>
@@ -618,122 +1046,583 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ตารางรายการอะไหล่ (รูปแบบเดียวกับหน้างานซ่อม) */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th className="w-[56px]">{language === "th" ? "รูป" : "Image"}</th>
-                <th>{language === "th" ? "รหัส" : "SKU"}</th>
-                <th>{language === "th" ? "สินค้า" : "Product"}</th>
-                <th className="text-right">{language === "th" ? "ราคาทุน" : "Cost"}</th>
-                <th className="text-right">{t("sellPrice")}</th>
-                <th className="text-right">{t("stock")}</th>
-                <th className="text-right">{language === "th" ? "ขั้นต่ำ" : "Min"}</th>
-                <th>{language === "th" ? "สถานะ" : "Status"}</th>
-                <th className="w-12 text-center">{t("edit")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="py-12 text-center text-sm text-muted-foreground"
+      {/* Dialog สำหรับเพิ่มจำนวนอะไหล่ */}
+      <Dialog open={isAddStockDialogOpen} onOpenChange={(open) => {
+        setIsAddStockDialogOpen(open);
+        if (!open) {
+          setSelectedPartForStock("");
+          setStockToAdd("");
+          setPartSearchQuery("");
+          setPartSearchOpen(false);
+          setSelectedCategoryForStock("all");
+        }
+      }}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "th" ? "เพิ่มจำนวนอะไหล่" : "Add Stock"}
+            </DialogTitle>
+            <DialogDescription>
+              {language === "th"
+                ? "เลือกอะไหล่และระบุจำนวนที่ต้องการเพิ่ม"
+                : "Select a part and enter the amount to add"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {/* เลือกหมวดหมู่ */}
+            <div className="space-y-2">
+              <Label htmlFor="selectCategory">
+                {language === "th" ? "เลือกหมวดหมู่" : "Select Category"}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Select
+                value={selectedCategoryForStock}
+                onValueChange={(value) => {
+                  setSelectedCategoryForStock(value as typeof selectedCategoryForStock);
+                  setSelectedPartForStock(""); // Reset selected part when category changes
+                  setPartSearchQuery("");
+                }}
+              >
+                <SelectTrigger id="selectCategory" className="w-full">
+                  <SelectValue placeholder={language === "th" ? "เลือกหมวดหมู่" : "Select Category"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {language === "th" ? "ทั้งหมด" : "All"}
+                  </SelectItem>
+                  <SelectItem value="screen">
+                    {language === "th" ? "หน้าจอ" : "Screens"}
+                  </SelectItem>
+                  <SelectItem value="battery">
+                    {language === "th" ? "แบตเตอรี่" : "Batteries"}
+                  </SelectItem>
+                  <SelectItem value="port">
+                    {language === "th" ? "พอร์ต" : "Ports"}
+                  </SelectItem>
+                  <SelectItem value="glass">
+                    {language === "th" ? "กระจก" : "Glass"}
+                  </SelectItem>
+                  <SelectItem value="others">
+                    {language === "th" ? "อื่นๆ" : "Others"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* เลือกอะไหล่ */}
+            <div className="space-y-2">
+              <Label htmlFor="selectPart">
+                {language === "th" ? "เลือกอะไหล่" : "Select Part"}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Popover open={partSearchOpen} onOpenChange={setPartSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={partSearchOpen}
+                    className="w-full justify-between h-auto py-2"
+                    disabled={!selectedCategoryForStock}
                   >
-                    {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
-                  </td>
-                </tr>
-              ) : filteredParts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="py-12 text-center text-sm text-muted-foreground"
-                  >
-                    {language === "th" ? "ไม่พบรายการอะไหล่" : "No parts found."}
-                  </td>
-                </tr>
-              ) : (
-                filteredParts.map((part) => {
-                  const status = getPartStatus(part.stock, part.minStock);
-                  const statusLabel =
-                    status === "out"
-                      ? language === "th"
-                        ? "หมด"
-                        : "Out of stock"
-                      : status === "low"
-                        ? language === "th"
-                          ? "ใกล้หมด"
-                          : "Low stock"
-                        : language === "th"
-                          ? "พร้อมขาย"
-                          : "Ready";
-                  const statusClass =
-                    status === "out"
-                      ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                      : status === "low"
-                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
-                  return (
-                    <tr key={part.id}>
-                      <td className="w-[56px] py-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                          <Package className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      </td>
-                      <td className="font-medium text-foreground tabular-nums">{part.displayId}</td>
-                      <td>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {language === "th" ? part.nameTh : part.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {language === "th" ? part.categoryTh : part.category}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="text-right tabular-nums">฿{part.cost.toLocaleString()}</td>
-                      <td className="text-right tabular-nums">
-                        ฿{part.sellPrice.toLocaleString()}
-                      </td>
-                      <td className="text-right">
-                        <span className="font-medium tabular-nums text-primary">
-                          {part.stock.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="text-right tabular-nums text-muted-foreground">
-                        {part.minStock.toLocaleString()}
-                      </td>
-                      <td>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            statusClass
-                          )}
-                        >
-                          {statusLabel}
-                        </span>
-                      </td>
-                      <td className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label={t("edit")}
-                          onClick={() => openEditDialog(part)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
+                    {selectedPartForStock ? (
+                      (() => {
+                        const selectedPart = parts.find((p) => p.id === selectedPartForStock);
+                        if (!selectedPart) return language === "th" ? "เลือกอะไหล่" : "Select a part";
+                        const status = getPartStatus(selectedPart.stock, selectedPart.minStock);
+                        const statusIcon = status === "out" ? <XCircle className="w-4 h-4 text-red-500" /> :
+                                          status === "low" ? <AlertTriangle className="w-4 h-4 text-amber-500" /> :
+                                          <CheckCircle className="w-4 h-4 text-emerald-500" />;
+                        return (
+                          <div className="flex items-center gap-2 flex-1 text-left">
+                            {statusIcon}
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="font-medium truncate">
+                                {language === "th" ? selectedPart.nameTh : selectedPart.name}
+                              </span>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {selectedPart.displayId} · {language === "th" ? "สต็อก" : "Stock"}: {selectedPart.stock}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {!selectedCategoryForStock 
+                          ? (language === "th" ? "กรุณาเลือกหมวดหมู่ก่อน" : "Please select category first")
+                          : (language === "th" ? "🔍 ค้นหาหรือเลือกอะไหล่..." : "🔍 Search or select a part...")
+                        }
+                      </span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder={language === "th" ? "ค้นหาอะไหล่..." : "Search parts..."}
+                      value={partSearchQuery}
+                      onValueChange={setPartSearchQuery}
+                    />
+                    <CommandList>
+                      <CommandEmpty>
+                        {language === "th" ? "ไม่พบอะไหล่" : "No parts found"}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {(() => {
+                          // Filter parts by selected category
+                          let filteredPartsByCategory = parts;
+                          
+                          if (selectedCategoryForStock !== "all") {
+                            if (selectedCategoryForStock === "port") {
+                              filteredPartsByCategory = parts.filter((part) => {
+                                const cat = (part.category || "").toLowerCase();
+                                const catTh = (part.categoryTh || "").toLowerCase();
+                                return cat.includes("port") || catTh.includes("พอร์ต");
+                              });
+                            } else if (selectedCategoryForStock === "glass") {
+                              filteredPartsByCategory = parts.filter((part) => {
+                                const cat = (part.category || "").toLowerCase();
+                                const catTh = (part.categoryTh || "").toLowerCase();
+                                return cat.includes("glass") || catTh.includes("กระจก");
+                              });
+                            } else if (selectedCategoryForStock === "others") {
+                              filteredPartsByCategory = parts.filter((part) => {
+                                const partType = getPartType(part.category);
+                                const cat = (part.category || "").toLowerCase();
+                                const catTh = (part.categoryTh || "").toLowerCase();
+                                const isPort = cat.includes("port") || catTh.includes("พอร์ต");
+                                const isGlass = cat.includes("glass") || catTh.includes("กระจก");
+                                const isScreen = partType === "screen";
+                                const isBattery = partType === "battery";
+                                return !isScreen && !isBattery && !isPort && !isGlass;
+                              });
+                            } else {
+                              const partType = getPartType(selectedCategoryForStock);
+                              filteredPartsByCategory = parts.filter((part) => {
+                                const type = getPartType(part.category);
+                                return type === partType;
+                              });
+                            }
+                          }
+
+                          // Apply search filter
+                          return filteredPartsByCategory
+                            .filter((part) => {
+                              if (!partSearchQuery) return true;
+                              const query = partSearchQuery.toLowerCase();
+                              return (
+                                part.name.toLowerCase().includes(query) ||
+                                part.nameTh.toLowerCase().includes(query) ||
+                                part.displayId.toLowerCase().includes(query) ||
+                                part.category.toLowerCase().includes(query) ||
+                                part.categoryTh.toLowerCase().includes(query)
+                              );
+                            })
+                            .map((part) => {
+                              const status = getPartStatus(part.stock, part.minStock);
+                              const statusIcon = status === "out" ? <XCircle className="w-4 h-4 text-red-500" /> :
+                                                status === "low" ? <AlertTriangle className="w-4 h-4 text-amber-500" /> :
+                                                <CheckCircle className="w-4 h-4 text-emerald-500" />;
+                              const statusLabel = status === "out"
+                                ? (language === "th" ? "หมด" : "Out")
+                                : status === "low"
+                                  ? (language === "th" ? "ใกล้หมด" : "Low")
+                                  : (language === "th" ? "พร้อมขาย" : "Ready");
+                              const isSelected = selectedPartForStock === part.id;
+                              return (
+                                <CommandItem
+                                  key={part.id}
+                                  value={`${part.name} ${part.nameTh} ${part.displayId}`}
+                                  onSelect={() => {
+                                    setSelectedPartForStock(part.id);
+                                    setPartSearchOpen(false);
+                                    setPartSearchQuery("");
+                                    // Auto-focus on stock input after selection
+                                    setTimeout(() => {
+                                      stockInputRef.current?.focus();
+                                    }, 100);
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    {statusIcon}
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium truncate">
+                                          {language === "th" ? part.nameTh : part.name}
+                                        </span>
+                                        {isSelected && (
+                                          <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span className="font-mono">{part.displayId}</span>
+                                        <span>·</span>
+                                        <span>{language === "th" ? "สต็อก" : "Stock"}: {part.stock}</span>
+                                        <span>·</span>
+                                        <span className={cn(
+                                          "px-1.5 py-0.5 rounded text-xs font-medium",
+                                          status === "out" ? "bg-red-500/15 text-red-600 dark:text-red-400" :
+                                          status === "low" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                                          "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                        )}>
+                                          {statusLabel}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CommandItem>
+                              );
+                            });
+                        })()}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stockAmount">
+                {language === "th" ? "จำนวนที่ต้องการเพิ่ม" : "Amount to Add"}
+                <span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="stockAmount"
+                ref={stockInputRef}
+                type="number"
+                min={1}
+                placeholder={language === "th" ? "กรอกจำนวน" : "Enter amount"}
+                value={stockToAdd}
+                onChange={(e) => setStockToAdd(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && selectedPartForStock && stockToAdd && !isNaN(Number(stockToAdd)) && Number(stockToAdd) > 0) {
+                    handleAddStock();
+                  }
+                }}
+              />
+              {selectedPartForStock && stockToAdd && !isNaN(Number(stockToAdd)) && Number(stockToAdd) > 0 && (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                  <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">
+                      {language === "th" ? "สต็อกหลังเพิ่ม" : "Stock after adding"}:{" "}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {(parts.find((p) => p.id === selectedPartForStock)?.stock || 0) + Number(stockToAdd)}
+                    </span>
+                    <span className="text-muted-foreground ml-1">
+                      {language === "th" ? "ชิ้น" : "items"}
+                    </span>
+                  </p>
+                </div>
               )}
-            </tbody>
-          </table>
+              {stockToAdd && (isNaN(Number(stockToAdd)) || Number(stockToAdd) <= 0) && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  {language === "th" ? "กรุณากรอกจำนวนที่มากกว่า 0" : "Please enter a number greater than 0"}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddStockDialogOpen(false);
+                setSelectedPartForStock("");
+                setStockToAdd("");
+                setPartSearchQuery("");
+                setPartSearchOpen(false);
+              }}
+            >
+              {t("cancel")}
+            </Button>
+            <Button 
+              onClick={handleAddStock}
+              disabled={!selectedCategoryForStock || !selectedPartForStock || !stockToAdd || isNaN(Number(stockToAdd)) || Number(stockToAdd) <= 0}
+            >
+              {language === "th" ? "เพิ่มจำนวน" : "Add Stock"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* แสดงการ์ดหมวดหมู่ หรือ ตารางอะไหล่ */}
+      {!categoryParam ? (
+        /* แสดงการ์ดหมวดหมู่เมื่อไม่มี category parameter */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {isLoading ? (
+            <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
+              {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
+            </div>
+          ) : (
+            <>
+              {/* อะไหล่ทั้งหมด (All) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=all")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
+                    <Layers className="h-8 w-8 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "ทั้งหมด" : "All Parts"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {parts.length} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* หน้าจอ (Screens) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=screen")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
+                    <Smartphone className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "หน้าจอ" : "Screens"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getCategoryCount("screen")} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* แบตเตอรี่ (Batteries) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=battery")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
+                    <Battery className="h-8 w-8 text-yellow-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "แบตเตอรี่" : "Batteries"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getCategoryCount("battery")} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* พอร์ต (Ports) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=port")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+                    <Usb className="h-8 w-8 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "พอร์ต" : "Ports"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getCategoryCount("port")} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* กระจก (Glass) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=glass")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-cyan-500/10 group-hover:bg-cyan-500/20 transition-colors">
+                    <Package className="h-8 w-8 text-cyan-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "กระจก" : "Glass"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getCategoryCount("glass")} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* อื่นๆ (Others) */}
+              <Card
+                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                onClick={() => navigate("/inventory?category=others")}
+              >
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <div className="p-4 rounded-xl bg-gray-500/10 group-hover:bg-gray-500/20 transition-colors">
+                    <Package className="h-8 w-8 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {language === "th" ? "อื่นๆ" : "Others"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {getCategoryCount("others")} {language === "th" ? "รายการ" : "items"}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
-      </div>
+      ) : (
+        /* แสดงตารางอะไหล่เมื่อมี category parameter */
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th className="w-[56px]">{language === "th" ? "รูป" : "Image"}</th>
+                  <th>{language === "th" ? "รหัส" : "SKU"}</th>
+                  <th>{language === "th" ? "สินค้า" : "Product"}</th>
+                  <th className="text-right">{language === "th" ? "ราคาทุน" : "Cost"}</th>
+                  <th className="text-right">{t("sellPrice")}</th>
+                  <th className="text-right">{t("stock")}</th>
+                  <th className="text-right">{language === "th" ? "ขั้นต่ำ" : "Min"}</th>
+                  <th>{language === "th" ? "สถานะ" : "Status"}</th>
+                  <th className="w-24 text-center">{language === "th" ? "การดำเนินการ" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
+                    </td>
+                  </tr>
+                ) : filteredParts.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Package className="w-12 h-12 opacity-50" />
+                        <p>{language === "th" ? "ไม่พบรายการอะไหล่" : "No parts found."}</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParts.map((part) => {
+                    const status = getPartStatus(part.stock, part.minStock);
+                    const statusLabel =
+                      status === "out"
+                        ? language === "th"
+                          ? "หมด"
+                          : "Out of stock"
+                        : status === "low"
+                          ? language === "th"
+                            ? "ใกล้หมด"
+                            : "Low stock"
+                          : language === "th"
+                            ? "พร้อมขาย"
+                            : "Ready";
+                    const statusClass =
+                      status === "out"
+                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                        : status === "low"
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                    return (
+                      <tr key={part.id}>
+                        <td className="w-[56px] py-3">
+                          <PartImageCell 
+                            imageUrl={part.imageUrl}
+                            alt={language === "th" ? part.nameTh : part.name}
+                          />
+                        </td>
+                        <td className="font-medium text-foreground tabular-nums">{part.displayId}</td>
+                        <td>
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {language === "th" ? part.nameTh : part.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {language === "th" ? part.categoryTh : part.category}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="text-right tabular-nums">฿{part.cost.toLocaleString()}</td>
+                        <td className="text-right tabular-nums">
+                          ฿{part.sellPrice.toLocaleString()}
+                        </td>
+                        <td className="text-right">
+                          <span className="font-medium tabular-nums text-primary">
+                            {part.stock.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="text-right tabular-nums text-muted-foreground">
+                          {part.minStock.toLocaleString()}
+                        </td>
+                        <td>
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              statusClass
+                            )}
+                          >
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label={language === "th" ? "เพิ่มจำนวน" : "Add stock"}
+                              onClick={() => {
+                                setSelectedPartForStock(part.id);
+                                setStockToAdd("");
+                                setPartSearchQuery("");
+                                setIsAddStockDialogOpen(true);
+                                setTimeout(() => {
+                                  stockInputRef.current?.focus();
+                                }, 100);
+                              }}
+                              title={language === "th" ? "เพิ่มจำนวนสต็อก" : "Add stock"}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label={t("edit")}
+                              onClick={() => openEditDialog(part)}
+                              title={t("edit")}
+                            >
+                              <Edit className="h-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };
