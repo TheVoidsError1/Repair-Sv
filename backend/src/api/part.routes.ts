@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { AppDataSource } from '../config/data-source.js';
 import { Part } from '../entities/Part.js';
+import { Transaction } from '../entities/Transaction.js';
 
 const router = Router();
 
@@ -450,6 +451,100 @@ router.put('/:id', upload.single('image'), handleMulterError, async (req, res) =
     res.status(500).json({
       status: 'error',
       message: 'Failed to update part',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Add stock to part (with transaction recording)
+router.post('/:id/add-stock', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity } = req.body;
+
+    // Validation
+    if (!quantity || !validateInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Quantity must be a valid integer greater than 0',
+      });
+    }
+
+    const partRepository = AppDataSource.getRepository(Part);
+    const transactionRepository = AppDataSource.getRepository(Transaction);
+    
+    const part = await partRepository.findOne({ where: { id } });
+
+    if (!part) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Part not found',
+      });
+    }
+
+    const quantityToAdd = typeof quantity === 'string' ? parseInt(quantity, 10) : quantity;
+    const quantityBefore = part.stockQuantity;
+    const quantityAfter = quantityBefore + quantityToAdd;
+
+    // Generate transaction number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    
+    // Count today's transactions for sequential numbering
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    
+    const todayCount = await transactionRepository
+      .createQueryBuilder('transaction')
+      .where('transaction.createdAt >= :start', { start: todayStart })
+      .andWhere('transaction.createdAt < :end', { end: todayEnd })
+      .getCount();
+    
+    const sequenceNumber = String(todayCount + 1).padStart(3, '0');
+    const transactionNumber = `EXP-STOCK-${year}-${month}-${sequenceNumber}`;
+
+    // Calculate total cost
+    const costPerUnit = Number(part.costPrice);
+    const totalCost = costPerUnit * quantityToAdd;
+
+    // Update part stock
+    part.stockQuantity = quantityAfter;
+    await partRepository.save(part);
+
+    // Create transaction record
+    const partName = part.nameTh || part.name || 'Unknown';
+    const transaction = transactionRepository.create({
+      transactionNumber,
+      partId: part.id,
+      type: 'purchase',
+      quantityAdded: quantityToAdd,
+      totalCost,
+      description: `Stock Purchase - ${part.name || 'Unknown'} (${quantityToAdd} units)`,
+      descriptionTh: `ซื้อสต็อก - ${partName} จาก ${quantityBefore} เพิ่มเป็น ${quantityAfter} (${quantityToAdd} ชิ้น)`,
+    });
+
+    const savedTransaction = await transactionRepository.save(transaction);
+
+    // Return with part details
+    const transactionWithPart = await transactionRepository.findOne({
+      where: { id: savedTransaction.id },
+      relations: ['part'],
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        part,
+        transaction: transactionWithPart,
+      },
+      message: 'Stock added successfully',
+    });
+  } catch (error) {
+    console.error('Add stock error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to add stock',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

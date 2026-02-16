@@ -4,4 +4,5 @@ export { Part } from './Part.js';
 export { Repair } from './Repair.js';
 export { RepairStatus } from './Repair.js';
 export { WarrantyClaim } from './WarrantyClaim.js';
+export { Transaction } from './Transaction.js';
 export { WarrantyClaimStatus } from './WarrantyClaim.js';

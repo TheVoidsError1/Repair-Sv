@@ -13,6 +13,7 @@ import repairRoutes from './api/repair.routes.js';
 import partRoutes from './api/part.routes.js';
 import warrantyRoutes from './api/warranty.routes.js';
 import financeRoutes from './api/finance.routes.js';
+import transactionRoutes from './api/transaction.routes.js';
 import lineRoutes from './api/line.routes.js';
 import { Personnel } from './entities/Personnel.js';
 
@@ -88,6 +89,7 @@ app.use('/api/repairs', repairRoutes);
 app.use('/api/parts', partRoutes);
 app.use('/api/warranty', warrantyRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/api/line', lineRoutes);
 
 // Seed default admin user

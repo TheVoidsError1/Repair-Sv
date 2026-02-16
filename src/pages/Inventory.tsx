@@ -50,6 +50,7 @@ import {
   PlusCircle,
   Search,
   Smartphone,
+  Trash2,
   Upload,
   Usb,
   X,
@@ -221,6 +222,8 @@ const Inventory = () => {
   const stockInputRef = useRef<HTMLInputElement>(null);
   /** รหัสอะไหล่ที่กำลังแก้ไข (null = โหมดเพิ่มใหม่) */
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
+  /** Transaction ที่สร้างขึ้นเมื่อเพิ่มสต็อก */
+  const [createdTransaction, setCreatedTransaction] = useState<any | null>(null);
 
   const [newPart, setNewPart] = useState({
     name: "",
@@ -720,35 +723,36 @@ const Inventory = () => {
         return;
       }
 
-      const newStock = part.stock + stockAmount;
-      const partData = convertPartToAPI({
-        name: part.name,
-        nameTh: part.nameTh,
-        category: part.category,
-        categoryTh: part.categoryTh,
-        stock: String(newStock),
-        minStock: String(part.minStock),
-        cost: String(part.cost),
-        sellPrice: String(part.sellPrice),
-      });
-
-      const response = await apiClient.updatePart(part.id, partData);
+      // ใช้ API ใหม่ที่บันทึกธุรกรรม
+      const response = await apiClient.addPartStock(part.id, stockAmount);
 
       if (response.status === "success" && response.data) {
-        const updatedPart = convertPartFromAPI(response.data as PartFromAPI);
+        const updatedPart = convertPartFromAPI(response.data.part as PartFromAPI);
+        const transaction = response.data.transaction;
+        
         setParts((prev) =>
           prev.map((p) => (p.id === selectedPartForStock ? updatedPart : p))
         );
+        
+        // เก็บ Transaction เพื่อแสดงใน Dialog
+        setCreatedTransaction(transaction);
+        
+        const totalCost = Number(transaction.totalCost).toLocaleString();
+        const partName = language === "th" ? part.nameTh : part.name;
+        
         toast({
           title: language === "th" ? "เพิ่มจำนวนสต็อกเรียบร้อย" : "Stock updated",
           description:
             language === "th"
-              ? `เพิ่มจำนวนสต็อก ${stockAmount} ชิ้น (รวม: ${newStock} ชิ้น)`
-              : `Added ${stockAmount} items (Total: ${newStock} items)`,
+              ? `${partName}\nเพิ่ม ${stockAmount} ชิ้น (${part.stock} → ${updatedPart.stock})\nจำนวนเงิน: ฿${totalCost}\nเลขที่: ${transaction.transactionNumber}`
+              : `${partName}\nAdded ${stockAmount} items (${part.stock} → ${updatedPart.stock})\nAmount: ฿${totalCost}\nRef: ${transaction.transactionNumber}`,
         });
-        setIsAddStockDialogOpen(false);
+        
+        // ไม่ปิด Dialog ทันที แต่แสดง Transaction ให้ผู้ใช้เห็น
+        // setIsAddStockDialogOpen(false);
         setSelectedPartForStock("");
         setStockToAdd("");
+        setSelectedCategoryForStock("all");
       } else {
         toast({
           title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
@@ -1055,6 +1059,7 @@ const Inventory = () => {
           setPartSearchQuery("");
           setPartSearchOpen(false);
           setSelectedCategoryForStock("all");
+          setCreatedTransaction(null);
         }
       }}>
         <DialogContent className="sm:max-w-[550px]">
@@ -1324,6 +1329,90 @@ const Inventory = () => {
                 </p>
               )}
             </div>
+            
+            {/* แสดง Transaction ที่สร้างขึ้น */}
+            {createdTransaction && (
+              <div className="mt-4 p-4 rounded-lg border border-primary/20 bg-primary/5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-primary" />
+                      <h4 className="font-semibold text-foreground">
+                        {language === "th" ? "ธุรกรรมที่สร้างขึ้น" : "Transaction Created"}
+                      </h4>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {language === "th" ? "เลขที่ธุรกรรม" : "Transaction ID"}:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {createdTransaction.transactionNumber}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {language === "th" ? "รายละเอียด" : "Description"}:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {language === "th" ? createdTransaction.descriptionTh : createdTransaction.description}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {language === "th" ? "จำนวนเงิน" : "Amount"}:
+                        </span>
+                        <span className="font-semibold text-primary">
+                          ฿{Number(createdTransaction.totalCost).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {language === "th" ? "วันที่" : "Date"}:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {new Date(createdTransaction.createdAt).toLocaleDateString(language === "th" ? "th-TH" : "en-US")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={async () => {
+                      try {
+                        const response = await apiClient.deleteTransaction(createdTransaction.id);
+                        if (response.status === "success") {
+                          toast({
+                            title: language === "th" ? "ลบธุรกรรมเรียบร้อย" : "Transaction deleted",
+                            description: language === "th" 
+                              ? "ธุรกรรมถูกลบออกจากระบบแล้ว"
+                              : "Transaction has been removed from the system",
+                          });
+                          setCreatedTransaction(null);
+                          setIsAddStockDialogOpen(false);
+                          // Reload parts to update stock
+                          await loadParts();
+                        } else {
+                          throw new Error(response.message || "Failed to delete transaction");
+                        }
+                      } catch (error) {
+                        console.error("Error deleting transaction:", error);
+                        toast({
+                          title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+                          description: error instanceof Error ? error.message : (language === "th" ? "ไม่สามารถลบธุรกรรมได้" : "Failed to delete transaction"),
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    {language === "th" ? "ลบ" : "Delete"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button
@@ -1334,16 +1423,19 @@ const Inventory = () => {
                 setStockToAdd("");
                 setPartSearchQuery("");
                 setPartSearchOpen(false);
+                setCreatedTransaction(null);
               }}
             >
               {t("cancel")}
             </Button>
-            <Button 
-              onClick={handleAddStock}
-              disabled={!selectedCategoryForStock || !selectedPartForStock || !stockToAdd || isNaN(Number(stockToAdd)) || Number(stockToAdd) <= 0}
-            >
-              {language === "th" ? "เพิ่มจำนวน" : "Add Stock"}
-            </Button>
+            {!createdTransaction && (
+              <Button 
+                onClick={handleAddStock}
+                disabled={!selectedCategoryForStock || !selectedPartForStock || !stockToAdd || isNaN(Number(stockToAdd)) || Number(stockToAdd) <= 0}
+              >
+                {language === "th" ? "เพิ่มจำนวน" : "Add Stock"}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -238,6 +238,19 @@ class ApiClient {
     });
   }
 
+  async addPartStock(id: string, quantity: number) {
+    return this.request<any>(`/api/parts/${id}/add-stock`, {
+      method: 'POST',
+      body: JSON.stringify({ quantity }),
+    });
+  }
+
+  async deleteTransaction(transactionId: string) {
+    return this.request<any>(`/api/transactions/${transactionId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Warranty Claims
   async getWarrantyClaims() {
     return this.request<any[]>('/api/warranty');

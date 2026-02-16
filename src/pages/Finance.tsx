@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
     ArrowDownRight,
@@ -18,6 +19,7 @@ import {
     Download,
     TrendingDown,
     TrendingUp,
+    Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -33,6 +35,7 @@ import {
     YAxis,
 } from "recharts";
 import { apiClient } from "@/lib/api";
+import * as XLSX from 'xlsx';
 
 const Finance = () => {
   const { t, language } = useLanguage();
@@ -95,6 +98,11 @@ const Finance = () => {
   const [transactionTab, setTransactionTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Repair details dialog state
+  const [repairDetailsOpen, setRepairDetailsOpen] = useState(false);
+  const [selectedRepair, setSelectedRepair] = useState<any>(null);
+  const [loadingRepairDetails, setLoadingRepairDetails] = useState(false);
 
   // Fetch financial data
   useEffect(() => {
@@ -195,6 +203,35 @@ const Finance = () => {
   console.log('[Finance] Filtered transactions:', filteredTransactions.length);
   console.log('[Finance] Transaction tab:', transactionTab);
 
+  // Handle viewing repair details
+  const handleViewRepairDetails = async (transactionId: string) => {
+    // Extract repair ID from transaction ID (e.g., TXN-REP-2026-009 -> REP-2026-009)
+    const repairNumber = transactionId.replace('TXN-', '');
+    
+    setLoadingRepairDetails(true);
+    setRepairDetailsOpen(true);
+    
+    try {
+      const response = await apiClient.getRepairs(1, 1000); // Get all repairs
+      const repair = response.data.find((r: any) => r.repairNumber === repairNumber);
+      
+      if (repair) {
+        // Fetch detailed repair info including parts
+        const detailResponse = await apiClient.getRepairById(repair.id);
+        console.log('Repair detail response:', detailResponse);
+        setSelectedRepair(detailResponse.data || detailResponse);
+      } else {
+        console.log('Repair not found:', repairNumber);
+        setSelectedRepair(null);
+      }
+    } catch (error) {
+      console.error('Error fetching repair details:', error);
+      setSelectedRepair(null);
+    } finally {
+      setLoadingRepairDetails(false);
+    }
+  };
+
   // Create financial breakdown data for pie chart
   // Calculate percentages relative to a base that ensures correct percentage distribution
   // Base = totalIncome + totalExpenses to get proper percentage distribution
@@ -261,6 +298,65 @@ const Finance = () => {
     );
   }
 
+  // Export to Excel function
+  const handleExportToExcel = () => {
+    try {
+      // สร้างข้อมูลสรุปทางการเงิน
+      const summaryData = [
+        [language === "th" ? "รายการ" : "Item", language === "th" ? "จำนวน" : "Amount"],
+        [language === "th" ? "รายได้รวม" : "Total Income", `฿${summary.totalIncome.toLocaleString()}`],
+        [language === "th" ? "ค่าใช้จ่ายรวม" : "Total Expenses", `฿${summary.totalExpenses.toLocaleString()}`],
+        [language === "th" ? "กำไรสุทธิ" : "Net Profit", `฿${summary.netProfit.toLocaleString()}`],
+        [language === "th" ? "อัตรากำไร" : "Profit Margin", `${summary.profitMargin.toFixed(2)}%`],
+        [language === "th" ? "มูลค่าสต็อก" : "Stock Value", `฿${summary.totalStockValue.toLocaleString()}`],
+        [language === "th" ? "กำไรเฉลี่ยต่องาน" : "Avg Profit per Job", `฿${summary.averageProfitPerRepair.toLocaleString()}`],
+        [language === "th" ? "กำไรจากอะไหล่" : "Parts Profit", `฿${summary.partsMarkup.toLocaleString()}`],
+        [language === "th" ? "จำนวนงานซ่อม" : "Total Repairs", summary.totalRepairs.toString()],
+      ];
+
+      // สร้างข้อมูลธุรกรรม
+      const transactionsData = [
+        [
+          language === "th" ? "เลขที่ธุรกรรม" : "Transaction ID",
+          language === "th" ? "ประเภท" : "Type",
+          language === "th" ? "รายละเอียด" : "Description",
+          language === "th" ? "จำนวนเงิน" : "Amount",
+          language === "th" ? "วันที่" : "Date",
+          language === "th" ? "วิธีการชำระ" : "Method",
+        ],
+        ...filteredTransactions.map(tx => [
+          tx.id,
+          tx.type === 'income' ? (language === "th" ? "รายได้" : "Income") : (language === "th" ? "รายจ่าย" : "Expense"),
+          language === "th" ? tx.descriptionTh : tx.description,
+          `฿${tx.amount.toLocaleString()}`,
+          tx.date,
+          language === "th" ? tx.methodTh : tx.method,
+        ])
+      ];
+
+      // สร้าง workbook
+      const wb = XLSX.utils.book_new();
+
+      // สร้าง worksheet สำหรับสรุปทางการเงิน
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, language === "th" ? "สรุปทางการเงิน" : "Financial Summary");
+
+      // สร้าง worksheet สำหรับธุรกรรม
+      const wsTransactions = XLSX.utils.aoa_to_sheet(transactionsData);
+      XLSX.utils.book_append_sheet(wb, wsTransactions, language === "th" ? "รายการธุรกรรม" : "Transactions");
+
+      // สร้างชื่อไฟล์
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      const fileName = `Financial_Report_${dateStr}.xlsx`;
+
+      // Export ไฟล์
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="page-header">
@@ -283,7 +379,7 @@ const Finance = () => {
                 <SelectItem value="1y">{t("lastYear")}</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleExportToExcel}>
               <Download className="w-4 h-4" />
               {t("export")}
             </Button>
@@ -642,30 +738,47 @@ const Finance = () => {
                     <th>{t("amount")}</th>
                     <th>{t("date")}</th>
                     <th>{t("method")}</th>
+                    <th className="text-center">{language === "th" ? "ดูรายละเอียด" : "Details"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedTransactions.length > 0 ? (
-                    paginatedTransactions.map((txn) => (
-                      <tr key={txn.id}>
-                        <td className="font-medium text-foreground">{txn.id}</td>
-                        <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
-                        <td
-                          className={
-                            txn.type === "income"
-                              ? "text-status-completed font-medium"
-                              : "text-status-cancelled font-medium"
-                          }
-                        >
-                          {txn.type === "income" ? "+" : "-"}฿{txn.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td>{txn.date}</td>
-                        <td>{language === "th" ? txn.methodTh : txn.method}</td>
-                      </tr>
-                    ))
+                    paginatedTransactions.map((txn) => {
+                      const isRepairIncome = txn.id.startsWith('TXN-REP-');
+                      return (
+                        <tr key={txn.id}>
+                          <td className="font-medium text-foreground">{txn.id}</td>
+                          <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
+                          <td
+                            className={
+                              txn.type === "income"
+                                ? "text-status-completed font-medium"
+                                : "text-status-cancelled font-medium"
+                            }
+                          >
+                            {txn.type === "income" ? "+" : "-"}฿{txn.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td>{txn.date}</td>
+                          <td>{language === "th" ? txn.methodTh : txn.method}</td>
+                          <td className="text-center">
+                            {isRepairIncome && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleViewRepairDetails(txn.id)}
+                              >
+                                <Eye className="w-4 h-4" />
+                                {language === "th" ? "ดู" : "View"}
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={5} className="text-center text-muted-foreground py-8">
+                      <td colSpan={6} className="text-center text-muted-foreground py-8">
                         No transactions found
                       </td>
                     </tr>
@@ -729,11 +842,14 @@ const Finance = () => {
                     <th>{t("amount")}</th>
                     <th>{t("date")}</th>
                     <th>{t("method")}</th>
+                    <th className="text-center">{language === "th" ? "ดูรายละเอียด" : "Details"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedTransactions.length > 0 ? (
-                    paginatedTransactions.map((txn) => (
+                    paginatedTransactions.map((txn) => {
+                      const isRepairIncome = txn.id.startsWith('TXN-REP-');
+                      return (
                         <tr key={txn.id}>
                           <td className="font-medium text-foreground">{txn.id}</td>
                           <td>{language === "th" ? txn.descriptionTh : txn.description}</td>
@@ -742,11 +858,25 @@ const Finance = () => {
                           </td>
                           <td>{txn.date}</td>
                           <td>{language === "th" ? txn.methodTh : txn.method}</td>
+                          <td className="text-center">
+                            {isRepairIncome && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleViewRepairDetails(txn.id)}
+                              >
+                                <Eye className="w-4 h-4" />
+                                {language === "th" ? "ดู" : "View"}
+                              </Button>
+                            )}
+                          </td>
                         </tr>
-                      ))
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={5} className="text-center text-muted-foreground py-8">
+                      <td colSpan={6} className="text-center text-muted-foreground py-8">
                         No transactions found
                       </td>
                     </tr>
@@ -810,6 +940,7 @@ const Finance = () => {
                     <th>{t("amount")}</th>
                     <th>{t("date")}</th>
                     <th>{t("method")}</th>
+                    <th className="text-center">{language === "th" ? "ดูรายละเอียด" : "Details"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -823,11 +954,14 @@ const Finance = () => {
                           </td>
                           <td>{txn.date}</td>
                           <td>{language === "th" ? txn.methodTh : txn.method}</td>
+                          <td className="text-center">
+                            {/* No details button for expense transactions */}
+                          </td>
                         </tr>
                       ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="text-center text-muted-foreground py-8">
+                      <td colSpan={6} className="text-center text-muted-foreground py-8">
                         No transactions found
                       </td>
                     </tr>
@@ -883,6 +1017,142 @@ const Finance = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Repair Details Dialog */}
+      <Dialog open={repairDetailsOpen} onOpenChange={setRepairDetailsOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "th" ? "รายละเอียดอะไหล่ที่ใช้" : "Parts Used Details"}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingRepairDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">
+                  {language === "th" ? "กำลังโหลด..." : "Loading..."}
+                </p>
+              </div>
+            </div>
+          ) : selectedRepair ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "เลขที่งานซ่อม" : "Repair Number"}
+                  </p>
+                  <p className="font-medium">{selectedRepair.repairNumber || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "ลูกค้า" : "Customer"}
+                  </p>
+                  <p className="font-medium">
+                    {selectedRepair.customer
+                      ? (selectedRepair.customer.fullName || `${selectedRepair.customer.firstName || ''} ${selectedRepair.customer.lastName || ''}`.trim())
+                      : "-"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "ยี่ห้อ/รุ่น" : "Brand/Model"}
+                  </p>
+                  <p className="font-medium">
+                    {[selectedRepair.deviceBrand, selectedRepair.deviceModel]
+                      .filter(Boolean)
+                      .join(' ') || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-3">
+                  {language === "th" ? "อะไหล่ที่ใช้" : "Parts Used"}
+                </h4>
+                {selectedRepair.selectedParts && selectedRepair.selectedParts.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedRepair.selectedParts.map((part: any, index: number) => (
+                      <div
+                        key={part.id}
+                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {language === "th" ? part.nameTh || part.name : part.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {language === "th" ? "ราคาทุน" : "Cost Price"}: ฿{Number(part.costPrice || 0).toFixed(2)} | {" "}
+                              {language === "th" ? "ราคาขาย" : "Sale Price"}: ฿{Number(part.price || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-primary">
+                            ฿{Number(part.price || 0).toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {language === "th" ? "กำไร" : "Profit"}: ฿{(Number(part.price || 0) - Number(part.costPrice || 0)).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-3 border-t border-border">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold">
+                          {language === "th" ? "รวมราคาอะไหล่" : "Total Parts Cost"}
+                        </p>
+                        <p className="text-lg font-bold text-primary">
+                          ฿{selectedRepair.selectedParts
+                            .reduce((sum: number, part: any) => sum + (Number(part.price) || 0), 0)
+                            .toFixed(2)
+                            .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <p className="font-semibold text-status-completed">
+                          {language === "th" ? "กำไรจากอะไหล่" : "Profit from Parts"}
+                        </p>
+                        <p className="text-lg font-bold text-status-completed">
+                          ฿{selectedRepair.selectedParts
+                            .reduce((sum: number, part: any) => sum + ((Number(part.price) || 0) - (Number(part.costPrice) || 0)), 0)
+                            .toFixed(2)
+                            .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">
+                    {language === "th" ? "ไม่มีการใช้อะไหล่" : "No parts used"}
+                  </p>
+                )}
+              </div>
+
+              {selectedRepair.totalCost && (
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold text-lg">
+                      {language === "th" ? "ค่าบริการรวม" : "Total Service Cost"}
+                    </p>
+                    <p className="text-2xl font-bold text-primary">
+                      ฿{Number(selectedRepair.totalCost || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              {language === "th" ? "ไม่พบข้อมูล" : "No data found"}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };

@@ -208,6 +208,8 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const repairRepository = AppDataSource.getRepository(Repair);
+    const partRepository = AppDataSource.getRepository(Part);
+    
     const repair = await repairRepository.findOne({
       where: { id },
       relations: ['customer', 'assignedTo', 'selectedPart'],
@@ -220,9 +222,30 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // ดึงข้อมูล parts ทั้งหมดจาก selectedPartIds (ถ้ามี)
+    let selectedParts = null;
+    if (repair.selectedPartIds) {
+      try {
+        const partIds = JSON.parse(repair.selectedPartIds);
+        if (Array.isArray(partIds) && partIds.length > 0) {
+          selectedParts = await partRepository.find({
+            where: { id: In(partIds) },
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing selectedPartIds:', error);
+      }
+    }
+
+    // เพิ่ม selectedParts ลงใน response
+    const responseData = {
+      ...repair,
+      selectedParts: selectedParts || (repair.selectedPart ? [repair.selectedPart] : []),
+    };
+
     res.json({
       status: 'success',
-      data: repair,
+      data: responseData,
     });
   } catch (error) {
     console.error('Get repair by ID error:', error);

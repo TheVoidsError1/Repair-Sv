@@ -344,6 +344,7 @@ const RepairNew = () => {
         // Reset form
         setFormData(initialFormData);
         setSelectedPartIds([]);
+        setIsEstimatedPriceManuallyEdited(false);
         setReceiveTime(roundTimeTo30Min(
           `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
         ));
@@ -445,6 +446,7 @@ const RepairNew = () => {
         // Reset form
         setFormData(initialFormData);
         setSelectedPartIds([]);
+        setIsEstimatedPriceManuallyEdited(false);
         setReceiveTime(roundTimeTo30Min(
           `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
         ));
@@ -478,6 +480,37 @@ const RepairNew = () => {
   
   const hasOutOfStockPart = selectedParts.some((part) => part.stock === 0);
   const canCreateOrder = !hasOutOfStockPart;
+
+  // Track if user has manually edited estimatedPrice
+  const [isEstimatedPriceManuallyEdited, setIsEstimatedPriceManuallyEdited] = useState(false);
+
+  // Calculate total price of selected parts and update estimatedPrice automatically
+  useEffect(() => {
+    if (selectedParts.length > 0) {
+      const totalPrice = selectedParts.reduce((sum, part) => sum + part.sellPrice, 0);
+      // Only auto-update if user hasn't manually edited the field
+      if (!isEstimatedPriceManuallyEdited) {
+        setFormData((prev) => ({
+          ...prev,
+          estimatedPrice: totalPrice.toString(),
+        }));
+      }
+    } else if (selectedParts.length === 0) {
+      // If all parts are removed, clear estimatedPrice only if it was auto-calculated
+      if (!isEstimatedPriceManuallyEdited) {
+        setFormData((prev) => ({
+          ...prev,
+          estimatedPrice: "",
+        }));
+      }
+    }
+  }, [selectedPartIds, partsList, isEstimatedPriceManuallyEdited]); // Recalculate when selected parts or parts list changes
+
+  // Handle manual edit of estimatedPrice
+  const handleEstimatedPriceChange = (value: string) => {
+    setIsEstimatedPriceManuallyEdited(true);
+    handleInputChange("estimatedPrice", value);
+  };
 
   const handleAddPart = (partId: string) => {
     if (partId && !selectedPartIds.includes(partId)) {
@@ -900,7 +933,7 @@ const RepairNew = () => {
                   type="number"
                   placeholder={t("enterEstimatedPrice")}
                   value={formData.estimatedPrice}
-                  onChange={(e) => handleInputChange("estimatedPrice", e.target.value)}
+                  onChange={(e) => handleEstimatedPriceChange(e.target.value)}
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">

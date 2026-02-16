@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AppDataSource } from '../config/data-source.js';
 import { Repair, RepairStatus } from '../entities/Repair.js';
 import { Part } from '../entities/Part.js';
+import { Transaction } from '../entities/Transaction.js';
 import { Between, In } from 'typeorm';
 
 const router = Router();
@@ -753,6 +754,7 @@ router.get('/transactions', async (req, res) => {
 
     const repairRepository = AppDataSource.getRepository(Repair);
     const partRepository = AppDataSource.getRepository(Part);
+    const transactionRepository = AppDataSource.getRepository(Transaction);
 
     const transactions: any[] = [];
 
@@ -788,6 +790,7 @@ router.get('/transactions', async (req, res) => {
             descriptionTh: `ชำระค่าซ่อม - ${repair.repairNumber || 'N/A'}`,
             amount: parseFloat(amount.toFixed(2)),
             date: transactionDate.toISOString().split('T')[0],
+            timestamp: transactionDate.getTime(), // Add timestamp for sorting
             method: 'Cash', // Default, you can add payment method to Repair entity later
             methodTh: 'เงินสด',
             repairId: repair.id,
@@ -797,8 +800,12 @@ router.get('/transactions', async (req, res) => {
     }
 
     // Get parts purchases (expense transactions)
+    // Note: Stock purchase transactions (type='purchase') are NOT shown in Finance transactions
+    // They are only shown in Inventory page when adding stock
     if (type === 'all' || type === 'expense') {
-      // 1. ดึงธุรกรรมจากอะไหล่ที่เพิ่มในคลัง (ราคาทุน)
+      // Skip stock purchase transactions - they are only shown in Inventory page
+
+      // 2. ดึงธุรกรรมจากอะไหล่ที่เพิ่มในคลัง (ราคาทุน) - สำหรับอะไหล่เก่าที่ยังไม่มีธุรกรรม
       // ดึงอะไหล่ทั้งหมดที่มีสต็อกและราคาทุน (ไม่จำกัดช่วงเวลา เพื่อให้มีข้อมูลแสดง)
       // แต่จะกรองตามวันที่สร้างหรืออัพเดท
       const allPartsWithStock = await partRepository
@@ -877,6 +884,7 @@ router.get('/transactions', async (req, res) => {
             descriptionTh: `ซื้ออะไหล่ - ${partName} (${stockQty} ชิ้น)`,
             amount: parseFloat(totalCost.toFixed(2)),
             date: transactionDate.toISOString().split('T')[0],
+            timestamp: transactionDate.getTime(), // Add timestamp for sorting
             method: 'Transfer',
             methodTh: 'โอนเงิน',
             partId: part.id,
@@ -943,6 +951,7 @@ router.get('/transactions', async (req, res) => {
                 descriptionTh: `อะไหล่ที่ใช้ - ${partName} (${count} ชิ้น) - งานซ่อม ${repair.repairNumber || 'N/A'}`,
                 amount: parseFloat(totalCost.toFixed(2)),
                 date: repairDate.toISOString().split('T')[0],
+                timestamp: repairDate.getTime(), // Add timestamp for sorting
                 method: 'Transfer',
                 methodTh: 'โอนเงิน',
                 partId: part.id,
@@ -954,11 +963,12 @@ router.get('/transactions', async (req, res) => {
       }
     }
 
-    // Sort by date descending and limit
+    // Sort by timestamp descending (newest first), then by date
     transactions.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return dateB - dateA;
+      // Use timestamp if available, otherwise fallback to date
+      const timeA = a.timestamp || new Date(a.date).getTime();
+      const timeB = b.timestamp || new Date(b.date).getTime();
+      return timeB - timeA;
     });
 
     const limitedTransactions = transactions.slice(0, Number(limit));
