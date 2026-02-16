@@ -7,6 +7,7 @@ import {
     type ReactNode,
 } from "react";
 import { apiClient } from "@/lib/api";
+import { useSocket } from "./SocketContext";
 
 export type RepairTag = "endOfDay" | "leaveDevice";
 
@@ -113,6 +114,7 @@ export function RepairsProvider({ children }: { children: ReactNode }) {
     totalCount: 0,
     totalPages: 0,
   });
+  const { socket, isConnected } = useSocket();
 
   const refreshRepairs = async (page: number = 1, limit: number = 8) => {
     try {
@@ -140,9 +142,56 @@ export function RepairsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // โหลดข้อมูลครั้งแรก
   useEffect(() => {
     refreshRepairs(pagination.page, pagination.limit);
   }, []);
+
+  // ฟัง Socket events สำหรับ real-time updates
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    console.log('🔌 Setting up repair socket listeners');
+
+    // เมื่อมีการสร้างงานซ่อมใหม่
+    socket.on('repair:created', (repair: any) => {
+      console.log('📡 Received repair:created', repair);
+      const convertedRepair = convertRepairFromAPI(repair);
+      setRepairs((prev) => [convertedRepair, ...prev]);
+      setPagination((prev) => ({
+        ...prev,
+        totalCount: prev.totalCount + 1,
+      }));
+    });
+
+    // เมื่อมีการอัปเดตงานซ่อม
+    socket.on('repair:updated', (repair: any) => {
+      console.log('📡 Received repair:updated', repair);
+      const convertedRepair = convertRepairFromAPI(repair);
+      setRepairs((prev) => 
+        prev.map((r) => 
+          r.id === convertedRepair.id ? convertedRepair : r
+        )
+      );
+    });
+
+    // เมื่อมีการลบงานซ่อม
+    socket.on('repair:deleted', (data: { id: string }) => {
+      console.log('📡 Received repair:deleted', data);
+      setRepairs((prev) => prev.filter((r) => r.id !== data.id));
+      setPagination((prev) => ({
+        ...prev,
+        totalCount: Math.max(0, prev.totalCount - 1),
+      }));
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.off('repair:created');
+      socket.off('repair:updated');
+      socket.off('repair:deleted');
+    };
+  }, [socket, isConnected]);
 
   const value = useMemo(() => {
     const endOfDayCount = repairs.filter((r) => r.tag === "endOfDay").length;

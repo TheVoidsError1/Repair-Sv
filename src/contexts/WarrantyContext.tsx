@@ -8,6 +8,7 @@ import {
     type ReactNode,
 } from "react";
 import { apiClient } from "@/lib/api";
+import { useSocket } from "./SocketContext";
 
 export type WarrantyClaimStatus =
   | "pending"
@@ -54,6 +55,22 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
   const [claims, setClaims] = useState<WarrantyClaim[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { socket, isConnected } = useSocket();
+
+  // Helper function to transform warranty claim data
+  const transformClaim = (claim: any): WarrantyClaim => ({
+    id: claim.id,
+    claimNumber: claim.claimNumber,
+    repairId: claim.repair?.repairNumber || claim.repairId,
+    serialNumber: claim.serialNumber || claim.repair?.serialNumber,
+    claimReason: claim.claimReason,
+    claimReasonTh: claim.claimReasonTh,
+    status: claim.status as WarrantyClaimStatus,
+    claimDate: claim.claimDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+    createdAt: claim.createdAt,
+    updatedAt: claim.updatedAt,
+    repair: claim.repair,
+  });
 
   // Fetch all warranty claims from backend
   const fetchClaims = useCallback(async () => {
@@ -62,20 +79,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.getWarrantyClaims();
       if (response.status === "success" && response.data) {
-        // Transform backend data to match frontend interface
-        const transformedClaims = response.data.map((claim: any) => ({
-          id: claim.id, // Use UUID as ID
-          claimNumber: claim.claimNumber,
-          repairId: claim.repair?.repairNumber || claim.repairId,
-          serialNumber: claim.serialNumber || claim.repair?.serialNumber,
-          claimReason: claim.claimReason,
-          claimReasonTh: claim.claimReasonTh,
-          status: claim.status as WarrantyClaimStatus,
-          claimDate: claim.claimDate.split('T')[0], // Format date
-          createdAt: claim.createdAt,
-          updatedAt: claim.updatedAt,
-          repair: claim.repair,
-        }));
+        const transformedClaims = response.data.map(transformClaim);
         setClaims(transformedClaims);
       } else {
         setError(response.message || "Failed to fetch warranty claims");
@@ -91,6 +95,42 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchClaims();
   }, [fetchClaims]);
+
+  // ฟัง Socket events สำหรับ real-time updates
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    console.log('🔌 Setting up warranty socket listeners');
+
+    // เมื่อมีการสร้างเคลมใหม่
+    socket.on('warranty:created', (warranty: any) => {
+      console.log('📡 Received warranty:created', warranty);
+      const transformedClaim = transformClaim(warranty);
+      setClaims((prev) => [transformedClaim, ...prev]);
+    });
+
+    // เมื่อมีการอัปเดตเคลม
+    socket.on('warranty:updated', (warranty: any) => {
+      console.log('📡 Received warranty:updated', warranty);
+      const transformedClaim = transformClaim(warranty);
+      setClaims((prev) =>
+        prev.map((c) => (c.id === transformedClaim.id ? transformedClaim : c))
+      );
+    });
+
+    // เมื่อมีการลบเคลม
+    socket.on('warranty:deleted', (data: { id: string }) => {
+      console.log('📡 Received warranty:deleted', data);
+      setClaims((prev) => prev.filter((c) => c.id !== data.id));
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.off('warranty:created');
+      socket.off('warranty:updated');
+      socket.off('warranty:deleted');
+    };
+  }, [socket, isConnected]);
 
   // Add new warranty claim
   const addClaim = useCallback(

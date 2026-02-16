@@ -176,12 +176,22 @@ const Warranty = () => {
   // เลือกได้เฉพาะงานซ่อมที่เสร็จแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
   // เรียงลำดับตามวันที่สร้าง (ใหม่สุดก่อน) และกรองเฉพาะที่มี serialNumber
   const completedRepairs = allCompletedRepairs
-    .map((r) => ({
-      id: r.id,
-      serialNumber: r.serialNumber,
-      customer: r.customer?.fullName || `${r.customer?.firstName || ''} ${r.customer?.lastName || ''}`.trim() || 'Unknown',
-      createdAt: formatDate(r.dateOfReport ?? r.createdAt) || formatDate(new Date()),
-    }))
+    .map((r) => {
+      const repairDate = formatDate(r.dateOfReport ?? r.createdAt) || formatDate(new Date());
+      const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
+      const remainingDays = getRemainingWarrantyDays(expiryDate);
+      return {
+        id: r.id,
+        repairNumber: r.repairNumber || r.id,
+        serialNumber: r.serialNumber,
+        customer: r.customer?.fullName || `${r.customer?.firstName || ''} ${r.customer?.lastName || ''}`.trim() || 'Unknown',
+        device: r.deviceModel || r.deviceType || r.device || '-',
+        createdAt: repairDate,
+        expiryDate,
+        remainingDays,
+        warrantyStatus: getWarrantyBadgeStatus(remainingDays),
+      };
+    })
     .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 
   const statusLabels: Record<string, string> = {
@@ -339,33 +349,94 @@ const Warranty = () => {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="repairSelect">
+                  <Label htmlFor="repairSelect" className="text-base font-semibold">
                     {language === "th" ? "เลือกงานซ่อม" : "Select Repair"}
+                    <span className="text-destructive ml-1">*</span>
                   </Label>
+                  <p className="text-sm text-muted-foreground -mt-1">
+                    {language === "th" 
+                      ? "เลือกงานซ่อมที่เสร็จแล้วเพื่อสร้างเคลมการรับประกัน" 
+                      : "Select a completed repair to create a warranty claim"}
+                  </p>
                   <Select
                     value={selectedRepairId}
                     onValueChange={(value) => setSelectedRepairId(value)}
                   >
-                    <SelectTrigger id="repairSelect">
-                      <SelectValue placeholder={language === "th" ? "เลือกงานซ่อมที่เสร็จแล้ว" : "Select completed repair"} />
+                    <SelectTrigger id="repairSelect" className="h-auto min-h-[44px]">
+                      <SelectValue placeholder={language === "th" ? "🔍 คลิกเพื่อเลือกงานซ่อม..." : "🔍 Click to select repair..."}>
+                        {selectedRepairId && (() => {
+                          const selected = completedRepairs.find(r => r.id === selectedRepairId);
+                          if (!selected) return null;
+                          return (
+                            <div className="flex flex-col items-start text-left">
+                              <span className="font-medium">{selected.repairNumber}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {selected.customer} · {selected.device}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[400px]">
                       {loadingCompletedRepairs ? (
-                        <div className="flex items-center justify-center py-4">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                        <div className="flex items-center justify-center py-8">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            <p className="text-sm text-muted-foreground">
+                              {language === "th" ? "กำลังโหลด..." : "Loading..."}
+                            </p>
+                          </div>
                         </div>
                       ) : completedRepairs.length === 0 ? (
-                        <SelectItem value="no-repairs" disabled>
-                          {language === "th" ? "ไม่มีงานซ่อมที่เสร็จแล้ว" : "No completed repairs"}
-                        </SelectItem>
+                        <div className="py-8 text-center">
+                          <p className="text-sm text-muted-foreground">
+                            {language === "th" ? "ไม่มีงานซ่อมที่เสร็จแล้ว" : "No completed repairs"}
+                          </p>
+                        </div>
                       ) : (
                         completedRepairs.map((repair) => {
-                          const displayText = repair.serialNumber
-                            ? `${repair.serialNumber} - ${repair.customer}`
-                            : repair.customer;
+                          const statusColor = 
+                            repair.warrantyStatus === "valid" ? "text-emerald-600" :
+                            repair.warrantyStatus === "expiring_soon" ? "text-amber-600" :
+                            "text-red-600";
+                          const statusIcon = 
+                            repair.warrantyStatus === "valid" ? "✓" :
+                            repair.warrantyStatus === "expiring_soon" ? "⚠" :
+                            "✗";
                           return (
-                            <SelectItem key={repair.id} value={repair.id}>
-                              {displayText}
+                            <SelectItem 
+                              key={repair.id} 
+                              value={repair.id}
+                              className="py-3"
+                            >
+                              <div className="flex flex-col gap-1 w-full">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold text-foreground">
+                                    {repair.repairNumber}
+                                  </span>
+                                  <span className={`text-xs font-medium ${statusColor}`}>
+                                    {statusIcon} {repair.remainingDays >= 0 
+                                      ? `${repair.remainingDays} ${language === "th" ? "วัน" : "days"}`
+                                      : language === "th" ? "หมดอายุ" : "Expired"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>👤 {repair.customer}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                  {repair.serialNumber && (
+                                    <span>📱 {repair.device} · SN: {repair.serialNumber}</span>
+                                  )}
+                                  {!repair.serialNumber && (
+                                    <span>📱 {repair.device}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span>📅 {language === "th" ? "ซ่อม" : "Repair"}: {repair.createdAt}</span>
+                                  <span>⏰ {language === "th" ? "หมดอายุ" : "Expiry"}: {repair.expiryDate}</span>
+                                </div>
+                              </div>
                             </SelectItem>
                           );
                         })
@@ -374,38 +445,81 @@ const Warranty = () => {
                   </Select>
                 </div>
                 {repairBySn && (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-sm">
-                    <p className="font-medium text-foreground">
-                      {repairBySn.repairNumber || repairBySn.id} · {repairBySn.customer?.fullName || `${repairBySn.customer?.firstName || ''} ${repairBySn.customer?.lastName || ''}`.trim()}
-                    </p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
-                      <span>{language === "th" ? "วันที่ซ่อม" : "Repair date"}</span>
-                      <span className="text-foreground">{repairDateBySn}</span>
-                      <span>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</span>
-                      <span className="text-foreground">{expiryDateBySn}</span>
-                      <span>{language === "th" ? "วันคงเหลือ" : "Remaining days"}</span>
-                      <span className="text-foreground">
-                        {remainingDaysBySn < 0
-                          ? (language === "th" ? "หมดอายุ" : "Expired")
-                          : `${remainingDaysBySn} ${language === "th" ? "วัน" : "days"}`}
-                      </span>
-                      <span>{language === "th" ? "จำนวนเคลมก่อนหน้า" : "Previous claims"}</span>
-                      <span className="text-foreground">{previousClaimCountBySn}</span>
+                  <div className="rounded-lg border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg font-bold text-foreground">
+                            {repairBySn.repairNumber || repairBySn.id}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs font-semibold",
+                            getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+                              : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                                ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                                : "bg-red-500/20 text-red-700 dark:text-red-400"
+                          )}>
+                            {getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
+                              ? "✓ " + (language === "th" ? "ภายในประกัน" : "In warranty")
+                              : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
+                                ? "⚠ " + (language === "th" ? "ใกล้หมด" : "Expiring soon")
+                                : "✗ " + (language === "th" ? "หมดอายุ" : "Expired")}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-foreground mb-1">
+                          👤 {repairBySn.customer?.fullName || `${repairBySn.customer?.firstName || ''} ${repairBySn.customer?.lastName || ''}`.trim()}
+                        </p>
+                        {(repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device) && (
+                          <p className="text-sm text-muted-foreground">
+                            📱 {repairBySn.deviceModel || repairBySn.deviceType || repairBySn.device}
+                            {repairBySn.serialNumber && (
+                              <span className="ml-2 font-mono">· SN: {repairBySn.serialNumber}</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className={cn(
-                      "text-xs font-medium pt-1",
-                      getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
-                        ? "text-emerald-600"
-                        : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
-                          ? "text-amber-600"
-                          : "text-red-600"
-                    )}>
-                      {getWarrantyBadgeStatus(remainingDaysBySn) === "valid"
-                        ? (language === "th" ? "ภายในประกัน" : "In warranty")
-                        : getWarrantyBadgeStatus(remainingDaysBySn) === "expiring_soon"
-                          ? (language === "th" ? "ใกล้หมด" : "Expiring soon")
-                          : (language === "th" ? "หมดอายุ" : "Expired")}
-                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          📅 {language === "th" ? "วันที่ซ่อม" : "Repair date"}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">{repairDateBySn}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          ⏰ {language === "th" ? "วันหมดประกัน" : "Expiry date"}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">{expiryDateBySn}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          {remainingDaysBySn >= 0 ? "⏳" : "❌"} {language === "th" ? "วันคงเหลือ" : "Remaining days"}
+                        </p>
+                        <p className={cn(
+                          "text-sm font-semibold",
+                          remainingDaysBySn < 0
+                            ? "text-red-600 dark:text-red-400"
+                            : remainingDaysBySn <= 30
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                        )}>
+                          {remainingDaysBySn < 0
+                            ? (language === "th" ? "หมดอายุแล้ว" : "Expired")
+                            : `${remainingDaysBySn} ${language === "th" ? "วัน" : "days"}`}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          📋 {language === "th" ? "จำนวนเคลมก่อนหน้า" : "Previous claims"}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {previousClaimCountBySn} {language === "th" ? "ครั้ง" : "times"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
                 <div className="grid gap-2">

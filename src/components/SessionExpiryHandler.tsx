@@ -1,8 +1,17 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 
 /**
  * Component to handle session expiration and automatic logout
@@ -12,23 +21,40 @@ export function SessionExpiryHandler() {
   const { isAuthenticated, logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
   const { language } = useLanguage();
+  const [showExpiryDialog, setShowExpiryDialog] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   const lastCheckRef = useRef<number>(0);
   const THROTTLE_TIME = 30 * 1000; // Check at most once every 30 seconds
 
   const handleSessionExpired = useCallback(() => {
+    setShowExpiryDialog(true);
+    setCountdown(3);
+  }, []);
+
+  const handleRedirectToLogin = useCallback(() => {
     logout();
-    toast({
-      title: language === "th" ? "เซสชันหมดอายุ" : "Session Expired",
-      description:
-        language === "th"
-          ? "เซสชันของคุณหมดอายุแล้ว กรุณาเข้าสู่ระบบอีกครั้ง"
-          : "Your session has expired. Please login again.",
-      variant: "destructive",
-    });
+    setShowExpiryDialog(false);
     navigate("/login", { replace: true });
-  }, [logout, toast, navigate, language]);
+  }, [logout, navigate]);
+
+  // Auto-redirect to login after showing dialog for 3 seconds with countdown
+  useEffect(() => {
+    if (showExpiryDialog) {
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            handleRedirectToLogin();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000); // Update countdown every second
+
+      return () => clearInterval(countdownInterval);
+    }
+  }, [showExpiryDialog, handleRedirectToLogin]);
 
   const checkSessionExpiration = useCallback(() => {
     const now = Date.now();
@@ -85,5 +111,59 @@ export function SessionExpiryHandler() {
     };
   }, [isAuthenticated, currentUser, checkSessionExpiration]);
 
-  return null;
+  return (
+    <>
+      <Dialog 
+        open={showExpiryDialog} 
+        onOpenChange={(open) => {
+          // Prevent closing dialog by clicking outside or pressing ESC
+          // Only allow closing through the button
+          if (!open) {
+            handleRedirectToLogin();
+          }
+        }}
+        modal={true}
+      >
+        <DialogContent 
+          className="sm:max-w-[425px]" 
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-destructive/10">
+                <AlertTriangle className="w-6 h-6 text-destructive" />
+              </div>
+              <DialogTitle className="text-xl">
+                {language === "th" ? "เซสชันหมดอายุ" : "Session Expired"}
+              </DialogTitle>
+            </div>
+            <DialogDescription className="pt-2 text-base">
+              {language === "th"
+                ? "เซสชันของคุณหมดอายุแล้ว กรุณาเข้าสู่ระบบอีกครั้ง"
+                : "Your session has expired. Please login again."}
+            </DialogDescription>
+            {countdown > 0 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {language === "th"
+                  ? `กำลังเปลี่ยนเส้นทางไปหน้าเข้าสู่ระบบในอีก ${countdown} วินาที...`
+                  : `Redirecting to login page in ${countdown} second${countdown !== 1 ? 's' : ''}...`}
+              </p>
+            )}
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={handleRedirectToLogin}
+              className="w-full sm:w-auto"
+              variant="default"
+              autoFocus
+            >
+              {language === "th" ? "ไปหน้าเข้าสู่ระบบ" : "Go to Login"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }

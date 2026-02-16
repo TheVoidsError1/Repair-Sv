@@ -3,7 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { createServer } from 'http';
 import { initializeDatabase, closeDatabase, AppDataSource } from './config/data-source.js';
+import { initializeSocket } from './config/socket.js';
 import authRoutes from './api/auth.routes.js';
 import personnelRoutes from './api/personnel.routes.js';
 import customerRoutes from './api/customer.routes.js';
@@ -17,6 +19,7 @@ import { Personnel } from './entities/Personnel.js';
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -130,11 +133,15 @@ const startServer = async () => {
 
     // Seed default admin user
     await seedDefaultAdmin();
+
+    // Initialize Socket.IO
+    initializeSocket(httpServer);
     
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
       console.log(`📊 Database: Fixphone`);
       console.log(`🔧 TypeORM initialized successfully`);
+      console.log(`🔌 WebSocket server ready`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

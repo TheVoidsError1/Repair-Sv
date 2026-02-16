@@ -6,6 +6,7 @@ import { Part } from '../entities/Part.js';
 import { WarrantyClaim, WarrantyClaimStatus } from '../entities/WarrantyClaim.js';
 import { Between, In } from 'typeorm';
 import { getLineNotificationService } from '../services/line-notification.service.js';
+import { emitRepairCreated, emitRepairUpdate, emitRepairDeleted } from '../config/socket.js';
 
 const router = Router();
 
@@ -524,6 +525,9 @@ router.post('/', async (req, res) => {
       selectedParts: selectedParts || (repairWithRelations?.selectedPart ? [repairWithRelations.selectedPart] : null),
     };
 
+    // Emit socket event for real-time update
+    emitRepairCreated(responseData);
+
     res.status(201).json({
       status: 'success',
       data: responseData,
@@ -808,6 +812,9 @@ router.put('/:id', async (req, res) => {
       relations: ['customer', 'assignedTo'],
     });
 
+    // Emit socket event for real-time update
+    emitRepairUpdate(repairWithRelations);
+
     res.json({
       status: 'success',
       data: repairWithRelations,
@@ -908,8 +915,12 @@ router.delete('/:id', async (req, res) => {
 
     // ใช้ delete() แทน remove() เพื่อให้ TypeORM จัดการ foreign keys อัตโนมัติ
     console.log(`[Delete Repair] Deleting repair ${repair.id}...`);
+    const deletedRepairId = repair.id;
     await repairRepository.delete(repair.id);
     console.log(`[Delete Repair] Repair deleted successfully: ${repair.id}`);
+
+    // Emit socket event for real-time update
+    emitRepairDeleted(deletedRepairId);
 
     res.json({
       status: 'success',

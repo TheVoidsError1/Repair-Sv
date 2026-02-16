@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AppDataSource } from '../config/data-source.js';
 import { WarrantyClaim, WarrantyClaimStatus } from '../entities/WarrantyClaim.js';
 import { Repair } from '../entities/Repair.js';
+import { emitWarrantyCreated, emitWarrantyUpdate, emitWarrantyDeleted } from '../config/socket.js';
 
 const router = Router();
 
@@ -148,6 +149,9 @@ router.post('/', async (req, res) => {
       relations: ['repair', 'repair.customer'],
     });
 
+    // Emit socket event for real-time update
+    emitWarrantyCreated(claimWithRelations);
+
     res.status(201).json({
       status: 'success',
       data: claimWithRelations,
@@ -203,6 +207,9 @@ router.patch('/:id/status', async (req, res) => {
       where: { id },
       relations: ['repair', 'repair.customer'],
     });
+
+    // Emit socket event for real-time update
+    emitWarrantyUpdate(updatedClaim);
 
     res.json({
       status: 'success',
@@ -264,6 +271,9 @@ router.patch('/:id', async (req, res) => {
       relations: ['repair', 'repair.customer'],
     });
 
+    // Emit socket event for real-time update
+    emitWarrantyUpdate(updatedClaim);
+
     res.json({
       status: 'success',
       data: updatedClaim,
@@ -294,7 +304,11 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
+    const deletedClaimId = claim.id;
     await warrantyRepository.remove(claim);
+
+    // Emit socket event for real-time update
+    emitWarrantyDeleted(deletedClaimId);
 
     res.json({
       status: 'success',

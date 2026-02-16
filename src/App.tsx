@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RepairsProvider } from "@/contexts/RepairsContext";
 import { WarrantyProvider } from "@/contexts/WarrantyContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 import { canAccessRoute } from "@/lib/roleConfig";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
@@ -29,6 +30,8 @@ import Register from "./pages/Register";
 import AccountManagement from "./pages/AccountManagement";
 import RepairItemsManagement from "./pages/RepairItemsManagement";
 import CustomerManagement from "./pages/CustomerManagement";
+import Customers from "./pages/Customers";
+import CustomerDetails from "./pages/CustomerDetails";
 
 const queryClient = new QueryClient();
 
@@ -75,41 +78,45 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <SessionExpiryHandler />
-            <RepairsProvider>
-              <WarrantyProvider>
-                <Routes>
-                  <Route path="/" element={<RootRedirect />} />
-                  <Route path="/dashboard" element={<RoleProtectedRoute><Dashboard /></RoleProtectedRoute>} />
-                  <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
-                  <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
-                  <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
-                  <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
-                  <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
-                  <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-                  <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
-                  <Route path="/finance" element={<RoleProtectedRoute><Finance /></RoleProtectedRoute>} />
-                  <Route path="/settings" element={<RoleProtectedRoute><Settings /></RoleProtectedRoute>} />
-                  <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
-                  <Route path="/system/line" element={<RoleProtectedRoute><LineManagement /></RoleProtectedRoute>} />
-                  <Route path="/system/network" element={<RoleProtectedRoute><NetworkManagement /></RoleProtectedRoute>} />
-                  <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
-                  <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
-                  <Route path="/system/register" element={<RoleProtectedRoute><Register /></RoleProtectedRoute>} />
-                  <Route path="/system/account" element={<RoleProtectedRoute><AccountManagement /></RoleProtectedRoute>} />
-                  <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
-                  <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
-                </Routes>
-              </WarrantyProvider>
-            </RepairsProvider>
-          </BrowserRouter>
-        </TooltipProvider>
+        <SocketProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <SessionExpiryHandler />
+              <RepairsProvider>
+                <WarrantyProvider>
+                  <Routes>
+                    <Route path="/" element={<RootRedirect />} />
+                    <Route path="/dashboard" element={<RoleProtectedRoute><Dashboard /></RoleProtectedRoute>} />
+                    <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
+                    <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
+                    <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
+                    <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
+                    <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
+                    <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+                    <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
+                    <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+                    <Route path="/customers/:id" element={<ProtectedRoute><CustomerDetails /></ProtectedRoute>} />
+                    <Route path="/finance" element={<RoleProtectedRoute><Finance /></RoleProtectedRoute>} />
+                    <Route path="/settings" element={<RoleProtectedRoute><Settings /></RoleProtectedRoute>} />
+                    <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
+                    <Route path="/system/line" element={<RoleProtectedRoute><LineManagement /></RoleProtectedRoute>} />
+                    <Route path="/system/network" element={<RoleProtectedRoute><NetworkManagement /></RoleProtectedRoute>} />
+                    <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
+                    <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
+                    <Route path="/system/register" element={<RoleProtectedRoute><Register /></RoleProtectedRoute>} />
+                    <Route path="/system/account" element={<RoleProtectedRoute><AccountManagement /></RoleProtectedRoute>} />
+                    <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
+                    <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
+                  </Routes>
+                </WarrantyProvider>
+              </RepairsProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </SocketProvider>
       </AuthProvider>
     </LanguageProvider>
   </QueryClientProvider>

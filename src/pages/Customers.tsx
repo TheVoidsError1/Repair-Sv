@@ -1,0 +1,742 @@
+import { MainLayout } from "@/components/layout/MainLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useSocket } from "@/contexts/SocketContext";
+import { apiClient } from "@/lib/api";
+import { Edit, Eye, MessageSquare, Phone, Plus, Search, Trash2, User, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
+interface Customer {
+  id: string;
+  firstName: string;
+  lastName?: string;
+  fullName?: string;
+  phone?: string;
+  lineId?: string;
+  lineIdRes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const Customers = () => {
+  const { language } = useLanguage();
+  const navigate = useNavigate();
+  const { socket, isConnected } = useSocket();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    lineId: "",
+  });
+
+  const ITEMS_PER_PAGE = 8;
+
+  const loadCustomers = async () => {
+    setLoading(true);
+    try {
+      const response = await apiClient.getCustomers();
+      if (response.status === "success" && response.data) {
+        setCustomers(response.data);
+      } else {
+        toast.error(
+          response.message ||
+            (language === "th"
+              ? "ไม่สามารถโหลดข้อมูลลูกค้าได้"
+              : "Failed to load customers")
+        );
+      }
+    } catch (error) {
+      console.error("Error loading customers:", error);
+      toast.error(
+        language === "th"
+          ? "เกิดข้อผิดพลาดในการโหลดข้อมูลลูกค้า"
+          : "Error loading customers"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  // Real-time updates
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    socket.on("customer:created", loadCustomers);
+    socket.on("customer:updated", loadCustomers);
+    socket.on("customer:deleted", loadCustomers);
+
+    return () => {
+      socket.off("customer:created", loadCustomers);
+      socket.off("customer:updated", loadCustomers);
+      socket.off("customer:deleted", loadCustomers);
+    };
+  }, [socket, isConnected]);
+
+  const filteredCustomers = customers.filter((customer) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const fullName =
+      customer.fullName ||
+      `${customer.firstName} ${customer.lastName || ""}`.trim();
+    return (
+      customer.firstName?.toLowerCase().includes(term) ||
+      customer.lastName?.toLowerCase().includes(term) ||
+      fullName.toLowerCase().includes(term) ||
+      customer.phone?.includes(term)
+    );
+  });
+
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const resetForm = () => {
+    setForm({
+      firstName: "",
+      lastName: "",
+      phone: "",
+      lineId: "",
+    });
+    setEditingCustomer(null);
+  };
+
+  const openAddDialog = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setForm({
+      firstName: customer.firstName || "",
+      lastName: customer.lastName || "",
+      phone: customer.phone || "",
+      lineId: customer.lineId || customer.lineIdRes || "",
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!form.firstName.trim()) {
+      toast.error(
+        language === "th" ? "กรุณากรอกชื่อ" : "Please enter first name"
+      );
+      return;
+    }
+
+    if (!form.lastName.trim()) {
+      toast.error(
+        language === "th"
+          ? "กรุณากรอกนามสกุล"
+          : "Please enter last name"
+      );
+      return;
+    }
+
+    try {
+      if (editingCustomer) {
+        const response = await apiClient.updateCustomer(editingCustomer.id, {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim() || null,
+          lineId: form.lineId.trim() || null,
+        });
+
+        if (response.status === "success") {
+          toast.success(
+            language === "th"
+              ? "แก้ไขข้อมูลลูกค้าสำเร็จ"
+              : "Customer updated successfully"
+          );
+          setIsDialogOpen(false);
+          resetForm();
+          loadCustomers();
+        } else {
+          toast.error(
+            response.message ||
+              (language === "th"
+                ? "ไม่สามารถแก้ไขข้อมูลลูกค้าได้"
+                : "Failed to update customer")
+          );
+        }
+      } else {
+        const response = await apiClient.createCustomer({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          phone: form.phone.trim() || null,
+          lineId: form.lineId.trim() || null,
+        });
+
+        if (response.status === "success") {
+          toast.success(
+            language === "th"
+              ? "เพิ่มลูกค้าสำเร็จ"
+              : "Customer created successfully"
+          );
+          setIsDialogOpen(false);
+          resetForm();
+          loadCustomers();
+        } else {
+          toast.error(
+            response.message ||
+              (language === "th"
+                ? "ไม่สามารถเพิ่มลูกค้าได้"
+                : "Failed to create customer")
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("Error saving customer:", error);
+      toast.error(
+        error?.response?.data?.message ||
+          (language === "th"
+            ? "เกิดข้อผิดพลาดในการบันทึกข้อมูล"
+            : "Error saving customer")
+      );
+    }
+  };
+
+  const openDeleteDialog = (customer: Customer) => {
+    setDeleteTarget(customer);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      const response = await apiClient.deleteCustomer(deleteTarget.id);
+
+      if (response.status === "success") {
+        toast.success(
+          language === "th"
+            ? "ลบลูกค้าสำเร็จ"
+            : "Customer deleted successfully"
+        );
+        setIsDeleteDialogOpen(false);
+        setDeleteTarget(null);
+        loadCustomers();
+      } else {
+        toast.error(
+          response.message ||
+            (language === "th"
+              ? "ไม่สามารถลบลูกค้าได้"
+              : "Failed to delete customer")
+        );
+      }
+    } catch (error: any) {
+      console.error("Error deleting customer:", error);
+      toast.error(
+        error?.response?.data?.message ||
+          (language === "th"
+            ? "เกิดข้อผิดพลาดในการลบข้อมูล"
+            : "Error deleting customer")
+      );
+    }
+  };
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="page-header">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="page-title flex items-center gap-2">
+                <Users className="w-8 h-8" />
+                {language === "th" ? "จัดการลูกค้า" : "Customer Management"}
+              </h1>
+              <p className="page-description">
+                {language === "th"
+                  ? "ดูและจัดการข้อมูลลูกค้าทั้งหมด"
+                  : "View and manage all customer information"}
+              </p>
+            </div>
+            <Button onClick={openAddDialog} className="gap-2">
+              <Plus className="w-4 h-4" />
+              {language === "th" ? "เพิ่มลูกค้า" : "Add Customer"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="bg-card rounded-xl border border-border p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder={
+                language === "th"
+                  ? "ค้นหาด้วยชื่อหรือเบอร์โทรศัพท์..."
+                  : "Search by name or phone..."
+              }
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        {/* Customer Statistics */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="stat-card">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-blue-500/10">
+                <Users className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {language === "th" ? "ลูกค้าทั้งหมด" : "Total Customers"}
+                </p>
+                <p className="text-xl font-semibold text-foreground">
+                  {customers.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-green-500/10">
+                <Phone className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {language === "th" ? "มีเบอร์โทร" : "With Phone"}
+                </p>
+                <p className="text-xl font-semibold text-foreground">
+                  {customers.filter((c) => c.phone).length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-emerald-500/10">
+                <MessageSquare className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {language === "th" ? "มี LINE" : "With LINE"}
+                </p>
+                <p className="text-xl font-semibold text-foreground">
+                  {customers.filter((c) => c.lineId || c.lineIdRes).length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Customer List */}
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+              {language === "th" ? "กำลังโหลด..." : "Loading..."}
+            </div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>
+                {language === "th"
+                  ? "ไม่พบข้อมูลลูกค้า"
+                  : "No customers found"}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        {language === "th" ? "ชื่อ-นามสกุล" : "Name"}
+                      </TableHead>
+                      <TableHead>
+                        {language === "th" ? "เบอร์โทรศัพท์" : "Phone"}
+                      </TableHead>
+                      <TableHead>{language === "th" ? "LINE ID" : "LINE ID"}</TableHead>
+                      <TableHead>{language === "th" ? "UserLineID" : "UserLineID"}</TableHead>
+                      <TableHead>
+                        {language === "th" ? "วันที่สร้าง" : "Created At"}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {language === "th" ? "จัดการ" : "Actions"}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedCustomers.map((customer) => {
+                      const fullName =
+                        customer.fullName ||
+                        `${customer.firstName} ${customer.lastName || ""}`.trim();
+                      return (
+                        <TableRow key={customer.id}>
+                          <TableCell className="font-medium">
+                            {fullName || customer.firstName}
+                          </TableCell>
+                          <TableCell>
+                            {customer.phone || (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {customer.lineId ? (
+                              <span className="text-blue-600 dark:text-blue-400">
+                                {customer.lineId}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {customer.lineIdRes ? (
+                              <span className="text-green-600 dark:text-green-400">
+                                {customer.lineIdRes}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(customer.createdAt).toLocaleDateString(
+                              language === "th" ? "th-TH" : "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  navigate(`/customers/${customer.id}`)
+                                }
+                                className="h-8 w-8"
+                                title={
+                                  language === "th"
+                                    ? "ดูรายละเอียด"
+                                    : "View Details"
+                                }
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(customer)}
+                                className="h-8 w-8"
+                                title={
+                                  language === "th" ? "แก้ไข" : "Edit"
+                                }
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openDeleteDialog(customer)}
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                title={language === "th" ? "ลบ" : "Delete"}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="border-t border-border p-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => {
+                            if (currentPage > 1) {
+                              setCurrentPage(currentPage - 1);
+                            }
+                          }}
+                          className={
+                            currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => {
+                            if (currentPage < totalPages) {
+                              setCurrentPage(currentPage + 1);
+                            }
+                          }}
+                          className={
+                            currentPage === totalPages
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="p-4 border-t border-border bg-muted/30">
+                <p className="text-sm text-muted-foreground text-center">
+                  {language === "th"
+                    ? `พบทั้งหมด ${filteredCustomers.length} รายการ (หน้า ${currentPage} จาก ${totalPages})`
+                    : `Total ${filteredCustomers.length} customers (Page ${currentPage} of ${totalPages})`}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Add/Edit Customer Dialog */}
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              resetForm();
+            }
+            setIsDialogOpen(open);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingCustomer
+                  ? language === "th"
+                    ? "แก้ไขข้อมูลลูกค้า"
+                    : "Edit Customer"
+                  : language === "th"
+                  ? "เพิ่มลูกค้าใหม่"
+                  : "Add New Customer"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingCustomer
+                  ? language === "th"
+                    ? "แก้ไขข้อมูลลูกค้า"
+                    : "Edit customer information"
+                  : language === "th"
+                  ? "กรอกข้อมูลลูกค้าใหม่"
+                  : "Enter new customer information"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="firstName">
+                  {language === "th" ? "ชื่อ" : "First Name"}{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="firstName"
+                  placeholder={
+                    language === "th" ? "กรอกชื่อ" : "Enter first name"
+                  }
+                  value={form.firstName}
+                  onChange={(e) =>
+                    setForm({ ...form, firstName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lastName">
+                  {language === "th" ? "นามสกุล" : "Last Name"}{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="lastName"
+                  placeholder={
+                    language === "th" ? "กรอกนามสกุล" : "Enter last name"
+                  }
+                  value={form.lastName}
+                  onChange={(e) =>
+                    setForm({ ...form, lastName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">
+                  {language === "th" ? "เบอร์โทรศัพท์" : "Phone"}
+                </Label>
+                <Input
+                  id="phone"
+                  placeholder={
+                    language === "th"
+                      ? "กรอกเบอร์โทรศัพท์ (9-10 หลัก)"
+                      : "Enter phone (9-10 digits)"
+                  }
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lineId">{language === "th" ? "UserLineID" : "UserLineID"}</Label>
+                <Input
+                  id="lineId"
+                  placeholder={
+                    language === "th" ? "กรอก UserLineID" : "Enter UserLineID"
+                  }
+                  value={form.lineId}
+                  onChange={(e) => setForm({ ...form, lineId: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                {language === "th" ? "ยกเลิก" : "Cancel"}
+              </Button>
+              <Button onClick={handleSaveCustomer}>
+                {editingCustomer
+                  ? language === "th"
+                    ? "บันทึก"
+                    : "Save"
+                  : language === "th"
+                  ? "เพิ่ม"
+                  : "Add"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {language === "th" ? "ยืนยันการลบ" : "Confirm Delete"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === "th" ? (
+                  <>
+                    คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้า{" "}
+                    <strong>
+                      {deleteTarget
+                        ? deleteTarget.fullName ||
+                          `${deleteTarget.firstName} ${deleteTarget.lastName || ""}`.trim()
+                        : ""}
+                    </strong>
+                    ? การกระทำนี้ไม่สามารถยกเลิกได้
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to delete customer{" "}
+                    <strong>
+                      {deleteTarget
+                        ? deleteTarget.fullName ||
+                          `${deleteTarget.firstName} ${deleteTarget.lastName || ""}`.trim()
+                        : ""}
+                    </strong>
+                    ? This action cannot be undone.
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>
+                {language === "th" ? "ยกเลิก" : "Cancel"}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCustomer}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {language === "th" ? "ลบ" : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </MainLayout>
+  );
+};
+
+export default Customers;

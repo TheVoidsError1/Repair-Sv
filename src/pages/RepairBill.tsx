@@ -5,11 +5,20 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
 import { cn } from "@/lib/utils";
 import { repairItemToBillData } from "@/types/repairOrder";
 import { ArrowLeft, FileText, Receipt } from "lucide-react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const RepairBill = () => {
@@ -18,6 +27,16 @@ const RepairBill = () => {
   const location = useLocation();
   const { repairs } = useRepairs();
   const highlightRepairId = (location.state as { highlightRepairId?: string } | null)?.highlightRepairId;
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 7;
+  
+  // Calculate pagination
+  const totalPages = Math.ceil(repairs.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedRepairs = repairs.slice(startIndex, endIndex);
 
   const handleIssueReceipt = (item: RepairItem) => {
     const orderData = repairItemToBillData(item, language);
@@ -84,7 +103,7 @@ const RepairBill = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {repairs.map((item) => {
+                    {paginatedRepairs.map((item) => {
                       const isHighlight = highlightRepairId === item.id;
                       return (
                       <tr
@@ -126,6 +145,52 @@ const RepairBill = () => {
               </div>
             )}
           </CardContent>
+          {/* Pagination */}
+          {repairs.length > 0 && totalPages > 1 && (
+            <div className="border-t border-border p-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          setCurrentPage(currentPage - 1);
+                        }
+                      }}
+                      className={
+                        currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (currentPage < totalPages) {
+                          setCurrentPage(currentPage + 1);
+                        }
+                      }}
+                      className={
+                        currentPage === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </Card>
       </div>
     </MainLayout>

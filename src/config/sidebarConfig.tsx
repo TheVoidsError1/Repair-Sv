@@ -195,6 +195,30 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
       },
     ],
   },
+  customers: {
+    id: "customers",
+    titleTh: "ลูกค้า",
+    titleEn: "Customers",
+    basePath: "/customers",
+    icon: Users,
+    iconBg: "bg-pink-500/20 text-pink-400",
+    sections: [
+      {
+        id: "main",
+        labelTh: "หลัก",
+        labelEn: "Main",
+        items: [
+          {
+            id: "list",
+            href: "/customers",
+            labelTh: "รายการลูกค้า",
+            labelEn: "Customer list",
+            icon: Users,
+          },
+        ],
+      },
+    ],
+  },
   settings: {
     id: "settings",
     titleTh: "ตั้งค่า",
@@ -294,6 +318,7 @@ export const SUBJECT_ORDER: string[] = [
   "inventory",
   "finance",
   "warranty",
+  "customers",
   "settings",
   "admin",
 ];

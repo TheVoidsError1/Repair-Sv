@@ -414,7 +414,7 @@ const CustomerManagement = () => {
                       {language === "th" ? "เบอร์โทรศัพท์" : "Phone"}
                     </TableHead>
                     <TableHead>
-                      {language === "th" ? "LINE ID" : "LINE ID"}
+                      {language === "th" ? "UserLineID" : "UserLineID"}
                     </TableHead>
                     <TableHead>
                       {language === "th" ? "วันที่สร้าง" : "Created At"}
@@ -572,11 +572,11 @@ const CustomerManagement = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="lineId">
-                  {language === "th" ? "LINE ID" : "LINE ID"}
+                  {language === "th" ? "UserLineID" : "UserLineID"}
                 </Label>
                 <Input
                   id="lineId"
-                  placeholder={language === "th" ? "กรอก LINE ID" : "Enter LINE ID"}
+                  placeholder={language === "th" ? "กรอก UserLineID" : "Enter UserLineID"}
                   value={form.lineId}
                   onChange={(e) =>
                     setForm({ ...form, lineId: e.target.value })
