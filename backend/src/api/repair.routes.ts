@@ -49,12 +49,19 @@ async function createAutoWarrantyClaim(repair: Repair): Promise<void> {
       return;
     }
 
+    // ตรวจสอบว่างานซ่อมมี serialNumber หรือไม่ (ถ้าไม่มีจะไม่สร้าง claim)
+    if (!repair.serialNumber || !repair.serialNumber.trim()) {
+      console.log(`[Warranty] Repair ${repair.repairNumber} has no serial number, skipping auto warranty claim creation`);
+      return;
+    }
+
     // สร้าง warranty claim อัตโนมัติ
     const claimNumber = await generateClaimNumber();
     
-    // ใช้ problemDescription หรือ problemSymptoms เป็น claimReason
-    const claimReason = repair.problemDescription || 'Auto-generated warranty claim';
-    const claimReasonTh = repair.problemSymptoms || repair.problemDescription || 'เคลมการรับประกันอัตโนมัติ';
+    // ใช้ข้อความเริ่มต้นสำหรับ warranty claim
+    const deviceInfo = repair.deviceModel || repair.deviceType || 'อุปกรณ์';
+    const claimReason = `Warranty coverage for ${deviceInfo} repair`;
+    const claimReasonTh = `การรับประกันการซ่อม${deviceInfo}`;
 
     const newClaim = warrantyRepository.create({
       claimNumber,
@@ -62,12 +69,12 @@ async function createAutoWarrantyClaim(repair: Repair): Promise<void> {
       serialNumber: repair.serialNumber,
       claimReason: claimReason.trim(),
       claimReasonTh: claimReasonTh.trim(),
-      status: WarrantyClaimStatus.PENDING,
+      status: WarrantyClaimStatus.APPROVED, // เปลี่ยนเป็น APPROVED เพื่อให้ใช้งานได้ทันที
       claimDate: new Date(),
     });
 
     await warrantyRepository.save(newClaim);
-    console.log(`[Warranty] Auto-created warranty claim ${claimNumber} for repair ${repair.repairNumber}`);
+    console.log(`[Warranty] Auto-created warranty claim ${claimNumber} for repair ${repair.repairNumber} with status APPROVED`);
   } catch (error) {
     // ไม่ให้ error นี้ทำให้การอัพเดท repair ล้มเหลว
     console.error('[Warranty] Error creating auto warranty claim:', error);

@@ -39,6 +39,14 @@ import {
     XCircle,
 } from "lucide-react";
 import { type ReactNode, useState, useEffect } from "react";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from "@/components/ui/pagination";
 
 /** จำนวนวันรับประกันเริ่มต้น (ใช้จาก repair.createdAt ของงานซ่อมที่ completed) */
 const DEFAULT_WARRANTY_DAYS = 90;
@@ -117,6 +125,12 @@ const Warranty = () => {
   const [allCompletedRepairs, setAllCompletedRepairs] = useState<any[]>([]);
   const [loadingCompletedRepairs, setLoadingCompletedRepairs] = useState(false);
 
+  // State สำหรับ pagination
+  const [pendingApprovalPage, setPendingApprovalPage] = useState(1);
+  const [warrantyListPage, setWarrantyListPage] = useState(1);
+  const ITEMS_PER_PAGE_PENDING = 4; // คำขอที่รออนุมัติ ไม่เกิน 4 รายการต่อหน้า
+  const ITEMS_PER_PAGE_WARRANTY = 6; // รายการรับประกัน ไม่เกิน 6 รายการต่อหน้า
+
   // โหลดงานซ่อมที่เสร็จแล้วทั้งหมดเมื่อเปิด dialog
   useEffect(() => {
     if (isDialogOpen) {
@@ -194,6 +208,27 @@ const Warranty = () => {
       statusFilter === "all" || claim.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination สำหรับคำขอที่รออนุมัติ
+  const pendingApprovalTotalPages = Math.ceil(pendingClaims.length / ITEMS_PER_PAGE_PENDING);
+  const pendingApprovalStartIndex = (pendingApprovalPage - 1) * ITEMS_PER_PAGE_PENDING;
+  const pendingApprovalEndIndex = pendingApprovalStartIndex + ITEMS_PER_PAGE_PENDING;
+  const paginatedPendingClaims = pendingClaims.slice(pendingApprovalStartIndex, pendingApprovalEndIndex);
+
+  // Pagination สำหรับรายการรับประกัน
+  const warrantyListTotalPages = Math.ceil(filteredClaims.length / ITEMS_PER_PAGE_WARRANTY);
+  const warrantyListStartIndex = (warrantyListPage - 1) * ITEMS_PER_PAGE_WARRANTY;
+  const warrantyListEndIndex = warrantyListStartIndex + ITEMS_PER_PAGE_WARRANTY;
+  const paginatedFilteredClaims = filteredClaims.slice(warrantyListStartIndex, warrantyListEndIndex);
+
+  // Reset pagination เมื่อ filter เปลี่ยน
+  useEffect(() => {
+    setPendingApprovalPage(1);
+  }, [pendingClaims.length]);
+
+  useEffect(() => {
+    setWarrantyListPage(1);
+  }, [searchQuery, statusFilter]);
 
   const pendingCount = claims.filter((c) => c.status === "pending").length;
   const approvedCount = claims.filter((c) => c.status === "approved").length;
@@ -423,7 +458,7 @@ const Warranty = () => {
                 </tr>
               </thead>
               <tbody>
-                {pendingClaims.map((claim) => {
+                {paginatedPendingClaims.map((claim) => {
                   const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
                   const noRepairRecord = !repair;
                   const snMismatch =
@@ -500,6 +535,51 @@ const Warranty = () => {
               </tbody>
             </table>
           </div>
+          {pendingApprovalTotalPages > 1 && (
+            <div className="border-t border-border p-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (pendingApprovalPage > 1) {
+                          setPendingApprovalPage(pendingApprovalPage - 1);
+                        }
+                      }}
+                      className={
+                        pendingApprovalPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: pendingApprovalTotalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setPendingApprovalPage(page)}
+                        isActive={pendingApprovalPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (pendingApprovalPage < pendingApprovalTotalPages) {
+                          setPendingApprovalPage(pendingApprovalPage + 1);
+                        }
+                      }}
+                      className={
+                        pendingApprovalPage === pendingApprovalTotalPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       )}
 
@@ -694,83 +774,130 @@ const Warranty = () => {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t("claimId")}</th>
-                <th>{t("customer")}</th>
-                <th>{t("device")}</th>
-                <th>{t("serialOrImei")}</th>
-                <th>{t("originalRepair")}</th>
-                <th>{t("claimReason")}</th>
-                <th>{t("status")}</th>
-                <th>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</th>
-                <th>{t("report")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClaims.map((claim) => {
-                const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
-                const originalRepairText = repair
-                  ? language === "th"
-                    ? repair.problemSymptoms || repair.problemDescription
-                    : repair.problemDescription
-                  : "—";
-                const customer = repair?.customer?.firstName 
-                  ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
-                  : repair?.customer || "—";
-                const device = repair?.deviceModel || repair?.device || "—";
-                const reasonText =
-                  language === "th" ? claim.claimReasonTh : claim.claimReason;
-                const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
-                const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
-                return (
-                  <tr key={claim.id}>
-                    <td>
-                      <div>
-                        <p className="font-medium text-foreground">{claim.claimNumber}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {claim.repairId}
-                        </p>
-                      </div>
-                    </td>
-                    <td>{customer}</td>
-                    <td>{device}</td>
-                    <td>
-                      <span className="font-mono text-sm">
-                        {claim.serialNumber || repair?.serialNumber || "—"}
-                      </span>
-                    </td>
-                    <td>{originalRepairText}</td>
-                    <td className="max-w-[200px] truncate">{reasonText}</td>
-                    <td>
-                      <span
-                        className={`status-badge ${statusStyles[claim.status]} flex items-center gap-1`}
-                      >
-                        {statusIcons[claim.status]}
-                        {statusLabels[claim.status]}
-                      </span>
-                    </td>
-                    <td>{expiryDate}</td>
-                    <td>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => handleViewReport(claim)}
-                      >
-                        <Eye className="w-4 h-4" />
-                        {t("view")}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+          <>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t("claimId")}</th>
+                  <th>{t("customer")}</th>
+                  <th>{t("device")}</th>
+                  <th>{t("serialOrImei")}</th>
+                  <th>{t("originalRepair")}</th>
+                  <th>{t("claimReason")}</th>
+                  <th>{t("status")}</th>
+                  <th>{language === "th" ? "วันหมดประกัน" : "Expiry date"}</th>
+                  <th>{t("report")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedFilteredClaims.map((claim) => {
+                  const repair = claim.repair || repairs.find((r) => r.id === claim.repairId);
+                  const originalRepairText = repair
+                    ? language === "th"
+                      ? repair.problemSymptoms || repair.problemDescription
+                      : repair.problemDescription
+                    : "—";
+                  const customer = repair?.customer?.firstName 
+                    ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
+                    : repair?.customer || "—";
+                  const device = repair?.deviceModel || repair?.device || "—";
+                  const reasonText =
+                    language === "th" ? claim.claimReasonTh : claim.claimReason;
+                  const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
+                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+                  return (
+                    <tr key={claim.id}>
+                      <td>
+                        <div>
+                          <p className="font-medium text-foreground">{claim.claimNumber}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {claim.repairId}
+                          </p>
+                        </div>
+                      </td>
+                      <td>{customer}</td>
+                      <td>{device}</td>
+                      <td>
+                        <span className="font-mono text-sm">
+                          {claim.serialNumber || repair?.serialNumber || "—"}
+                        </span>
+                      </td>
+                      <td>{originalRepairText}</td>
+                      <td className="max-w-[200px] truncate">{reasonText}</td>
+                      <td>
+                        <span
+                          className={`status-badge ${statusStyles[claim.status]} flex items-center gap-1`}
+                        >
+                          {statusIcons[claim.status]}
+                          {statusLabels[claim.status]}
+                        </span>
+                      </td>
+                      <td>{expiryDate}</td>
+                      <td>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => handleViewReport(claim)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          {t("view")}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+            {warrantyListTotalPages > 1 && (
+              <div className="border-t border-border p-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          if (warrantyListPage > 1) {
+                            setWarrantyListPage(warrantyListPage - 1);
+                          }
+                        }}
+                        className={
+                          warrantyListPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: warrantyListTotalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setWarrantyListPage(page)}
+                          isActive={warrantyListPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          if (warrantyListPage < warrantyListTotalPages) {
+                            setWarrantyListPage(warrantyListPage + 1);
+                          }
+                        }}
+                        className={
+                          warrantyListPage === warrantyListTotalPages
+                            ? "pointer-events-none opacity-50"
+                            : "cursor-pointer"
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Dialog ดูรายละเอียด — ขนาดใหญ่ อ่านง่าย */}

@@ -136,7 +136,6 @@ const initialFormData = {
   customer: "",
   phone: "",
   lineId: "",
-  lineIdRes: "",
   model: "",
   color: "",
   screenLockCode: "",
@@ -313,7 +312,6 @@ const RepairNew = () => {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
         lineId: formData.lineId.trim() || undefined,
-        lineIdRes: formData.lineIdRes.trim() || undefined,
         serialNumber: sn,
         model: formData.model.trim(),
         color: formData.color.trim(),
@@ -415,7 +413,6 @@ const RepairNew = () => {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
         lineId: formData.lineId.trim() || undefined,
-        lineIdRes: formData.lineIdRes.trim() || undefined,
         serialNumber: sn,
         model: formData.model.trim(),
         color: formData.color.trim(),
@@ -562,7 +559,6 @@ const RepairNew = () => {
       customer: customerName,
       phone: customerData.phone || "",
       lineId: customerData.lineId || "", // Line ID หลัก
-      lineIdRes: customerData.lineIdRes || "", // Line ID สำรอง
       serialNumber: latestSerialNumber, // Serial Number จากประวัติการซ่อมล่าสุด
     }));
   };
@@ -687,17 +683,6 @@ const RepairNew = () => {
                   placeholder={language === "th" ? "กรอก Line ID หลัก" : "Enter primary Line ID"}
                   value={formData.lineId}
                   onChange={(e) => handleInputChange("lineId", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="lineIdRes">
-                  {language === "th" ? "Line ID (สำรอง)" : "Line ID (Reserve)"}
-                </Label>
-                <Input
-                  id="lineIdRes"
-                  placeholder={language === "th" ? "กรอก Line ID สำรอง" : "Enter reserve Line ID"}
-                  value={formData.lineIdRes}
-                  onChange={(e) => handleInputChange("lineIdRes", e.target.value)}
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
