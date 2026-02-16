@@ -34,7 +34,7 @@ import { useRepairs, type RepairItem, type RepairTag } from "@/contexts/RepairsC
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { repairItemToBillData, type RepairOrderData } from "@/types/repairOrder";
-import { ChevronLeft, ChevronRight, Eye, FileText, Filter, Pencil, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, FileText, Filter, Pencil, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -285,7 +285,6 @@ const Repairs = () => {
   const [detailOrder, setDetailOrder] = useState<RepairOrderData | null>(null);
   const [isDetailEditing, setIsDetailEditing] = useState(false);
   const [detailTag, setDetailTag] = useState<RepairTag | "">("");
-  const [deleteRepairConfirm, setDeleteRepairConfirm] = useState<RepairItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editingRepair, setEditingRepair] = useState<RepairItem | null>(null);
   const [editingStatus, setEditingStatus] = useState<
@@ -407,19 +406,6 @@ const Repairs = () => {
     });
   };
 
-  const handleDeleteRepair = () => {
-    if (!deleteRepairConfirm) return;
-    setRepairs((prev) => prev.filter((r) => r.id !== deleteRepairConfirm.id));
-    setDetailOpen(false);
-    setSelectedRepair(null);
-    setDetailOrder(null);
-    setDeleteRepairConfirm(null);
-    toast({
-      title: language === "th" ? "ลบงานซ่อมแล้ว" : "Repair deleted",
-      description: language === "th" ? "รายการถูกลบออกจากระบบ" : "The repair order has been removed.",
-      variant: "destructive",
-    });
-  };
 
   const handleEditOrder = (repair: RepairItem) => {
     setEditingRepair(repair);
@@ -882,8 +868,8 @@ const Repairs = () => {
                   </DialogTitle>
                   <DialogDescription>
                     {language === "th"
-                      ? "ดู แก้ไข หรือลบรายการงานซ่อม"
-                      : "View, edit, or delete this repair order."}
+                      ? "ดู หรือแก้ไขรายการงานซ่อม"
+                      : "View or edit this repair order."}
                   </DialogDescription>
                 </div>
                 <span className="text-sm font-semibold text-foreground shrink-0">
@@ -1063,14 +1049,6 @@ const Repairs = () => {
                         <FileText className="w-4 h-4" />
                         {language === "th" ? "ไปออกบิล" : "Issue bill"}
                       </Button>
-                      <Button
-                        variant="destructive"
-                        className="gap-2"
-                        onClick={() => setDeleteRepairConfirm(selectedRepair)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        {language === "th" ? "ลบ" : "Delete"}
-                      </Button>
                     </div>
                   </>
                 )}
@@ -1080,30 +1058,6 @@ const Repairs = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ยืนยันลบงานซ่อม */}
-      <AlertDialog open={!!deleteRepairConfirm} onOpenChange={(open) => !open && setDeleteRepairConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {language === "th" ? "ยืนยันลบงานซ่อม" : "Delete repair order?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {language === "th"
-                ? `คุณจะลบรายการ ${deleteRepairConfirm?.id ?? ""} ออกจากระบบ ไม่สามารถกู้คืนได้`
-                : `This will permanently remove ${deleteRepairConfirm?.id ?? ""}. This action cannot be undone.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleDeleteRepair}
-            >
-              {language === "th" ? "ลบ" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Edit repair status dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

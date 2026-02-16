@@ -178,7 +178,7 @@ const AdminUsers = () => {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-username">{t("username")}</Label>
+                  <Label htmlFor="admin-username">{t("userName")}</Label>
                   <Input
                     id="admin-username"
                     placeholder={t("enterUsername")}

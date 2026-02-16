@@ -36,7 +36,7 @@ import { getPartStockStatus, type Part } from "@/lib/partsData";
 import { cn } from "@/lib/utils";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, X, Search, User, Phone, History } from "lucide-react";
+import { Calendar as CalendarIcon, X, Search, User, Phone, History, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -152,6 +152,7 @@ const RepairNew = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [serialError, setSerialError] = useState("");
   const [duplicateSnWarning, setDuplicateSnWarning] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [selectedPartIds, setSelectedPartIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [partsList, setPartsList] = useState<Part[]>([]);
@@ -166,6 +167,7 @@ const RepairNew = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isRepairHistoryDialogOpen, setIsRepairHistoryDialogOpen] = useState(false);
   const [customerRepairHistory, setCustomerRepairHistory] = useState<any[]>([]);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
   const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
@@ -242,13 +244,48 @@ const RepairNew = () => {
     loadParts();
   }, [language, toast]);
 
+  // Validate and show confirmation dialog
   const handleCreateOrder = async () => {
     setSerialError("");
     setDuplicateSnWarning(false);
+    setFieldErrors({});
+    
+    const errors: Record<string, string> = {};
+    
+    // Validate required fields
+    if (!formData.customer.trim()) {
+      errors.customer = language === "th" ? "กรุณากรอกชื่อลูกค้า" : "Please enter customer name";
+    }
+
+    if (!formData.phone.trim()) {
+      errors.phone = language === "th" ? "กรุณากรอกเบอร์โทรศัพท์" : "Please enter phone number";
+    }
+
     const sn = formData.serialNumber.trim();
     const validation = validateSerialNumber(formData.serialNumber);
     if (!validation.valid) {
-      setSerialError(language === "th" ? (validation.message ?? "กรุณากรอก IMEI / Serial Number") : (validation.message ?? "Please enter IMEI / Serial Number"));
+      errors.serialNumber = language === "th" ? (validation.message ?? "กรุณากรอก IMEI / Serial Number") : (validation.message ?? "Please enter IMEI / Serial Number");
+      setSerialError(errors.serialNumber);
+    }
+
+    if (!formData.problemSymptoms.trim()) {
+      errors.problemSymptoms = language === "th" ? "กรุณากรอกอาการเสีย" : "Please enter problem symptoms";
+    }
+
+    if (!formData.repairSummaryPrice || !formData.repairSummaryPrice.trim()) {
+      errors.repairSummaryPrice = language === "th" ? "กรุณากรอกสรุปราคาซ่อม" : "Please enter repair summary price";
+    }
+
+    // If there are errors, show them and return
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast({
+        title: language === "th" ? "กรุณากรอกข้อมูลให้ครบถ้วน" : "Please fill in all required fields",
+        description: language === "th" 
+          ? "กรุณาตรวจสอบข้อมูลที่กรอกแล้วลองอีกครั้ง"
+          : "Please check the entered information and try again",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -268,126 +305,13 @@ const RepairNew = () => {
       console.error('Error checking duplicate serial number:', error);
     }
 
-    // Validate required fields
-    if (!formData.customer.trim()) {
-      toast({
-        title: language === "th" ? "กรุณากรอกชื่อลูกค้า" : "Please enter customer name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.phone.trim()) {
-      toast({
-        title: language === "th" ? "กรุณากรอกเบอร์โทรศัพท์" : "Please enter phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const now = new Date();
-      const defaultDate = now.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-      const todayIso = getTodayIsoDate();
-      const dateForPickup = serviceType === "walk_in" ? todayIso : receiveDate;
-      const timePart = /^\d{1,2}:\d{2}$/.test(receiveTime.trim())
-        ? `${receiveTime.trim().split(":").map((x) => x.padStart(2, "0")).join(":")}`.slice(0, 5)
-        : "09:00";
-      const scheduledPickupTimeIso = dateForPickup && receiveTime
-        ? `${dateForPickup}T${timePart}:00`
-        : undefined;
-
-      // Prepare data for API
-      const repairData = {
-        customer: formData.customer.trim(),
-        phone: formData.phone.trim(),
-        lineId: formData.lineId.trim() || undefined,
-        serialNumber: sn,
-        model: formData.model.trim(),
-        color: formData.color.trim(),
-        screenLockCode: formData.screenLockCode.trim(),
-        problemSymptoms: formData.problemSymptoms.trim(),
-        deposit: formData.deposit || undefined,
-        estimatedPrice: formData.estimatedPrice || undefined,
-        repairSummaryPrice: formData.repairSummaryPrice || undefined,
-        dateOfReport: formData.dateOfReport || defaultDate,
-        timeOfReport: formData.timeOfReport || undefined,
-        scheduledPickupTime: scheduledPickupTimeIso,
-        service_type: serviceType,
-        receive_date: dateForPickup,
-        receive_time: receiveTime,
-        selectedPartIds: selectedPartIds.length > 0 ? selectedPartIds : undefined,
-      };
-
-      const response = await apiClient.createRepair(repairData);
-
-      if (response.status === 'success' && response.data) {
-        toast({
-          title: language === "th" ? "บันทึกข้อมูลสำเร็จ" : "Repair order created successfully",
-          description: language === "th" 
-            ? `เลขที่ใบแจ้งซ่อม: ${response.data.repairNumber}`
-            : `Repair Number: ${response.data.repairNumber}`,
-        });
-
-        // Refresh repairs list
-        await refreshRepairs();
-
-        // Refresh parts list to update stock quantities
-        await loadParts();
-
-        // Reset form
-        setFormData(initialFormData);
-        setSelectedPartIds([]);
-        setIsEstimatedPriceManuallyEdited(false);
-        setReceiveTime(roundTimeTo30Min(
-          `${new Date().getHours().toString().padStart(2, "0")}:${new Date().getMinutes().toString().padStart(2, "0")}`
-        ));
-        setReceiveDate(getTodayIsoDate());
-        setReportDateTimeOnOpen();
-
-        // Navigate to repairs list
-        navigate("/repairs");
-      } else {
-        throw new Error(response.message || 'Failed to create repair');
-      }
-    } catch (error) {
-      console.error('Error creating repair:', error);
-      toast({
-        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
-        description: error instanceof Error ? error.message : (language === "th" ? "ไม่สามารถบันทึกข้อมูลได้" : "Failed to create repair"),
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Open confirmation dialog
+    setIsConfirmDialogOpen(true);
   };
 
+  // Actually submit the order
   const doSubmitOrder = async () => {
-    setDuplicateSnWarning(false);
-    
-    // Validate required fields
-    if (!formData.customer.trim()) {
-      toast({
-        title: language === "th" ? "กรุณากรอกชื่อลูกค้า" : "Please enter customer name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.phone.trim()) {
-      toast({
-        title: language === "th" ? "กรุณากรอกเบอร์โทรศัพท์" : "Please enter phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setIsConfirmDialogOpen(false);
     setIsSubmitting(true);
 
     try {
@@ -764,14 +688,32 @@ const RepairNew = () => {
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="issue">{t("problemSymptoms")}</Label>
+                <Label htmlFor="issue">
+                  {t("problemSymptoms")}
+                  <span className="text-destructive ml-1">*</span>
+                </Label>
                 <Textarea
                   id="issue"
                   placeholder={t("enterProblemSymptoms")}
-                  className="min-h-[100px] resize-y max-h-[200px]"
+                  className={cn("min-h-[100px] resize-y max-h-[200px]", fieldErrors.problemSymptoms ? "border-destructive" : "")}
                   value={formData.problemSymptoms}
-                  onChange={(e) => handleInputChange("problemSymptoms", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("problemSymptoms", e.target.value);
+                    if (fieldErrors.problemSymptoms) {
+                      setFieldErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors.problemSymptoms;
+                        return newErrors;
+                      });
+                    }
+                  }}
                 />
+                {fieldErrors.problemSymptoms && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    {fieldErrors.problemSymptoms}
+                  </p>
+                )}
               </div>
 
               {/* ส่วนเลือกอะไหล่ — ต่อจากอาการเสีย */}
@@ -937,14 +879,33 @@ const RepairNew = () => {
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="repairSummaryPrice">{t("repairSummaryPrice")}</Label>
+                <Label htmlFor="repairSummaryPrice">
+                  {t("repairSummaryPrice")}
+                  <span className="text-destructive ml-1">*</span>
+                </Label>
                 <Input
                   id="repairSummaryPrice"
                   type="number"
                   placeholder={t("enterRepairSummaryPrice")}
                   value={formData.repairSummaryPrice}
-                  onChange={(e) => handleInputChange("repairSummaryPrice", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("repairSummaryPrice", e.target.value);
+                    if (fieldErrors.repairSummaryPrice) {
+                      setFieldErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors.repairSummaryPrice;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  className={fieldErrors.repairSummaryPrice ? "border-destructive" : ""}
                 />
+                {fieldErrors.repairSummaryPrice && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    {fieldErrors.repairSummaryPrice}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -957,6 +918,182 @@ const RepairNew = () => {
             </Button>
           </CardFooter>
         </Card>
+
+        {/* Confirmation Dialog */}
+        <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {language === "th" ? "ยืนยันการสร้างใบแจ้งซ่อม" : "Confirm Repair Order Creation"}
+              </DialogTitle>
+              <DialogDescription>
+                {language === "th"
+                  ? "กรุณาตรวจสอบข้อมูลก่อนยืนยัน"
+                  : "Please review the information before confirming"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Customer Information */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "ชื่อลูกค้า" : "Customer Name"}
+                  </p>
+                  <p className="font-medium">{formData.customer || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "เบอร์โทรศัพท์" : "Phone Number"}
+                  </p>
+                  <p className="font-medium">{formData.phone || "-"}</p>
+                </div>
+                {formData.lineId && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "Line ID" : "Line ID"}
+                    </p>
+                    <p className="font-medium">{formData.lineId}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Device Information */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "IMEI / Serial Number" : "IMEI / Serial Number"}
+                  </p>
+                  <p className="font-medium font-mono text-sm">{formData.serialNumber || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "รุ่น" : "Model"}
+                  </p>
+                  <p className="font-medium">{formData.model || "-"}</p>
+                </div>
+                {formData.color && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "สี" : "Color"}
+                    </p>
+                    <p className="font-medium">{formData.color}</p>
+                  </div>
+                )}
+                {formData.screenLockCode && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "รหัสล็อคหน้าจอ" : "Screen Lock Code"}
+                    </p>
+                    <p className="font-medium font-mono text-sm">{formData.screenLockCode}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Problem Symptoms */}
+              {formData.problemSymptoms && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {language === "th" ? "อาการเสีย" : "Problem Symptoms"}
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap">{formData.problemSymptoms}</p>
+                </div>
+              )}
+
+              {/* Selected Parts */}
+              {selectedParts.length > 0 && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {language === "th" ? "อะไหล่ที่เลือก" : "Selected Parts"}
+                  </p>
+                  <div className="space-y-2">
+                    {selectedParts.map((part) => (
+                      <div key={part.id} className="flex items-center justify-between text-sm">
+                        <span className="font-medium">
+                          {language === "th" ? part.nameTh : part.name}
+                        </span>
+                        <span className="text-muted-foreground">
+                          ฿{part.sellPrice.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-border mt-2">
+                      <div className="flex items-center justify-between font-semibold">
+                        <span>{language === "th" ? "รวมราคาอะไหล่" : "Total Parts Price"}</span>
+                        <span className="text-primary">
+                          ฿{selectedParts.reduce((sum, part) => sum + part.sellPrice, 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pricing */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                {formData.deposit && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "มัดจำ" : "Deposit"}
+                    </p>
+                    <p className="font-medium">฿{Number(formData.deposit).toLocaleString()}</p>
+                  </div>
+                )}
+                {formData.estimatedPrice && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "ประเมินราคา" : "Estimated Price"}
+                    </p>
+                    <p className="font-medium">฿{Number(formData.estimatedPrice).toLocaleString()}</p>
+                  </div>
+                )}
+                {formData.repairSummaryPrice && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">
+                      {language === "th" ? "สรุปราคาซ่อม" : "Repair Summary Price"}
+                    </p>
+                    <p className="font-semibold text-lg text-primary">
+                      ฿{Number(formData.repairSummaryPrice).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Pickup Time */}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">
+                  {language === "th" ? "เวลารับเครื่อง" : "Pickup Time"}
+                </p>
+                <p className="font-medium">
+                  {serviceType === "walk_in"
+                    ? language === "th"
+                      ? `วันนี้ เวลา ${receiveTime}`
+                      : `Today at ${receiveTime}`
+                    : receiveDateAsDate
+                    ? `${receiveDateAsDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB")} เวลา ${receiveTime}`
+                    : `${receiveDate} ${receiveTime}`}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setIsConfirmDialogOpen(false)}
+                disabled={isSubmitting}
+              >
+                {language === "th" ? "ย้อนกลับ" : "Go Back"}
+              </Button>
+              <Button onClick={doSubmitOrder} disabled={isSubmitting}>
+                {isSubmitting
+                  ? language === "th"
+                    ? "กำลังบันทึก..."
+                    : "Saving..."
+                  : language === "th"
+                  ? "ยืนยัน"
+                  : "Confirm"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog open={duplicateSnWarning} onOpenChange={(open) => !open && setDuplicateSnWarning(false)}>
           <AlertDialogContent>

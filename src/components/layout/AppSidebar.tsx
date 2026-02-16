@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { canAccessSubject } from "@/lib/roleConfig";
 import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, LogOut, Smartphone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -216,6 +217,7 @@ const mobileOpen = controlledMobileOpen ?? internalMobileOpen;
 const setMobileOpen = controlledSetMobileOpen ?? setInternalMobileOpen;
 const navigate = useNavigate();
 const { logout, currentUser } = useAuth();
+const { toast } = useToast();
 const userRole = currentUser?.role ?? "staff";
 const searchParams = new URLSearchParams(location.search);
 
@@ -296,6 +298,10 @@ const SidebarContent = () => (
       <button
         onClick={() => {
           setMobileOpen(false);
+          toast({
+            title: language === "th" ? "ออกจากระบบสำเร็จ" : "Logged out",
+            description: language === "th" ? "คุณได้ออกจากระบบแล้ว" : "You have been logged out successfully.",
+          });
           logout();
           navigate("/login");
         }}
