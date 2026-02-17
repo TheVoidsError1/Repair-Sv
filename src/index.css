@@ -141,13 +141,18 @@
 
 @layer components {
   .stat-card {
-    @apply bg-card rounded-xl p-6 border border-border;
+    @apply bg-card rounded-xl p-4 sm:p-5 lg:p-6 border border-border;
     box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 140px;
   }
 
   .stat-card:hover {
     box-shadow: var(--shadow-md);
     @apply transition-shadow duration-200;
+    transform: translateY(-2px);
   }
 
   .status-badge {
@@ -232,15 +237,15 @@
   }
 
   .page-header {
-    @apply mb-8;
+    @apply mb-6 sm:mb-8;
   }
 
   .page-title {
-    @apply text-2xl font-semibold text-foreground;
+    @apply text-xl sm:text-2xl lg:text-3xl font-semibold text-foreground;
   }
 
   .page-description {
-    @apply text-muted-foreground mt-1;
+    @apply text-sm sm:text-base text-muted-foreground mt-1.5 sm:mt-2;
   }
 }
 

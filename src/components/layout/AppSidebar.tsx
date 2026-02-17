@@ -62,11 +62,11 @@ const currentSubjectId = getSubjectIdFromPath(location.pathname);
 
 return (
   <div className="space-y-1">
-    {!collapsed && (
-      <p className="px-2 lg:px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
-        {language === "th" ? "เลือกหมวด" : "Subjects"}
-      </p>
-    )}
+      {!collapsed && (
+        <p className="px-2 lg:px-3 pt-1 pb-2 text-[10px] sm:text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+          {language === "th" ? "เลือกหมวด" : "Subjects"}
+        </p>
+      )}
     {SUBJECT_ORDER.filter((subjectId) => canAccessSubject(subjectId, userRole)).map((subjectId) => {
       const subject = SUBJECTS_CONFIG[subjectId];
       if (!subject) return null;
@@ -84,14 +84,14 @@ return (
         >
           <span
             className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0",
+              "flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex-shrink-0",
               isActive ? "bg-sidebar-primary/20 text-sidebar-primary" : subject.iconBg
             )}
           >
             <subject.icon className="w-4 h-4" />
           </span>
           {!collapsed && (
-            <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis">
+            <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis text-sm sm:text-base">
               {title}
             </span>
           )}
@@ -136,11 +136,11 @@ return (
         "sidebar-link flex items-center gap-2 lg:gap-3 rounded-lg text-sidebar-muted hover:text-sidebar-foreground w-full"
       )}
     >
-      <span className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0">
+      <span className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex-shrink-0">
         <ArrowLeft className="w-4 h-4" />
       </span>
       {!collapsed && (
-        <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis">
+        <span className="flex-1 min-w-0 text-left whitespace-nowrap overflow-hidden text-ellipsis text-sm sm:text-base">
           {language === "th" ? "กลับหมวดหลัก" : "Back to subjects"}
         </span>
       )}
@@ -149,10 +149,10 @@ return (
     {/* ชื่อหมวดปัจจุบัน — ไม่ใช้พื้นหลังแบบกดได้ */}
     {!collapsed && (
       <div className="flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-1.5">
-        <span className={cn("flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0", subject.iconBg)}>
+        <span className={cn("flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex-shrink-0", subject.iconBg)}>
           <subject.icon className="w-4 h-4" />
         </span>
-        <span className="text-sm font-medium text-sidebar-foreground truncate">{title}</span>
+        <span className="text-xs sm:text-sm font-medium text-sidebar-foreground truncate">{title}</span>
       </div>
     )}
 
@@ -160,7 +160,7 @@ return (
     {subject.sections.map((section) => (
       <div key={section.id} className="space-y-1">
         {!collapsed && (
-          <p className="px-2 lg:px-3 pt-1 pb-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider">
+          <p className="px-2 lg:px-3 pt-1 pb-2 text-[10px] sm:text-xs font-medium text-sidebar-muted uppercase tracking-wider">
             {language === "th" ? section.labelTh : section.labelEn}
           </p>
         )}
@@ -182,13 +182,13 @@ return (
                 )}
               >
                 <span className={cn(
-                  "flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0",
+                  "flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-md flex-shrink-0",
                   active ? "text-sidebar-primary" : "text-sidebar-muted"
                 )}>
-                  <item.icon className="w-3.5 h-3.5" />
+                  <item.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </span>
                 {!collapsed && (
-                  <span className="flex-1 min-w-0 truncate">{label}</span>
+                  <span className="flex-1 min-w-0 truncate text-xs sm:text-sm">{label}</span>
                 )}
               </Link>
             );
@@ -251,21 +251,21 @@ useEffect(() => {
 const SidebarContent = () => (
   <>
     {/* Logo */}
-    <div className="shrink-0 flex items-center gap-3 px-3 lg:px-4 py-5 lg:py-6 border-b border-sidebar-border">
-      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-sidebar-primary flex-shrink-0">
-        <Smartphone className="w-5 h-5 text-sidebar-primary-foreground" />
+    <div className="shrink-0 flex items-center gap-2 sm:gap-3 px-3 lg:px-4 py-4 sm:py-5 lg:py-6 border-b border-sidebar-border">
+      <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-sidebar-primary flex-shrink-0">
+        <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-sidebar-primary-foreground" />
       </div>
       {!collapsed && (
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-semibold text-sidebar-foreground truncate">Macfix service</span>
-          <span className="text-xs text-sidebar-muted truncate">
+          <span className="text-xs sm:text-sm font-semibold text-sidebar-foreground truncate">Macfix service</span>
+          <span className="text-[10px] sm:text-xs text-sidebar-muted truncate">
             {language === "th" ? "ระบบจัดการร้านซ่อม" : "Management"}
           </span>
         </div>
       )}
     </div>
 
-    <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-2 lg:px-3 py-4">
+    <nav className="sidebar-nav-scroll flex-1 min-h-0 overflow-y-auto px-2 sm:px-2 lg:px-3 py-3 sm:py-4">
       {subjectsMode ? (
         <SubjectsNav
           language={language}
@@ -294,7 +294,7 @@ const SidebarContent = () => (
     </nav>
 
     {/* Logout */}
-    <div className="shrink-0 p-2 lg:p-3 border-t border-sidebar-border">
+    <div className="shrink-0 p-2 sm:p-2 lg:p-3 border-t border-sidebar-border">
       <button
         onClick={() => {
           setMobileOpen(false);
@@ -307,9 +307,9 @@ const SidebarContent = () => (
         }}
         className="sidebar-link w-full text-destructive hover:text-destructive hover:bg-destructive/10"
       >
-        <LogOut className="w-5 h-5 flex-shrink-0" />
+        <LogOut className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
         {!collapsed && (
-          <span className="truncate">{language === "th" ? "ออกจากระบบ" : "Log out"}</span>
+          <span className="truncate text-xs sm:text-sm">{language === "th" ? "ออกจากระบบ" : "Log out"}</span>
         )}
       </button>
     </div>
@@ -327,13 +327,14 @@ return (
 
     <aside
       className={cn(
-        "lg:hidden fixed inset-y-0 left-0 z-50 w-[19rem] min-w-[19rem] max-w-[90vw] bg-sidebar flex flex-col transition-transform duration-300",
+        "lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] sm:w-[19rem] min-w-[280px] sm:min-w-[19rem] max-w-[85vw] sm:max-w-[90vw] bg-sidebar flex flex-col transition-transform duration-300 ease-in-out shadow-xl",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
       <button
         onClick={() => setMobileOpen(false)}
-        className="absolute top-4 right-4 p-2 text-sidebar-foreground hover:text-sidebar-primary"
+        className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-lg text-sidebar-foreground hover:text-sidebar-primary hover:bg-sidebar-primary/10 transition-colors"
+        aria-label={language === "th" ? "ปิดเมนู" : "Close menu"}
       >
         <X className="w-5 h-5" />
       </button>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../config/data-source.js';
 import { Personnel } from '../entities/Personnel.js';
+import { hashPassword } from '../utils/password.js';
 
 const router = Router();
 
@@ -91,9 +92,15 @@ router.post('/', async (req, res) => {
     // Generate unique token for the new user
     const token = uuidv4();
 
+    // Hash password if provided
+    const personnelData = { ...req.body };
+    if (personnelData.password) {
+      personnelData.password = await hashPassword(personnelData.password);
+    }
+
     // Create new personnel with token
     const newPersonnel = personnelRepository.create({
-      ...req.body,
+      ...personnelData,
       token: token,
     });
     await personnelRepository.save(newPersonnel);
@@ -143,7 +150,13 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    Object.assign(personnel, req.body);
+    // Hash password if it's being updated
+    const updateData = { ...req.body };
+    if (updateData.password) {
+      updateData.password = await hashPassword(updateData.password);
+    }
+
+    Object.assign(personnel, updateData);
     await personnelRepository.save(personnel);
 
     // Fetch updated personnel without password

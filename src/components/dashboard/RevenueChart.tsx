@@ -16,6 +16,16 @@ export function RevenueChart() {
   const { t, language } = useLanguage();
   const [data, setData] = useState<Array<{ name: string; income: number; expenses: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const loadWeeklyData = async () => {
@@ -45,14 +55,14 @@ export function RevenueChart() {
   }, [language]);
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 animate-fade-in">
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-foreground">{t("weeklyRevenue")}</h3>
-        <p className="text-sm text-muted-foreground">
+    <div className="bg-card rounded-xl border border-border p-4 sm:p-6 animate-fade-in">
+      <div className="mb-4 sm:mb-6">
+        <h3 className="text-base sm:text-lg font-semibold text-foreground">{t("weeklyRevenue")}</h3>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           {language === "th" ? "ภาพรวมรายได้และรายจ่ายสัปดาห์นี้" : "Income and expenses overview for this week"}
         </p>
       </div>
-      <div className="h-[300px]">
+      <div className="h-[250px] sm:h-[300px]">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">{language === "th" ? "กำลังโหลด..." : "Loading..."}</p>
@@ -74,16 +84,23 @@ export function RevenueChart() {
               <XAxis
                 dataKey="name"
                 stroke="hsl(215, 16%, 47%)"
-                fontSize={12}
+                fontSize={isMobile ? 9 : 12}
                 tickLine={false}
                 axisLine={false}
+                angle={-45}
+                textAnchor="end"
+                height={isMobile ? 80 : 60}
               />
               <YAxis
                 stroke="hsl(215, 16%, 47%)"
-                fontSize={12}
+                fontSize={isMobile ? 9 : 12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `฿${value.toLocaleString('th-TH')}`}
+                tickFormatter={(value) => {
+                  if (value >= 1000) return `฿${(value / 1000).toFixed(0)}k`;
+                  return `฿${value}`;
+                }}
+                width={isMobile ? 45 : 60}
               />
               <Tooltip
                 contentStyle={{

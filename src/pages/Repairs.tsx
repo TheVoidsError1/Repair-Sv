@@ -576,9 +576,9 @@ const Repairs = () => {
         </div>
       </div>
 
-      {/* ค้นหา + dropdown กรองสถานะ (มีสีตามสถานะ) */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
+      {/* ค้นหา + dropdown กรองสถานะ (มีสีตามสถานะ) - Responsive */}
+      <div className="flex flex-col gap-3 mb-6">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder={t("searchByIdCustomerDevice")}
@@ -587,212 +587,307 @@ const Repairs = () => {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-          <SelectTrigger
-            className={`w-[200px] ${
-              statusFilter === "all"
-                ? ""
-                : `status-badge border-0 ${statusStyles[statusFilter]}`
-            }`}
-          >
-            <Filter className="w-4 h-4 mr-2 shrink-0" />
-            <SelectValue placeholder={t("filterByStatus")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
-                {t("allStatus")}
-              </span>
-            </SelectItem>
-            <SelectItem value="pending">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-pending))]" />
-                {t("pending")}
-              </span>
-            </SelectItem>
-            <SelectItem value="in-progress">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-in-progress))]" />
-                {t("inProgress")}
-              </span>
-            </SelectItem>
-            <SelectItem value="completed">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-completed))]" />
-                {t("completed")}
-              </span>
-            </SelectItem>
-            <SelectItem value="picked-up">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-completed))]" />
-                {t("pickedUp")}
-              </span>
-            </SelectItem>
-            <SelectItem value="cancelled">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-cancelled))]" />
-                {t("cancelled")}
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={tagFilter} onValueChange={handleTagFilterChange}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={t("tagLabel")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              {language === "th" ? "ทุกแท็ก" : "All tags"}
-            </SelectItem>
-            <SelectItem value="endOfDay">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                {t("addQuickData")}
-              </span>
-            </SelectItem>
-            <SelectItem value="leaveDevice">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                {t("addRepairData")}
-              </span>
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+            <SelectTrigger
+              className={`w-full sm:w-[200px] ${
+                statusFilter === "all"
+                  ? ""
+                  : `status-badge border-0 ${statusStyles[statusFilter]}`
+              }`}
+            >
+              <Filter className="w-4 h-4 mr-2 shrink-0" />
+              <SelectValue placeholder={t("filterByStatus")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                  {t("allStatus")}
+                </span>
+              </SelectItem>
+              <SelectItem value="pending">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-pending))]" />
+                  {t("pending")}
+                </span>
+              </SelectItem>
+              <SelectItem value="in-progress">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-in-progress))]" />
+                  {t("inProgress")}
+                </span>
+              </SelectItem>
+              <SelectItem value="completed">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-completed))]" />
+                  {t("completed")}
+                </span>
+              </SelectItem>
+              <SelectItem value="picked-up">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-completed))]" />
+                  {t("pickedUp")}
+                </span>
+              </SelectItem>
+              <SelectItem value="cancelled">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-cancelled))]" />
+                  {t("cancelled")}
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={tagFilter} onValueChange={handleTagFilterChange}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder={t("tagLabel")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {language === "th" ? "ทุกแท็ก" : "All tags"}
+              </SelectItem>
+              <SelectItem value="endOfDay">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  {t("addQuickData")}
+                </span>
+              </SelectItem>
+              <SelectItem value="leaveDevice">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  {t("addRepairData")}
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Repairs Table */}
+      {/* Repairs Table - Desktop & Mobile Card View */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">{language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">{language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}</p>
+          </div>
+        ) : filteredRepairs.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">{language === "th" ? "ไม่มีข้อมูลงานซ่อม" : "No repairs found"}</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t("orderId")}</th>
+                    <th>{t("customer")}</th>
+                    <th>{t("device")}</th>
+                    <th>{t("issue")}</th>
+                    <th>{t("estCost")}</th>
+                    <th>{t("status")}</th>
+                    <th>{t("tagLabel")}</th>
+                    <th>{t("viewDetails")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRepairs.map((repair) => (
+                    <tr key={repair.id}>
+                      <td className="font-medium text-foreground">{repair.id}</td>
+                      <td>
+                        <div>
+                          <p className="font-medium text-foreground">{repair.customer}</p>
+                          <p className="text-xs text-muted-foreground">{repair.phone}</p>
+                        </div>
+                      </td>
+                      <td>{repair.device}</td>
+                      <td>{language === "th" ? repair.issueTh : repair.issue}</td>
+                      <td>฿{repair.estimatedCost.toLocaleString()}</td>
+                      <td>
+                        <Select
+                          value={repair.status}
+                          onValueChange={(value) =>
+                            handleQuickStatusChange(repair, value as "pending" | "in-progress" | "completed" | "cancelled" | "picked-up")
+                          }
+                        >
+                          <SelectTrigger
+                            className={`w-[140px] status-badge border-0 bg-transparent shadow-none hover:opacity-90 h-8 font-medium ${statusStyles[repair.status]}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">
+                              {t("pending")}
+                            </SelectItem>
+                            <SelectItem value="in-progress">
+                              {language === "th" ? "กำลังซ่อม" : t("inProgress")}
+                            </SelectItem>
+                            <SelectItem value="completed">
+                              {language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed")}
+                            </SelectItem>
+                            <SelectItem value="picked-up">
+                              {language === "th" ? "รับเครื่องแล้ว" : t("pickedUp")}
+                            </SelectItem>
+                            <SelectItem value="cancelled">
+                              {language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td>
+                        {repair.tag ? (
+                          <span
+                            className={
+                              repair.tag === "endOfDay"
+                                ? "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                : "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                            }
+                          >
+                            {repair.tag === "endOfDay"
+                              ? t("addQuickData")
+                              : t("addRepairData")}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">–</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleViewDetails(repair)}
+                          aria-label={t("viewDetails")}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ) : filteredRepairs.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">{language === "th" ? "ไม่มีข้อมูลงานซ่อม" : "No repairs found"}</p>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{t("orderId")}</th>
-                  <th>{t("customer")}</th>
-                  <th>{t("device")}</th>
-                  <th>{t("issue")}</th>
-                  <th>{t("estCost")}</th>
-                  <th>{t("status")}</th>
-                  <th>{t("tagLabel")}</th>
-                  <th>{t("viewDetails")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRepairs.map((repair) => (
-                  <tr key={repair.id}>
-                    <td className="font-medium text-foreground">{repair.id}</td>
-                    <td>
-                      <div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden divide-y divide-border">
+              {filteredRepairs.map((repair) => (
+                <div key={repair.id} className="p-4 space-y-3">
+                  {/* Header: ID & View Button */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{repair.id}</p>
+                      <div className="mt-1">
                         <p className="font-medium text-foreground">{repair.customer}</p>
                         <p className="text-xs text-muted-foreground">{repair.phone}</p>
                       </div>
-                    </td>
-                    <td>{repair.device}</td>
-                    <td>{language === "th" ? repair.issueTh : repair.issue}</td>
-                    <td>฿{repair.estimatedCost.toLocaleString()}</td>
-                    <td>
-                      <Select
-                        value={repair.status}
-                        onValueChange={(value) =>
-                          handleQuickStatusChange(repair, value as "pending" | "in-progress" | "completed" | "cancelled" | "picked-up")
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleViewDetails(repair)}
+                      aria-label={t("viewDetails")}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Device & Issue */}
+                  <div className="space-y-1 text-sm">
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[60px]">{t("device")}:</span>
+                      <span className="text-foreground">{repair.device}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[60px]">{t("issue")}:</span>
+                      <span className="text-foreground line-clamp-2">{language === "th" ? repair.issueTh : repair.issue}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[60px]">{t("estCost")}:</span>
+                      <span className="font-semibold text-foreground">฿{repair.estimatedCost.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Status & Tag */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={repair.status}
+                      onValueChange={(value) =>
+                        handleQuickStatusChange(repair, value as "pending" | "in-progress" | "completed" | "cancelled" | "picked-up")
+                      }
+                    >
+                      <SelectTrigger
+                        className={`w-auto min-w-[120px] status-badge border-0 shadow-none hover:opacity-90 h-8 font-medium ${statusStyles[repair.status]}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">
+                          {t("pending")}
+                        </SelectItem>
+                        <SelectItem value="in-progress">
+                          {language === "th" ? "กำลังซ่อม" : t("inProgress")}
+                        </SelectItem>
+                        <SelectItem value="completed">
+                          {language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed")}
+                        </SelectItem>
+                        <SelectItem value="picked-up">
+                          {language === "th" ? "รับเครื่องแล้ว" : t("pickedUp")}
+                        </SelectItem>
+                        <SelectItem value="cancelled">
+                          {language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {repair.tag && (
+                      <span
+                        className={
+                          repair.tag === "endOfDay"
+                            ? "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            : "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400"
                         }
                       >
-                        <SelectTrigger
-                          className={`w-[140px] status-badge border-0 bg-transparent shadow-none hover:opacity-90 h-8 font-medium ${statusStyles[repair.status]}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">
-                            {t("pending")}
-                          </SelectItem>
-                          <SelectItem value="in-progress">
-                            {language === "th" ? "กำลังซ่อม" : t("inProgress")}
-                          </SelectItem>
-                          <SelectItem value="completed">
-                            {language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed")}
-                          </SelectItem>
-                          <SelectItem value="picked-up">
-                            {language === "th" ? "รับเครื่องแล้ว" : t("pickedUp")}
-                          </SelectItem>
-                          <SelectItem value="cancelled">
-                            {language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled")}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td>
-                      {repair.tag ? (
-                        <span
-                          className={
-                            repair.tag === "endOfDay"
-                              ? "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                              : "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                          }
-                        >
-                          {repair.tag === "endOfDay"
-                            ? t("addQuickData")
-                            : t("addRepairData")}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">–</span>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleViewDetails(repair)}
-                        aria-label={t("viewDetails")}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                        {repair.tag === "endOfDay"
+                          ? t("addQuickData")
+                          : t("addRepairData")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         
-        {/* Pagination */}
+        {/* Pagination - Responsive */}
         {!isLoading && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-4 border-t border-border">
-            <div className="text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               {language === "th" 
                 ? `แสดง ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.totalCount)} จาก ${pagination.totalCount} รายการ`
                 : `Showing ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.totalCount)} of ${pagination.totalCount} items`}
             </div>
             <Pagination>
-              <PaginationContent>
+              <PaginationContent className="flex-wrap">
                 <PaginationItem>
                   <Button
                     variant="ghost"
-                    size="default"
+                    size="sm"
                     onClick={() => {
                       if (pagination.page > 1) {
                         handlePageChange(pagination.page - 1);
                       }
                     }}
                     disabled={pagination.page <= 1}
-                    className="gap-1 pl-2.5"
+                    className="gap-1 h-8"
                     aria-label={language === "th" ? "หน้าก่อนหน้า" : "Go to previous page"}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    <span>{language === "th" ? "ก่อนหน้า" : "Previous"}</span>
+                    <span className="hidden sm:inline">{language === "th" ? "ก่อนหน้า" : "Previous"}</span>
                   </Button>
                 </PaginationItem>
                 
-                {/* Page numbers */}
+                {/* Page numbers - Hide some on mobile */}
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
                   // Show first page, last page, current page, and pages around current
                   if (
@@ -801,12 +896,12 @@ const Repairs = () => {
                     (pageNum >= pagination.page - 1 && pageNum <= pagination.page + 1)
                   ) {
                     return (
-                      <PaginationItem key={pageNum}>
+                      <PaginationItem key={pageNum} className="hidden sm:inline-flex">
                         <Button
                           variant={pageNum === pagination.page ? "outline" : "ghost"}
                           size="icon"
                           onClick={() => handlePageChange(pageNum)}
-                          className="h-9 w-9"
+                          className="h-8 w-8"
                           aria-current={pageNum === pagination.page ? "page" : undefined}
                         >
                           {pageNum}
@@ -815,7 +910,7 @@ const Repairs = () => {
                     );
                   } else if (pageNum === pagination.page - 2 || pageNum === pagination.page + 2) {
                     return (
-                      <PaginationItem key={pageNum}>
+                      <PaginationItem key={pageNum} className="hidden sm:inline-flex">
                         <PaginationEllipsis />
                       </PaginationItem>
                     );
@@ -823,20 +918,25 @@ const Repairs = () => {
                   return null;
                 })}
                 
+                {/* Current page indicator for mobile */}
+                <div className="sm:hidden text-sm px-3">
+                  {pagination.page} / {pagination.totalPages}
+                </div>
+                
                 <PaginationItem>
                   <Button
                     variant="ghost"
-                    size="default"
+                    size="sm"
                     onClick={() => {
                       if (pagination.page < pagination.totalPages) {
                         handlePageChange(pagination.page + 1);
                       }
                     }}
                     disabled={pagination.page >= pagination.totalPages}
-                    className="gap-1 pr-2.5"
+                    className="gap-1 h-8"
                     aria-label={language === "th" ? "หน้าถัดไป" : "Go to next page"}
                   >
-                    <span>{language === "th" ? "ถัดไป" : "Next"}</span>
+                    <span className="hidden sm:inline">{language === "th" ? "ถัดไป" : "Next"}</span>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </PaginationItem>
@@ -858,15 +958,15 @@ const Repairs = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto p-0 gap-0 w-[95vw]">
           {selectedRepair && detailOrder && (
             <>
-              <DialogHeader className="px-6 pt-6 pb-4 flex flex-row items-start justify-between gap-4 border-b border-border">
-                <div className="space-y-1">
-                  <DialogTitle className="text-xl">
+              <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-4 border-b border-border">
+                <div className="space-y-1 flex-1">
+                  <DialogTitle className="text-lg sm:text-xl">
                     {language === "th" ? "รายละเอียดงานซ่อม" : "Repair details"}
                   </DialogTitle>
-                  <DialogDescription>
+                  <DialogDescription className="text-xs sm:text-sm">
                     {language === "th"
                       ? "ดู หรือแก้ไขรายการงานซ่อม"
                       : "View or edit this repair order."}
@@ -877,170 +977,245 @@ const Repairs = () => {
                 </span>
               </DialogHeader>
 
-              <div className="px-6 py-4 space-y-4">
-                {/* เลขที่คำสั่ง (read-only) */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{t("orderId")}</Label>
-                  <span className="text-sm text-foreground">{selectedRepair.id}</span>
+              <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
+                {/* ข้อมูลคำสั่งซ่อม */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span className="w-1 h-4 bg-primary rounded-full" />
+                    {language === "th" ? "ข้อมูลคำสั่งซ่อม" : "Order Information"}
+                  </h3>
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{t("orderId")}</Label>
+                      <span className="text-sm font-medium text-foreground">{selectedRepair.id}</span>
+                    </div>
+                    {selectedRepair.serialNumber && (
+                      <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                        <Label className="text-sm text-muted-foreground">
+                          {language === "th" ? "IMEI / SN" : "IMEI / Serial"}
+                        </Label>
+                        <span className="text-sm font-mono text-foreground">{selectedRepair.serialNumber}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{t("date")}</Label>
+                      <span className="text-sm text-foreground">{selectedRepair.createdAt}</span>
+                    </div>
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{t("status")}</Label>
+                      <span className={`status-badge inline-flex w-fit ${statusStyles[selectedRepair.status]}`}>
+                        {selectedRepair.status === "in-progress"
+                          ? (language === "th" ? "กำลังซ่อม" : t("inProgress"))
+                          : selectedRepair.status === "completed"
+                            ? (language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed"))
+                            : selectedRepair.status === "picked-up"
+                              ? (language === "th" ? "รับเครื่องแล้ว" : t("pickedUp"))
+                              : selectedRepair.status === "cancelled"
+                                ? (language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled"))
+                                : t("pending")}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{language === "th" ? "แท็ก" : "Tag"}</Label>
+                      {isDetailEditing ? (
+                        <Select value={detailTag || "none"} onValueChange={(v) => setDetailTag(v === "none" ? "" : (v as RepairTag))}>
+                          <SelectTrigger className="w-full max-w-[240px] h-9">
+                            <SelectValue placeholder={language === "th" ? "ทุกแท็ก" : "All tags"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">–</SelectItem>
+                            <SelectItem value="endOfDay">{language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in"}</SelectItem>
+                            <SelectItem value="leaveDevice">{language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off"}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-sm text-foreground">
+                          {detailTag === "endOfDay"
+                            ? (language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in")
+                            : detailTag === "leaveDevice"
+                              ? (language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off")
+                              : "–"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* IMEI / Serial Number (read-only) */}
-                {selectedRepair.serialNumber && (
-                  <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                    <Label className="text-sm text-muted-foreground">
-                      {language === "th" ? "IMEI / SN" : "IMEI / Serial"}
-                    </Label>
-                    <span className="text-sm text-foreground font-mono">{selectedRepair.serialNumber}</span>
+                {/* ข้อมูลลูกค้า */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span className="w-1 h-4 bg-primary rounded-full" />
+                    {language === "th" ? "ข้อมูลลูกค้า" : "Customer Information"}
+                  </h3>
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{t("customer")}</Label>
+                      {isDetailEditing ? (
+                        <Input
+                          value={detailOrder.customer}
+                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, customer: e.target.value } : p))}
+                          className="h-9"
+                        />
+                      ) : (
+                        <span className="text-sm font-medium text-foreground">{detailOrder.customer}</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{language === "th" ? "เบอร์โทร" : "Phone"}</Label>
+                      {isDetailEditing ? (
+                        <Input
+                          value={detailOrder.phone}
+                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, phone: e.target.value } : p))}
+                          className="h-9"
+                        />
+                      ) : (
+                        <span className="text-sm text-foreground">{detailOrder.phone}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ข้อมูลเครื่อง */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span className="w-1 h-4 bg-primary rounded-full" />
+                    {language === "th" ? "ข้อมูลเครื่อง" : "Device Information"}
+                  </h3>
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{t("device")}</Label>
+                      {isDetailEditing ? (
+                        <Input
+                          value={detailOrder.model}
+                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, model: e.target.value } : p))}
+                          className="h-9"
+                        />
+                      ) : (
+                        <span className="text-sm text-foreground">{detailOrder.model}</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
+                      <Label className="text-sm text-muted-foreground pt-2">{t("issue")}</Label>
+                      {isDetailEditing ? (
+                        <Textarea
+                          value={detailOrder.problemSymptoms}
+                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, problemSymptoms: e.target.value } : p))}
+                          rows={3}
+                          className="resize-none"
+                        />
+                      ) : (
+                        <span className="text-sm text-foreground whitespace-pre-wrap">{detailOrder.problemSymptoms || "–"}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* อะไหล่ที่ใช้ */}
+                {selectedRepair.selectedParts && selectedRepair.selectedParts.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <span className="w-1 h-4 bg-primary rounded-full" />
+                      {language === "th" ? "อะไหล่ที่ใช้" : "Parts Used"}
+                    </h3>
+                    <div className="bg-muted/30 rounded-lg p-4">
+                      <div className="space-y-2">
+                        {selectedRepair.selectedParts.map((part, index) => (
+                          <div
+                            key={part.id || index}
+                            className="flex items-start justify-between gap-3 p-3 bg-background rounded-md border border-border"
+                          >
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium text-foreground">
+                                {language === "th" ? part.nameTh || part.name : part.name || part.nameTh}
+                              </p>
+                              {part.partNumber && (
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  {language === "th" ? "รหัสอะไหล่" : "Part No."}: {part.partNumber}
+                                </p>
+                              )}
+                            </div>
+                            {part.price !== undefined && (
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-foreground">
+                                  ฿{typeof part.price === 'number' 
+                                    ? part.price.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    : Number(part.price || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {selectedRepair.selectedParts.length > 0 && (
+                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-border">
+                            <span className="text-sm font-semibold text-foreground">
+                              {language === "th" ? "รวมราคาอะไหล่" : "Total Parts Cost"}
+                            </span>
+                            <span className="text-sm font-bold text-foreground">
+                              ฿{selectedRepair.selectedParts
+                                .reduce((sum, part) => {
+                                  const price = typeof part.price === 'number' ? part.price : Number(part.price) || 0;
+                                  return sum + price;
+                                }, 0)
+                                .toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* ลูกค้า */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{t("customer")}</Label>
-                  {isDetailEditing ? (
-                    <Input
-                      value={detailOrder.customer}
-                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, customer: e.target.value } : p))}
-                      className="h-9"
-                    />
-                  ) : (
-                    <span className="text-sm text-foreground">{detailOrder.customer}</span>
-                  )}
-                </div>
-
-                {/* เบอร์โทร */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{language === "th" ? "เบอร์โทร" : "Phone"}</Label>
-                  {isDetailEditing ? (
-                    <Input
-                      value={detailOrder.phone}
-                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, phone: e.target.value } : p))}
-                      className="h-9"
-                    />
-                  ) : (
-                    <span className="text-sm text-foreground">{detailOrder.phone}</span>
-                  )}
-                </div>
-
-                {/* อุปกรณ์ */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{t("device")}</Label>
-                  {isDetailEditing ? (
-                    <Input
-                      value={detailOrder.model}
-                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, model: e.target.value } : p))}
-                      className="h-9"
-                    />
-                  ) : (
-                    <span className="text-sm text-foreground">{detailOrder.model}</span>
-                  )}
-                </div>
-
-                {/* ปัญหา */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-start">
-                  <Label className="text-sm text-muted-foreground pt-2">{t("issue")}</Label>
-                  {isDetailEditing ? (
-                    <Textarea
-                      value={detailOrder.problemSymptoms}
-                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, problemSymptoms: e.target.value } : p))}
-                      rows={2}
-                      className="resize-none"
-                    />
-                  ) : (
-                    <span className="text-sm text-foreground">{detailOrder.problemSymptoms}</span>
-                  )}
-                </div>
-
-                {/* ราคาประมาณ */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{language === "th" ? "ราคาประมาณ" : "Est. price"}</Label>
-                  {isDetailEditing ? (
-                    <Input
-                      type="number"
-                      value={detailOrder.estimatedPrice || ""}
-                      onChange={(e) => setDetailOrder((p) => (p ? { ...p, estimatedPrice: e.target.value } : p))}
-                      className="h-9"
-                    />
-                  ) : (
-                    <span className="text-sm text-foreground">
-                      ฿{Number(detailOrder.estimatedPrice || 0).toLocaleString()}
-                    </span>
-                  )}
-                </div>
-
-                {/* สถานะ — แสดงอย่างเดียว แก้ไขจาก dropdown ในคอลัมน์ตาราง */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{t("status")}</Label>
-                  <span className={`status-badge ${statusStyles[selectedRepair.status]}`}>
-                    {selectedRepair.status === "in-progress"
-                      ? (language === "th" ? "กำลังซ่อม" : t("inProgress"))
-                      : selectedRepair.status === "completed"
-                        ? (language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed"))
-                        : selectedRepair.status === "picked-up"
-                          ? (language === "th" ? "รับเครื่องแล้ว" : t("pickedUp"))
-                          : selectedRepair.status === "cancelled"
-                            ? (language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled"))
-                            : t("pending")}
-                  </span>
-                </div>
-
-                {/* แท็ก */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{language === "th" ? "แท็ก" : "Tag"}</Label>
-                  {isDetailEditing ? (
-                    <Select value={detailTag || "none"} onValueChange={(v) => setDetailTag(v === "none" ? "" : (v as RepairTag))}>
-                      <SelectTrigger className="w-full max-w-[240px] h-9">
-                        <SelectValue placeholder={language === "th" ? "ทุกแท็ก" : "All tags"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">–</SelectItem>
-                        <SelectItem value="endOfDay">{language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in"}</SelectItem>
-                        <SelectItem value="leaveDevice">{language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off"}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="text-sm text-foreground">
-                      {detailTag === "endOfDay"
-                        ? (language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in")
-                        : detailTag === "leaveDevice"
-                          ? (language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off")
-                          : "–"}
-                    </span>
-                  )}
-                </div>
-
-                {/* วันที่ */}
-                <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
-                  <Label className="text-sm text-muted-foreground">{t("date")}</Label>
-                  <span className="text-sm text-foreground">{selectedRepair.createdAt}</span>
+                {/* ราคา */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span className="w-1 h-4 bg-primary rounded-full" />
+                    {language === "th" ? "ราคา" : "Pricing"}
+                  </h3>
+                  <div className="bg-muted/30 rounded-lg p-4">
+                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
+                      <Label className="text-sm text-muted-foreground">{language === "th" ? "ราคาประมาณ" : "Est. price"}</Label>
+                      {isDetailEditing ? (
+                        <Input
+                          type="number"
+                          value={detailOrder.estimatedPrice || ""}
+                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, estimatedPrice: e.target.value } : p))}
+                          className="h-9"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold text-foreground">
+                          ฿{Number(detailOrder.estimatedPrice || 0).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <DialogFooter className="px-6 py-4 border-t border-border flex flex-row flex-wrap items-center justify-between gap-3">
+              <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2 sm:gap-3">
                 {isDetailEditing ? (
                   <>
-                    <Button variant="outline" onClick={() => setIsDetailEditing(false)} className="gap-2">
+                    <Button variant="outline" onClick={() => setIsDetailEditing(false)} className="gap-2 w-full sm:w-auto">
                       <X className="w-4 h-4" />
                       {language === "th" ? "ไม่บันทึก" : "Discard"}
                     </Button>
-                    <Button onClick={handleSaveDetail} className="gap-2 min-w-[100px]">
+                    <Button onClick={handleSaveDetail} className="gap-2 w-full sm:w-auto sm:min-w-[100px]">
                       <Pencil className="w-4 h-4" />
                       {language === "th" ? "บันทึก" : "Save"}
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button variant="ghost" onClick={() => setDetailOpen(false)} className="gap-2 text-muted-foreground">
+                    <Button variant="ghost" onClick={() => setDetailOpen(false)} className="gap-2 text-muted-foreground w-full sm:w-auto">
                       {language === "th" ? "ปิด" : "Close"}
                     </Button>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => setIsDetailEditing(true)} className="gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      <Button variant="outline" onClick={() => setIsDetailEditing(true)} className="gap-2 w-full sm:w-auto">
                         <Pencil className="w-4 h-4" />
                         {language === "th" ? "แก้ไข" : "Edit"}
                       </Button>
                       <Button
                         variant="outline"
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto"
                         onClick={() => {
                           setDetailOpen(false);
                           navigate("/repairs/bill", { state: { highlightRepairId: selectedRepair.id } });

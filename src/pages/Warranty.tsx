@@ -789,8 +789,8 @@ const Warranty = () => {
               {language === "th" ? "อนุมัติหรือปฏิเสธเคลมการรับประกัน" : "Approve or reject warranty claims"}
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
+          <div className="overflow-x-auto min-w-full">
+            <table className="data-table min-w-[900px]">
               <thead>
                 <tr>
                   <th>{t("claimId")}</th>
@@ -1120,8 +1120,8 @@ const Warranty = () => {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="data-table">
+            <div className="overflow-x-auto min-w-full">
+              <table className="data-table min-w-[900px]">
               <thead>
                 <tr>
                   <th>{t("claimId")}</th>

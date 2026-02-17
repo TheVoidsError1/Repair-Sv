@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../config/data-source.js';
 import { Personnel } from '../entities/Personnel.js';
+import { hashPassword, comparePassword } from '../utils/password.js';
 
 const router = Router();
 
@@ -29,8 +30,27 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Simple password check (in production, use bcrypt to hash passwords)
-    if (user.password !== password) {
+    // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+    const isPasswordHashed = user.password.startsWith('$2a$') || 
+                             user.password.startsWith('$2b$') || 
+                             user.password.startsWith('$2y$');
+
+    let isPasswordValid = false;
+    
+    if (isPasswordHashed) {
+      // Compare with hashed password
+      isPasswordValid = await comparePassword(password, user.password);
+    } else {
+      // Legacy: compare plain text password (for backward compatibility)
+      // Then hash it for future use
+      isPasswordValid = user.password === password;
+      if (isPasswordValid) {
+        // Migrate to hashed password
+        user.password = await hashPassword(password);
+      }
+    }
+
+    if (!isPasswordValid) {
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
@@ -131,8 +151,8 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    // Update password
-    user.password = newPassword;
+    // Hash and update password
+    user.password = await hashPassword(newPassword);
     await personnelRepository.save(user);
 
     res.json({
@@ -226,8 +246,8 @@ router.post('/reset-password-by-email', async (req, res) => {
       });
     }
 
-    // Update password
-    user.password = newPassword;
+    // Hash and update password
+    user.password = await hashPassword(newPassword);
     await personnelRepository.save(user);
 
     res.json({

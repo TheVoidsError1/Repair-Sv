@@ -799,8 +799,8 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* การ์ดสรุปแจ้งเตือนสถานะสต็อก */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      {/* การ์ดสรุปแจ้งเตือนสถานะสต็อก - Responsive */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <div className="stat-card">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-status-cancelled/10">
@@ -1442,8 +1442,9 @@ const Inventory = () => {
 
       {/* แสดงการ์ดหมวดหมู่ หรือ ตารางอะไหล่ */}
       {!categoryParam ? (
-        /* แสดงการ์ดหมวดหมู่เมื่อไม่มี category parameter */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <>
+          {/* แสดงการ์ดหมวดหมู่เมื่อไม่มี category parameter - Responsive */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
           {isLoading ? (
             <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
               {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
@@ -1572,10 +1573,13 @@ const Inventory = () => {
             </>
           )}
         </div>
+        </>
       ) : (
-        /* แสดงตารางอะไหล่เมื่อมี category parameter */
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* แสดงตารางอะไหล่เมื่อมี category parameter - Desktop & Mobile */}
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
@@ -1713,7 +1717,117 @@ const Inventory = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-border">
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
+              </div>
+            ) : filteredParts.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <Package className="w-12 h-12 opacity-50" />
+                  <p>{language === "th" ? "ไม่พบรายการอะไหล่" : "No parts found."}</p>
+                </div>
+              </div>
+            ) : (
+              filteredParts.map((part) => {
+                const status = getPartStatus(part.stock, part.minStock);
+                const statusLabel =
+                  status === "out"
+                    ? language === "th" ? "หมด" : "Out of stock"
+                    : status === "low"
+                      ? language === "th" ? "ใกล้หมด" : "Low stock"
+                      : language === "th" ? "พร้อมขาย" : "Ready";
+                const statusClass =
+                  status === "out"
+                    ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                    : status === "low"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+                return (
+                  <div key={part.id} className="p-4 space-y-3">
+                    {/* Header with Image and Info */}
+                    <div className="flex items-start gap-3">
+                      <PartImageCell 
+                        imageUrl={part.imageUrl}
+                        alt={language === "th" ? part.nameTh : part.name}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {language === "th" ? part.nameTh : part.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {language === "th" ? "รหัส" : "SKU"}: {part.displayId}
+                        </p>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+                            statusClass
+                          )}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">{language === "th" ? "ราคาทุน" : "Cost"}:</span>
+                        <p className="font-medium">฿{part.cost.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t("sellPrice")}:</span>
+                        <p className="font-medium">฿{part.sellPrice.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t("stock")}:</span>
+                        <p className="font-semibold text-primary">{part.stock.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{language === "th" ? "ขั้นต่ำ" : "Min"}:</span>
+                        <p className="text-muted-foreground">{part.minStock.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => {
+                          setSelectedPartForStock(part.id);
+                          setStockToAdd("");
+                          setPartSearchQuery("");
+                          setIsAddStockDialogOpen(true);
+                          setTimeout(() => {
+                            stockInputRef.current?.focus();
+                          }, 100);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                        {language === "th" ? "เพิ่ม" : "Add"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => openEditDialog(part)}
+                      >
+                        <Edit className="h-4 w-4" />
+                        {t("edit")}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
+        </>
       )}
     </MainLayout>
   );

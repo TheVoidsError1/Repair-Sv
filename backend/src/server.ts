@@ -16,6 +16,7 @@ import financeRoutes from './api/finance.routes.js';
 import transactionRoutes from './api/transaction.routes.js';
 import lineRoutes from './api/line.routes.js';
 import { Personnel } from './entities/Personnel.js';
+import { hashPassword } from './utils/password.js';
 
 dotenv.config();
 
@@ -110,11 +111,14 @@ const seedDefaultAdmin = async () => {
     return;
   }
 
+  // Hash password before saving
+  const hashedPassword = await hashPassword(defaultPassword);
+  
   const admin = personnelRepository.create({
     firstName: 'Admin',
     lastName: 'User',
     username: defaultUsername,
-    password: defaultPassword, // โปรดเปลี่ยนเป็น hash ใน production
+    password: hashedPassword,
     email: defaultEmail,
     phone: '0800000000',
     role: 'admin',

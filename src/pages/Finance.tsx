@@ -729,8 +729,8 @@ const Finance = () => {
             </TabsList>
           </div>
           <TabsContent value="all" className="mt-0">
-            <div className="overflow-x-auto">
-              <table className="data-table">
+            <div className="overflow-x-auto min-w-full">
+              <table className="data-table min-w-[800px]">
                 <thead>
                   <tr>
                     <th>{t("transactionId")}</th>
@@ -833,8 +833,8 @@ const Finance = () => {
             )}
           </TabsContent>
           <TabsContent value="income" className="mt-0">
-            <div className="overflow-x-auto">
-              <table className="data-table">
+            <div className="overflow-x-auto min-w-full">
+              <table className="data-table min-w-[800px]">
                 <thead>
                   <tr>
                     <th>{t("transactionId")}</th>
@@ -931,8 +931,8 @@ const Finance = () => {
             )}
           </TabsContent>
           <TabsContent value="expense" className="mt-0">
-            <div className="overflow-x-auto">
-              <table className="data-table">
+            <div className="overflow-x-auto min-w-full">
+              <table className="data-table min-w-[800px]">
                 <thead>
                   <tr>
                     <th>{t("transactionId")}</th>

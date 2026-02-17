@@ -385,7 +385,7 @@ const Customers = () => {
           </div>
         </div>
 
-        {/* Customer List */}
+        {/* Customer List - Desktop & Mobile */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">
@@ -403,7 +403,8 @@ const Customers = () => {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -512,6 +513,90 @@ const Customers = () => {
                 </Table>
               </div>
 
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-border">
+                {paginatedCustomers.map((customer) => {
+                  const fullName =
+                    customer.fullName ||
+                    `${customer.firstName} ${customer.lastName || ""}`.trim();
+                  return (
+                    <div key={customer.id} className="p-4 space-y-3">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-foreground truncate">{fullName || customer.firstName}</p>
+                          {customer.phone && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                              <Phone className="w-3 h-3" />
+                              {customer.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-1.5 text-sm">
+                        {customer.lineId && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground min-w-[80px]">LINE ID:</span>
+                            <span className="text-blue-600 dark:text-blue-400 break-all">{customer.lineId}</span>
+                          </div>
+                        )}
+                        {customer.lineIdRes && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground min-w-[80px]">UserLineID:</span>
+                            <span className="text-green-600 dark:text-green-400 break-all">{customer.lineIdRes}</span>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground min-w-[80px]">{language === "th" ? "วันที่สร้าง" : "Created"}:</span>
+                          <span className="text-foreground">
+                            {new Date(customer.createdAt).toLocaleDateString(
+                              language === "th" ? "th-TH" : "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/customers/${customer.id}`)}
+                          className="flex-1 gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          {language === "th" ? "ดู" : "View"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(customer)}
+                          className="flex-1 gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          {language === "th" ? "แก้ไข" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteDialog(customer)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="border-t border-border p-4">
@@ -581,7 +666,7 @@ const Customers = () => {
             setIsDialogOpen(open);
           }}
         >
-          <DialogContent>
+          <DialogContent className="w-[95vw] sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>
                 {editingCustomer
@@ -592,7 +677,7 @@ const Customers = () => {
                   ? "เพิ่มลูกค้าใหม่"
                   : "Add New Customer"}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm">
                 {editingCustomer
                   ? language === "th"
                     ? "แก้ไขข้อมูลลูกค้า"
@@ -602,9 +687,9 @@ const Customers = () => {
                   : "Enter new customer information"}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-3 sm:gap-4 py-3 sm:py-4">
               <div className="grid gap-2">
-                <Label htmlFor="firstName">
+                <Label htmlFor="firstName" className="text-sm">
                   {language === "th" ? "ชื่อ" : "First Name"}{" "}
                   <span className="text-destructive">*</span>
                 </Label>
@@ -617,10 +702,11 @@ const Customers = () => {
                   onChange={(e) =>
                     setForm({ ...form, firstName: e.target.value })
                   }
+                  className="h-10"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lastName">
+                <Label htmlFor="lastName" className="text-sm">
                   {language === "th" ? "นามสกุล" : "Last Name"}{" "}
                   <span className="text-destructive">*</span>
                 </Label>
@@ -633,10 +719,11 @@ const Customers = () => {
                   onChange={(e) =>
                     setForm({ ...form, lastName: e.target.value })
                   }
+                  className="h-10"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="phone">
+                <Label htmlFor="phone" className="text-sm">
                   {language === "th" ? "เบอร์โทรศัพท์" : "Phone"}
                 </Label>
                 <Input
@@ -648,10 +735,11 @@ const Customers = () => {
                   }
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="h-10"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lineId">{language === "th" ? "UserLineID" : "UserLineID"}</Label>
+                <Label htmlFor="lineId" className="text-sm">{language === "th" ? "UserLineID" : "UserLineID"}</Label>
                 <Input
                   id="lineId"
                   placeholder={
@@ -659,20 +747,22 @@ const Customers = () => {
                   }
                   value={form.lineId}
                   onChange={(e) => setForm({ ...form, lineId: e.target.value })}
+                  className="h-10"
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
                 onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
                 }}
+                className="w-full sm:w-auto"
               >
                 {language === "th" ? "ยกเลิก" : "Cancel"}
               </Button>
-              <Button onClick={handleSaveCustomer}>
+              <Button onClick={handleSaveCustomer} className="w-full sm:w-auto">
                 {editingCustomer
                   ? language === "th"
                     ? "บันทึก"
@@ -690,12 +780,12 @@ const Customers = () => {
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
         >
-          <AlertDialogContent>
+          <AlertDialogContent className="w-[95vw] sm:max-w-[425px]">
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {language === "th" ? "ยืนยันการลบ" : "Confirm Delete"}
               </AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription className="text-xs sm:text-sm">
                 {language === "th" ? (
                   <>
                     คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้า{" "}
@@ -721,13 +811,13 @@ const Customers = () => {
                 )}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel className="w-full sm:w-auto">
                 {language === "th" ? "ยกเลิก" : "Cancel"}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteCustomer}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
               >
                 {language === "th" ? "ลบ" : "Delete"}
               </AlertDialogAction>

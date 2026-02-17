@@ -142,7 +142,7 @@ const Dashboard = () => {
   return (
     <MainLayout>
       <div className="page-header">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="page-title">{t("dashboard")}</h1>
             <p className="page-description">{t("dashboardWelcome")}</p>
@@ -150,8 +150,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Grid - Responsive */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard
           title={t("activeRepairs")}
           value={activeRepairsCount}
@@ -186,8 +186,8 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Charts and Alerts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Charts and Alerts Row - Responsive */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <div className="lg:col-span-2">
           <RevenueChart />
         </div>

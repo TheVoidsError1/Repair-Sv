@@ -73,11 +73,11 @@ export function StockAlerts() {
 
   return (
     <div className="bg-card rounded-xl border border-border animate-fade-in h-full">
-      <div className="flex items-center gap-2 p-6 border-b border-border">
-        <AlertTriangle className="w-5 h-5 text-status-pending" />
-        <h3 className="text-lg font-semibold text-foreground">{t("lowStockAlerts")}</h3>
+      <div className="flex items-center gap-2 p-4 sm:p-6 border-b border-border">
+        <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-status-pending" />
+        <h3 className="text-base sm:text-lg font-semibold text-foreground">{t("lowStockAlerts")}</h3>
       </div>
-      <div className="p-4 space-y-3">
+      <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
