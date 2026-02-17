@@ -5,6 +5,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiClient } from "@/lib/api";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import {
     buildPickupIsoFromDateAndTime,
@@ -19,9 +20,21 @@ export interface BillContentProps {
   data: RepairOrderData;
   formatPrice: (value: string) => string;
   copyLabel: string;
+  selectedParts?: Array<{
+    id?: string;
+    partNumber?: string;
+    name?: string;
+    nameTh?: string;
+    price?: number;
+  }>;
+  additionalParts?: Array<{
+    name: string;
+    nameTh?: string;
+    price: number;
+  }>;
 }
 
-export const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) => (
+export const BillContent = ({ data, formatPrice, copyLabel, selectedParts, additionalParts }: BillContentProps) => (
   <div className="repair-bill-single bg-white border-2 border-gray-800 rounded-lg p-4 print:p-3 text-gray-900">
     <div className="flex justify-between items-start mb-3 text-xs">
       <div className="text-center">
@@ -139,6 +152,38 @@ export const BillContent = ({ data, formatPrice, copyLabel }: BillContentProps) 
         <span className="ml-4">นัดรับซ่อม</span>
         <div className="w-40 border-b border-gray-400 min-h-[20px]" />
       </div>
+
+      {/* แสดงรายการชิ้นส่วนที่ใช้ */}
+      {((selectedParts && selectedParts.length > 0) || (additionalParts && additionalParts.length > 0)) && (
+        <div className="mt-3 space-y-2">
+          <div className="text-xs font-semibold">รายการชิ้นส่วนที่ใช้:</div>
+          <div className="space-y-1 text-[11px]">
+            {selectedParts && selectedParts.map((part, index) => (
+              <div key={part.id || index} className="flex justify-between items-center border-b border-gray-300 pb-1">
+                <span className="flex-1">
+                  {part.nameTh || part.name || "รายการซ่อม"}
+                  {part.partNumber && (
+                    <span className="text-gray-500 ml-2">({part.partNumber})</span>
+                  )}
+                </span>
+                <span className="w-24 text-right">
+                  {part.price ? formatPrice(String(part.price)) : ""}
+                </span>
+              </div>
+            ))}
+            {additionalParts && additionalParts.map((part, index) => (
+              <div key={`additional-${index}`} className="flex justify-between items-center border-b border-gray-300 pb-1">
+                <span className="flex-1">
+                  {part.nameTh || part.name || "รายการซ่อม"}
+                </span>
+                <span className="w-24 text-right">
+                  {part.price ? formatPrice(String(part.price)) : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
 
     <div className="mt-2 mb-3">
@@ -210,12 +255,94 @@ const RepairOrderBill = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
-  const dataFromNav = location.state as RepairOrderData | null | undefined;
+  const dataFromNav = location.state as (RepairOrderData & { returnTo?: string }) | null | undefined;
   const [reportDate, setReportDate] = useState(() => getInitialReportDateTime().dateOfReport);
   const [reportTime, setReportTime] = useState(() => getInitialReportDateTime().timeOfReport);
   const [serviceType, setServiceType] = useState<ServiceType>("walk_in");
   const [receiveTime, setReceiveTime] = useState(() => getInitialReportDateTime().timeOfReport);
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
+  const [selectedParts, setSelectedParts] = useState<Array<{
+    id?: string;
+    partNumber?: string;
+    name?: string;
+    nameTh?: string;
+    price?: number;
+  }>>([]);
+  const [additionalParts, setAdditionalParts] = useState<Array<{
+    name: string;
+    nameTh?: string;
+    price: number;
+  }>>([]);
+  const [fullRepairData, setFullRepairData] = useState<any>(null);
+
+  // Load full repair data from API if repairId is provided
+  useEffect(() => {
+    const state = location.state as any;
+    if (!state?.repairId) return;
+
+    const loadFullRepairData = async () => {
+      try {
+        // Try to get by repairNumber first, then by UUID
+        let repair = null;
+        try {
+          const response = await apiClient.getRepairById(state.repairId);
+          if (response.status === 'success' && response.data) {
+            repair = response.data;
+          }
+        } catch (error) {
+          // If getRepairById fails, try searching in all repairs
+          const response = await apiClient.getRepairs(1, 1000);
+          if (response.status === 'success' && response.data) {
+            repair = response.data.find((r: any) => 
+              r.repairNumber === state.repairId || r.id === state.repairId
+            );
+          }
+        }
+
+        if (repair) {
+          setFullRepairData(repair);
+          
+          // Load parts
+          if (repair.selectedParts && Array.isArray(repair.selectedParts) && repair.selectedParts.length > 0) {
+            setSelectedParts(repair.selectedParts.map((part: any) => ({
+              id: part.id,
+              partNumber: part.partNumber || undefined,
+              name: part.name,
+              nameTh: part.nameTh || part.name,
+              price: part.price,
+            })));
+          } else if (state?.selectedParts) {
+            setSelectedParts(state.selectedParts);
+          }
+          
+          if (repair.additionalParts && Array.isArray(repair.additionalParts) && repair.additionalParts.length > 0) {
+            setAdditionalParts(repair.additionalParts);
+          } else if (state?.additionalParts) {
+            setAdditionalParts(state.additionalParts);
+          }
+        } else {
+          // Fallback to state data
+          if (state?.selectedParts) {
+            setSelectedParts(state.selectedParts);
+          }
+          if (state?.additionalParts) {
+            setAdditionalParts(state.additionalParts);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading full repair data:', error);
+        // Fallback to state data
+        if (state?.selectedParts) {
+          setSelectedParts(state.selectedParts);
+        }
+        if (state?.additionalParts) {
+          setAdditionalParts(state.additionalParts);
+        }
+      }
+    };
+
+    loadFullRepairData();
+  }, [location.state]);
 
   useEffect(() => {
     if (!dataFromNav) return;
@@ -285,27 +412,75 @@ const RepairOrderBill = () => {
       month: "2-digit",
       year: "numeric",
     });
+
+    // Use full repair data if available, otherwise use dataFromNav
+    const baseData: RepairOrderData = fullRepairData ? {
+      serialNumber: fullRepairData.serialNumber || dataFromNav.serialNumber,
+      customer: dataFromNav.customer,
+      phone: dataFromNav.phone,
+      model: fullRepairData.deviceModel || fullRepairData.deviceType || dataFromNav.model,
+      color: fullRepairData.deviceColor || dataFromNav.color || "",
+      screenLockCode: fullRepairData.screenLockCode || dataFromNav.screenLockCode || "",
+      problemSymptoms: fullRepairData.problemSymptoms || fullRepairData.problemDescription || dataFromNav.problemSymptoms || "",
+      deposit: fullRepairData.deposit ? String(fullRepairData.deposit) : dataFromNav.deposit || "",
+      estimatedPrice: fullRepairData.estimatedPrice ? String(fullRepairData.estimatedPrice) : dataFromNav.estimatedPrice || "",
+      repairSummaryPrice: fullRepairData.repairSummaryPrice ? String(fullRepairData.repairSummaryPrice) : (fullRepairData.totalCost ? String(fullRepairData.totalCost) : dataFromNav.repairSummaryPrice || ""),
+      dateOfReport: fullRepairData.dateOfReport ? (() => {
+        try {
+          const d = new Date(fullRepairData.dateOfReport);
+          return d.toLocaleDateString(language === "th" ? "th-TH" : "en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          });
+        } catch {
+          return dataFromNav.dateOfReport || todayLocale;
+        }
+      })() : dataFromNav.dateOfReport || todayLocale,
+      timeOfReport: fullRepairData.timeOfReport || dataFromNav.timeOfReport,
+      scheduledPickupTime: fullRepairData.scheduledPickupTime ? (() => {
+        try {
+          return new Date(fullRepairData.scheduledPickupTime).toISOString();
+        } catch {
+          return dataFromNav.scheduledPickupTime;
+        }
+      })() : dataFromNav.scheduledPickupTime,
+      service_type: (fullRepairData.serviceType || dataFromNav.service_type || "walk_in") as ServiceType,
+      receive_date: fullRepairData.receiveDate ? (() => {
+        try {
+          const d = new Date(fullRepairData.receiveDate);
+          return d.toISOString().split('T')[0];
+        } catch {
+          return dataFromNav.receive_date || todayIso;
+        }
+      })() : dataFromNav.receive_date || todayIso,
+      receive_time: fullRepairData.receiveTime || dataFromNav.receive_time,
+      selectedPartId: dataFromNav.selectedPartId,
+      selectedParts: dataFromNav.selectedParts,
+      additionalParts: dataFromNav.additionalParts,
+    } : dataFromNav;
+
     if (serviceType === "walk_in") {
       const pickupIso = buildPickupIsoFromDateAndTime(todayIso, receiveTime);
       return {
-        ...dataFromNav,
+        ...baseData,
         service_type: "walk_in",
         receive_date: todayIso,
         receive_time: receiveTime,
-        dateOfReport: dataFromNav.dateOfReport || todayLocale,
-        timeOfReport: dataFromNav.timeOfReport ?? receiveTime,
-        scheduledPickupTime: pickupIso ?? dataFromNav.scheduledPickupTime,
+        dateOfReport: baseData.dateOfReport || todayLocale,
+        timeOfReport: baseData.timeOfReport ?? receiveTime,
+        scheduledPickupTime: pickupIso ?? baseData.scheduledPickupTime,
       };
     }
     const pickupIso = buildPickupIsoFromDateAndTime(receiveDate, receiveTime);
     return {
-      ...dataFromNav,
+      ...baseData,
       service_type: "drop_off",
       receive_date: receiveDate,
       receive_time: receiveTime,
-      dateOfReport: reportDate || dataFromNav.dateOfReport,
-      timeOfReport: reportTime || dataFromNav.timeOfReport,
-      scheduledPickupTime: pickupIso ?? dataFromNav.scheduledPickupTime,
+      dateOfReport: reportDate || baseData.dateOfReport,
+      timeOfReport: reportTime || baseData.timeOfReport,
+      scheduledPickupTime: pickupIso ?? baseData.scheduledPickupTime,
     };
   })();
 
@@ -317,9 +492,13 @@ const RepairOrderBill = () => {
             {language === "th" ? "กรุณาเลือกงานซ่อมจากรายการออกบิล" : "Please select a repair from the bill list."}
           </p>
           <div className="flex justify-center">
-            <Button variant="outline" onClick={() => navigate("/repairs/bill")} className="gap-2">
+            <Button variant="outline" onClick={() => {
+              // กลับไปหน้าที่ระบุไว้ใน returnTo หรือกลับไปที่จัดการใบแจ้งซ่อม
+              const returnPath = dataFromNav?.returnTo || "/repairs/bill/management";
+              navigate(returnPath);
+            }} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
-              {language === "th" ? "กลับไปรายการออกบิล" : "Back to bill list"}
+              {language === "th" ? "กลับไปรายการ" : "Back to list"}
             </Button>
           </div>
         </div>
@@ -331,7 +510,11 @@ const RepairOrderBill = () => {
     <MainLayout>
       <div className="max-w-6xl mx-auto repair-bill-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 print:hidden">
-          <Button variant="outline" onClick={() => navigate("/repairs/bill")} className="gap-2 w-fit">
+          <Button variant="outline" onClick={() => {
+            // กลับไปหน้าที่ระบุไว้ใน returnTo หรือกลับไปที่จัดการใบแจ้งซ่อม
+            const returnPath = dataFromNav?.returnTo || "/repairs/bill/management";
+            navigate(returnPath);
+          }} className="gap-2 w-fit">
             <ArrowLeft className="w-4 h-4" />
             {language === "th" ? "กลับรายการ" : "Back to list"}
           </Button>
@@ -350,6 +533,8 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={leftCopyLabel}
+                  selectedParts={selectedParts}
+                  additionalParts={additionalParts}
                 />
               </div>
               <div className="flex-1">
@@ -357,6 +542,8 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={rightCopyLabel}
+                  selectedParts={selectedParts}
+                  additionalParts={additionalParts}
                 />
               </div>
             </>
@@ -371,6 +558,8 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={leftCopyLabel}
+                  selectedParts={selectedParts}
+                  additionalParts={additionalParts}
                 />
               </div>
               <div className="flex-1">
@@ -378,6 +567,8 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={rightCopyLabel}
+                  selectedParts={selectedParts}
+                  additionalParts={additionalParts}
                 />
               </div>
             </>

@@ -210,10 +210,24 @@ router.get('/:id', async (req, res) => {
     const repairRepository = AppDataSource.getRepository(Repair);
     const partRepository = AppDataSource.getRepository(Part);
     
-    const repair = await repairRepository.findOne({
-      where: { id },
-      relations: ['customer', 'assignedTo', 'selectedPart'],
-    });
+    // Check if id is a valid UUID format (8-4-4-4-12 hex characters)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isUUID = uuidRegex.test(id);
+    
+    let repair;
+    if (isUUID) {
+      // If it's a UUID, search by id
+      repair = await repairRepository.findOne({
+        where: { id },
+        relations: ['customer', 'assignedTo', 'selectedPart'],
+      });
+    } else {
+      // If it's not a UUID, it's likely a repairNumber
+      repair = await repairRepository.findOne({
+        where: { repairNumber: id },
+        relations: ['customer', 'assignedTo', 'selectedPart'],
+      });
+    }
 
     if (!repair) {
       return res.status(404).json({
@@ -237,10 +251,21 @@ router.get('/:id', async (req, res) => {
       }
     }
 
-    // เพิ่ม selectedParts ลงใน response
+    // Parse additionalParts (ถ้ามี)
+    let additionalParts = null;
+    if (repair.additionalParts) {
+      try {
+        additionalParts = JSON.parse(repair.additionalParts);
+      } catch (error) {
+        console.error('Error parsing additionalParts:', error);
+      }
+    }
+
+    // เพิ่ม selectedParts และ additionalParts ลงใน response
     const responseData = {
       ...repair,
       selectedParts: selectedParts || (repair.selectedPart ? [repair.selectedPart] : []),
+      additionalParts: additionalParts || [],
     };
 
     res.json({
@@ -286,6 +311,7 @@ router.post('/', async (req, res) => {
       receive_time,
       selectedPartId, // Keep for backward compatibility
       selectedPartIds, // New: array of part IDs
+      additionalParts, // Array of parts not in inventory: [{ name: string, nameTh?: string, price: number }]
       deviceType = 'phone',
       deviceBrand,
       deviceModel,
@@ -494,6 +520,7 @@ router.post('/', async (req, res) => {
       timeOfReport: timeOfReport || undefined,
       selectedPartId: selectedPartIds && selectedPartIds.length > 0 ? selectedPartIds[0] : (selectedPartId || undefined), // Use first part ID for backward compatibility
       selectedPartIds: selectedPartIds && selectedPartIds.length > 0 ? JSON.stringify(selectedPartIds) : undefined, // Store as JSON string
+      additionalParts: additionalParts && Array.isArray(additionalParts) && additionalParts.length > 0 ? JSON.stringify(additionalParts) : undefined, // Store as JSON string
       warrantyInfo: warrantyInfo || undefined,
     };
 
@@ -637,7 +664,16 @@ router.put('/:id', async (req, res) => {
     }
 
     // Update other fields (excluding status which we already handled)
-    const { status, selectedPartIds: newSelectedPartIds, selectedPartId: newSelectedPartId, ...otherFields } = req.body;
+    const { status, selectedPartIds: newSelectedPartIds, selectedPartId: newSelectedPartId, additionalParts: newAdditionalParts, ...otherFields } = req.body;
+    
+    // Handle additionalParts update
+    if (newAdditionalParts !== undefined) {
+      if (newAdditionalParts && Array.isArray(newAdditionalParts) && newAdditionalParts.length > 0) {
+        repair.additionalParts = JSON.stringify(newAdditionalParts);
+      } else {
+        repair.additionalParts = undefined;
+      }
+    }
     
     // Handle selectedPartIds update
     if (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) {
@@ -650,43 +686,81 @@ router.put('/:id', async (req, res) => {
       }
     }
     
-    // คำนวณ partsCost, laborCost, totalCost อัตโนมัติ (ถ้ามีการเปลี่ยนแปลง selectedPartIds)
-    if (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) {
+    // คำนวณ partsCost, laborCost, totalCost อัตโนมัติ (ถ้ามีการเปลี่ยนแปลง selectedPartIds หรือ additionalParts)
+    const shouldRecalculateCost = (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) || 
+                                   (newAdditionalParts !== undefined);
+    
+    if (shouldRecalculateCost) {
       try {
-        const partIdsToCalculate = newSelectedPartIds || (newSelectedPartId ? [newSelectedPartId] : []);
+        let autoPartsCost = 0;
         
-        if (partIdsToCalculate.length > 0) {
-          const partRepository = AppDataSource.getRepository(Part);
-          const parts = await partRepository.findByIds(partIdsToCalculate);
+        // คำนวณราคาจาก selectedParts (ชิ้นส่วนที่มีในคลังสินค้า)
+        if (newSelectedPartIds !== undefined || newSelectedPartId !== undefined) {
+          const partIdsToCalculate = newSelectedPartIds || (newSelectedPartId ? [newSelectedPartId] : []);
           
-          // นับจำนวนแต่ละ part
-          const partCounts: Record<string, number> = {};
-          partIdsToCalculate.forEach((partId: string) => {
-            partCounts[partId] = (partCounts[partId] || 0) + 1;
-          });
-          
-          // คำนวณราคารวมของอะไหล่
-          let autoPartsCost = 0;
-          parts.forEach((part: any) => {
-            const count = partCounts[part.id] || 1;
-            const partPrice = Number(part.price) || 0;
-            autoPartsCost += partPrice * count;
-          });
-          
-          // อัพเดทค่าถ้า Frontend ไม่ได้ส่งมา หรือเป็น 0
-          if (otherFields.partsCost === undefined || otherFields.partsCost === 0) {
-            otherFields.partsCost = autoPartsCost;
+          if (partIdsToCalculate.length > 0) {
+            const partRepository = AppDataSource.getRepository(Part);
+            const parts = await partRepository.findByIds(partIdsToCalculate);
+            
+            // นับจำนวนแต่ละ part
+            const partCounts: Record<string, number> = {};
+            partIdsToCalculate.forEach((partId: string) => {
+              partCounts[partId] = (partCounts[partId] || 0) + 1;
+            });
+            
+            // คำนวณราคารวมของอะไหล่
+            parts.forEach((part: any) => {
+              const count = partCounts[part.id] || 1;
+              const partPrice = Number(part.price) || 0;
+              autoPartsCost += partPrice * count;
+            });
           }
-          
-          // คำนวณ totalCost ใหม่ (รวมภาษี 7%)
-          const currentLaborCost = otherFields.laborCost !== undefined ? otherFields.laborCost : repair.laborCost;
-          const currentPartsCost = otherFields.partsCost !== undefined ? otherFields.partsCost : repair.partsCost;
-          const subtotal = Number(currentPartsCost) + Number(currentLaborCost);
-          const taxRate = 0.07; // ภาษี 7%
-          otherFields.totalCost = subtotal * (1 + taxRate);
+        } else {
+          // ถ้าไม่ได้อัพเดท selectedPartIds ให้ใช้ราคาเดิม
+          autoPartsCost = Number(repair.partsCost) || 0;
+        }
+        
+        // คำนวณราคาจาก additionalParts (ชิ้นส่วนที่ไม่มีในคลังสินค้า)
+        let additionalPartsCost = 0;
+        if (newAdditionalParts !== undefined && Array.isArray(newAdditionalParts) && newAdditionalParts.length > 0) {
+          additionalPartsCost = newAdditionalParts.reduce((sum: number, part: any) => {
+            return sum + (Number(part.price) || 0);
+          }, 0);
+        } else if (repair.additionalParts) {
+          // ถ้าไม่ได้อัพเดท additionalParts ให้ใช้ราคาเดิม
+          try {
+            const existingAdditionalParts = JSON.parse(repair.additionalParts);
+            if (Array.isArray(existingAdditionalParts)) {
+              additionalPartsCost = existingAdditionalParts.reduce((sum: number, part: any) => {
+                return sum + (Number(part.price) || 0);
+              }, 0);
+            }
+          } catch (error) {
+            console.error('[Update Repair] Error parsing existing additionalParts:', error);
+          }
+        }
+        
+        // รวมราคาทั้งหมด
+        const totalPartsCost = autoPartsCost + additionalPartsCost;
+        
+        // อัพเดท partsCost
+        if (shouldRecalculateCost) {
+          otherFields.partsCost = totalPartsCost;
+        }
+        
+        // คำนวณ totalCost ใหม่ (รวมภาษี 7%)
+        const currentLaborCost = otherFields.laborCost !== undefined ? otherFields.laborCost : repair.laborCost;
+        const currentPartsCost = otherFields.partsCost !== undefined ? otherFields.partsCost : totalPartsCost;
+        const subtotal = Number(currentPartsCost) + Number(currentLaborCost);
+        const taxRate = 0.07; // ภาษี 7%
+        otherFields.totalCost = subtotal * (1 + taxRate);
+        
+        // อัพเดท repairSummaryPrice ถ้าไม่ได้ส่งมา
+        if (otherFields.repairSummaryPrice === undefined) {
+          otherFields.repairSummaryPrice = totalPartsCost;
         }
       } catch (error) {
-        console.error('Error calculating parts cost on update:', error);
+        console.error('[Update Repair] Error calculating parts cost on update:', error);
       }
     }
     

@@ -42,6 +42,12 @@ export interface RepairItem {
     nameTh?: string;
     price?: number;
   }>;
+  /** ข้อมูลชิ้นส่วนเพิ่มเติมที่ไม่มีในคลังสินค้า (array) */
+  additionalParts?: Array<{
+    name: string;
+    nameTh?: string;
+    price: number;
+  }>;
 }
 
 interface RepairsContextValue {
@@ -102,6 +108,7 @@ function convertRepairFromAPI(repair: any): RepairItem {
       nameTh: repair.selectedPart.nameTh,
       price: repair.selectedPart.price,
     }] : undefined),
+    additionalParts: repair.additionalParts || undefined,
   };
 }
 

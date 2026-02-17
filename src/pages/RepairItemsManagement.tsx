@@ -174,6 +174,7 @@ const RepairItemsManagement = () => {
       problemSymptoms: repair.problemSymptoms || "",
       diagnosis: repair.diagnosis || "",
       repairNotes: repair.repairNotes || "",
+      additionalParts: (repair as any).additionalParts || [],
       status: repair.status || "pending",
       laborCost: repair.laborCost || 0,
       partsCost: repair.partsCost || 0,
@@ -680,6 +681,77 @@ const RepairItemsManagement = () => {
                 }
                 rows={2}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>{isTh ? "ชิ้นส่วนเพิ่มเติม (ไม่มีในคลังสินค้า)" : "Additional Parts (Not in Inventory)"}</Label>
+              <div className="space-y-2 border rounded-lg p-3">
+                {((editFormData.additionalParts as any[]) || []).map((part, index) => (
+                  <div key={index} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label className="text-xs">{isTh ? "ชื่อชิ้นส่วน" : "Part Name"}</Label>
+                      <Input
+                        value={part.name || ""}
+                        onChange={(e) => {
+                          const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                          newParts[index] = { ...newParts[index], name: e.target.value };
+                          setEditFormData({ ...editFormData, additionalParts: newParts });
+                        }}
+                        placeholder={isTh ? "เช่น ปุ่มเสีย" : "e.g., Broken button"}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-xs">{isTh ? "ชื่อภาษาไทย" : "Name (Thai)"}</Label>
+                      <Input
+                        value={part.nameTh || ""}
+                        onChange={(e) => {
+                          const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                          newParts[index] = { ...newParts[index], nameTh: e.target.value };
+                          setEditFormData({ ...editFormData, additionalParts: newParts });
+                        }}
+                        placeholder={isTh ? "เช่น ปุ่มเสีย" : "e.g., ปุ่มเสีย"}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Label className="text-xs">{isTh ? "ราคา" : "Price"}</Label>
+                      <Input
+                        type="number"
+                        value={part.price || 0}
+                        onChange={(e) => {
+                          const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                          newParts[index] = { ...newParts[index], price: parseFloat(e.target.value) || 0 };
+                          setEditFormData({ ...editFormData, additionalParts: newParts });
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                        newParts.splice(index, 1);
+                        setEditFormData({ ...editFormData, additionalParts: newParts });
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                    newParts.push({ name: "", nameTh: "", price: 0 });
+                    setEditFormData({ ...editFormData, additionalParts: newParts });
+                  }}
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {isTh ? "เพิ่มชิ้นส่วน" : "Add Part"}
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

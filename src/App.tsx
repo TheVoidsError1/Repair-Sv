@@ -16,6 +16,8 @@ import RepairNew from "./pages/RepairNew";
 import RepairBill from "./pages/RepairBill";
 import RepairOrderBill from "./pages/RepairOrderBill";
 import RepairReceipt from "./pages/RepairReceipt";
+import RepairBillManagement from "./pages/RepairBillManagement";
+import CustomerBills from "./pages/CustomerBills";
 import Inventory from "./pages/Inventory";
 import Warranty from "./pages/Warranty";
 import Finance from "./pages/Finance";
@@ -95,6 +97,8 @@ const App = () => (
                     <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
                     <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
                     <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
+                    <Route path="/repairs/bill/management" element={<ProtectedRoute><RepairBillManagement /></ProtectedRoute>} />
+                    <Route path="/repairs/bill/customer" element={<ProtectedRoute><CustomerBills /></ProtectedRoute>} />
                     <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                     <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
                     <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />

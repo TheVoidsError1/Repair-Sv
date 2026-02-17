@@ -57,6 +57,9 @@ export class Repair {
   @Column({ type: 'text', nullable: true })
   selectedPartIds?: string; // JSON array of part IDs
 
+  @Column({ type: 'text', nullable: true })
+  additionalParts?: string; // JSON array of parts not in inventory: [{ name: string, nameTh?: string, price: number }]
+
   @Column({ type: 'varchar', length: 100 })
   deviceType!: string; // 'phone', 'tablet', 'laptop', etc.
 

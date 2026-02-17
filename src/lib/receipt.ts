@@ -98,6 +98,11 @@ export function mapRepairOrderToReceiptData(
       nameTh?: string;
       price?: number;
     }>;
+    additionalParts?: Array<{
+      name: string;
+      nameTh?: string;
+      price: number;
+    }>;
   } = {}
 ): ReceiptData {
   const receiptNo = options.receiptNo ?? "—";
@@ -107,9 +112,10 @@ export function mapRepairOrderToReceiptData(
   let items: ReceiptLineItem[] = [];
   let subtotal = 0;
 
+  // เพิ่มรายการจาก selectedParts (ชิ้นส่วนที่มีในคลังสินค้า)
   if (options.selectedParts && options.selectedParts.length > 0) {
     // สร้างรายการสำหรับแต่ละ part
-    items = options.selectedParts.map((part) => {
+    const selectedPartItems = options.selectedParts.map((part) => {
       // แปลงราคาให้เป็น number เสมอ (เผื่อ backend ส่งมาเป็น string จาก decimal)
       const partPrice = part.price != null ? parseFloat(String(part.price)) : 0;
       subtotal += partPrice;
@@ -121,6 +127,7 @@ export function mapRepairOrderToReceiptData(
         amount: partPrice,
       };
     });
+    items.push(...selectedPartItems);
   } else if (options.selectedPart) {
     // รองรับ backward compatibility: ถ้ามี selectedPart เดียว
     const partPrice =
@@ -137,7 +144,26 @@ export function mapRepairOrderToReceiptData(
         amount: partPrice,
       },
     ];
-  } else {
+  }
+
+  // เพิ่มรายการจาก additionalParts (ชิ้นส่วนที่ไม่มีในคลังสินค้า)
+  if (options.additionalParts && options.additionalParts.length > 0) {
+    const additionalPartItems = options.additionalParts.map((part) => {
+      const partPrice = part.price != null ? parseFloat(String(part.price)) : 0;
+      subtotal += partPrice;
+      return {
+        itemCode: "", // ไม่มีรหัสสินค้าเพราะไม่มีในคลัง
+        description: part.nameTh || part.name || "รายการซ่อม",
+        quantity: 1,
+        unitPrice: partPrice,
+        amount: partPrice,
+      };
+    });
+    items.push(...additionalPartItems);
+  }
+
+  // ถ้าไม่มีทั้ง selectedParts และ additionalParts ให้ใช้ราคารวมจาก repairSummaryPrice
+  if (items.length === 0) {
     // ถ้าไม่มี part ให้ใช้ราคารวมจาก repairSummaryPrice
     const price = parsePrice(data.repairSummaryPrice || data.estimatedPrice || "0");
     subtotal = price;

@@ -53,7 +53,7 @@ const RepairReceipt = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { refreshRepairs } = useRepairs();
-  const dataFromNav = location.state as (RepairOrderData & { repairId?: string }) | null | undefined;
+  const dataFromNav = location.state as (RepairOrderData & { repairId?: string; returnTo?: string }) | null | undefined;
   const [reportDate, setReportDate] = useState(() => getInitialReportDateTime().dateOfReport);
   const [reportTime, setReportTime] = useState(() => getInitialReportDateTime().timeOfReport);
   const [serviceType, setServiceType] = useState<ServiceType>("walk_in");
@@ -61,6 +61,7 @@ const RepairReceipt = () => {
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
   const [selectedPart, setSelectedPart] = useState<{ partNumber?: string; name?: string; nameTh?: string; price?: number } | null>(null);
   const [selectedParts, setSelectedParts] = useState<Array<{ partNumber?: string; name?: string; nameTh?: string; price?: number }>>([]);
+  const [additionalParts, setAdditionalParts] = useState<Array<{ name: string; nameTh?: string; price: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   // Load repair data from API if repairId is provided
@@ -69,12 +70,24 @@ const RepairReceipt = () => {
       // ถ้ามี selectedParts ใน dataFromNav (จาก RepairBill ที่ส่งมา) ให้ใช้เลย
       if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
         setSelectedParts(dataFromNav.selectedParts as any);
-        return;
+      }
+
+      // ถ้ามี additionalParts ใน dataFromNav ให้ใช้เลย
+      if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts) {
+        setAdditionalParts(dataFromNav.additionalParts as any);
       }
 
       // ถ้ามี selectedPart ใน dataFromNav (backward compatibility) ให้ใช้เลย
       if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
         setSelectedPart(dataFromNav.selectedPart as any);
+        // ถ้ามี selectedParts หรือ additionalParts แล้วไม่ต้อง return
+        if (!dataFromNav.selectedParts && !dataFromNav.additionalParts) {
+          return;
+        }
+      }
+
+      // ถ้ามีข้อมูลครบแล้วไม่ต้องโหลดจาก API
+      if (dataFromNav && (dataFromNav.selectedParts || dataFromNav.additionalParts || dataFromNav.selectedPart)) {
         return;
       }
 
@@ -124,6 +137,11 @@ const RepairReceipt = () => {
                 nameTh: repair.selectedPart.nameTh || repair.selectedPart.name,
                 price: repair.selectedPart.price,
               });
+            }
+
+            // โหลด additionalParts (ถ้ามี)
+            if (repair.additionalParts && Array.isArray(repair.additionalParts) && repair.additionalParts.length > 0) {
+              setAdditionalParts(repair.additionalParts);
             }
           }
         }
@@ -302,6 +320,7 @@ const RepairReceipt = () => {
         copyLabel: t("receiptForCustomer"),
         selectedPart: selectedPart, // backward compatibility
         selectedParts: selectedParts.length > 0 ? selectedParts : undefined,
+        additionalParts: additionalParts.length > 0 ? additionalParts : undefined,
       })
     : null;
 
@@ -313,7 +332,11 @@ const RepairReceipt = () => {
             {language === "th" ? "กรุณาเลือกงานซ่อมจากรายการออกบิล" : "Please select a repair from the bill list."}
           </p>
           <div className="flex justify-center">
-            <Button variant="outline" onClick={() => navigate("/repairs/bill")} className="gap-2">
+            <Button variant="outline" onClick={() => {
+              // กลับไปหน้าที่ระบุไว้ใน returnTo หรือกลับไปที่จัดการใบแจ้งซ่อม
+              const returnPath = dataFromNav?.returnTo || "/repairs/bill/management";
+              navigate(returnPath);
+            }} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
               {language === "th" ? "กลับไปรายการออกบิล" : "Back to bill list"}
             </Button>

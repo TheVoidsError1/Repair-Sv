@@ -80,11 +80,12 @@ function roundTimeTo30Min(timeStr: string): string {
   return `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 }
 
-/** IMEI/Serial: รับอักษรและตัวเลขได้ และต้องไม่เกิน 15 หลัก */
+/** IMEI/Serial: รับอักษรและตัวเลขได้ และต้องไม่เกิน 15 หลัก (ไม่บังคับกรอก) */
 function validateSerialNumber(value: string): { valid: boolean; message?: string } {
   const trimmed = value.trim();
-  if (!trimmed) return { valid: false, message: "กรุณากรอกหมายเลข IMEI / Serial Number" };
-  // ต้องไม่เกิน 15 หลัก
+  // ถ้าไม่กรอกก็ไม่ต้อง validate (ไม่บังคับ)
+  if (!trimmed) return { valid: true };
+  // ถ้ากรอกแล้ว ต้องไม่เกิน 15 หลัก
   if (trimmed.length > 15) {
     return { valid: false, message: "หมายเลข IMEI / Serial Number ต้องไม่เกิน 15 หลัก" };
   }
@@ -260,10 +261,13 @@ const RepairNew = () => {
     }
 
     const sn = formData.serialNumber.trim();
-    const validation = validateSerialNumber(formData.serialNumber);
-    if (!validation.valid) {
-      errors.serialNumber = language === "th" ? (validation.message ?? "กรุณากรอก IMEI / Serial Number") : (validation.message ?? "Please enter IMEI / Serial Number");
-      setSerialError(errors.serialNumber);
+    // Validate serial number only if it's provided (not required)
+    if (sn) {
+      const validation = validateSerialNumber(formData.serialNumber);
+      if (!validation.valid) {
+        errors.serialNumber = language === "th" ? (validation.message ?? "หมายเลข IMEI / Serial Number ไม่ถูกต้อง") : (validation.message ?? "Invalid IMEI / Serial Number");
+        setSerialError(errors.serialNumber);
+      }
     }
 
     if (!formData.problemSymptoms.trim()) {
@@ -287,20 +291,22 @@ const RepairNew = () => {
       return;
     }
     
-    // Check for duplicate serial number in database
-    try {
-      const existingRepairs = await apiClient.getRepairs();
-      if (existingRepairs.status === 'success' && existingRepairs.data) {
-        const isDuplicate = existingRepairs.data.some(
-          (r: any) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
-        );
-        if (isDuplicate) {
-          setDuplicateSnWarning(true);
-          return;
+    // Check for duplicate serial number in database (only if serial number is provided)
+    if (sn) {
+      try {
+        const existingRepairs = await apiClient.getRepairs();
+        if (existingRepairs.status === 'success' && existingRepairs.data) {
+          const isDuplicate = existingRepairs.data.some(
+            (r: any) => r.serialNumber && r.serialNumber.trim().toLowerCase() === sn.toLowerCase()
+          );
+          if (isDuplicate) {
+            setDuplicateSnWarning(true);
+            return;
+          }
         }
+      } catch (error) {
+        console.error('Error checking duplicate serial number:', error);
       }
-    } catch (error) {
-      console.error('Error checking duplicate serial number:', error);
     }
 
     // Open confirmation dialog
@@ -332,7 +338,7 @@ const RepairNew = () => {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
         lineId: formData.lineId.trim() || undefined,
-        serialNumber: sn,
+        serialNumber: sn || undefined,
         model: formData.model.trim(),
         color: formData.color.trim(),
         screenLockCode: formData.screenLockCode.trim(),
@@ -708,7 +714,6 @@ const RepairNew = () => {
               <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="serialNumber">
                   {language === "th" ? "หมายเลข IMEI / Serial Number" : "IMEI / Serial Number"}
-                  <span className="text-destructive ml-1">*</span>
                 </Label>
                 <Input
                   id="serialNumber"
@@ -1284,13 +1289,11 @@ const RepairNew = () => {
             {!selectedCategory ? (
               // Step 1: Show categories
               <Command className="rounded-lg border shadow-md">
-                {partSearchQuery && (
-                  <CommandInput
-                    placeholder={language === "th" ? "ค้นหาหมวดหมู่..." : "Search categories..."}
-                    value={partSearchQuery}
-                    onValueChange={setPartSearchQuery}
-                  />
-                )}
+                <CommandInput
+                  placeholder={language === "th" ? "ค้นหาหมวดหมู่..." : "Search categories..."}
+                  value={partSearchQuery}
+                  onValueChange={setPartSearchQuery}
+                />
                 <CommandList>
                   <CommandEmpty>
                     {language === "th" ? "ไม่พบหมวดหมู่" : "No categories found"}

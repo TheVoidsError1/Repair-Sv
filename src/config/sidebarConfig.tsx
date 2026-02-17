@@ -15,6 +15,8 @@ import {
   UserPlus,
   Users,
   Wrench,
+  ClipboardList,
+  UserSearch,
   type LucideIcon,
 } from "lucide-react";
 
@@ -118,6 +120,20 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelTh: "ออกบิล",
             labelEn: "Issue bill",
             icon: FileText,
+          },
+          {
+            id: "bill-management",
+            href: "/repairs/bill/management",
+            labelTh: "จัดการใบแจ้งซ่อม",
+            labelEn: "Manage Repair Bills",
+            icon: ClipboardList,
+          },
+          {
+            id: "customer-bills",
+            href: "/repairs/bill/customer",
+            labelTh: "ดูบิลของลูกค้า",
+            labelEn: "Customer Bills",
+            icon: UserSearch,
           },
         ],
       },

@@ -26,6 +26,20 @@ export interface RepairOrderData {
   receive_time?: string;
   /** รหัสอะไหล่ที่เลือก (จาก parts table) */
   selectedPartId?: string;
+  /** ข้อมูลอะไหล่ทั้งหมดที่เลือก (array) */
+  selectedParts?: Array<{
+    id?: string;
+    partNumber?: string;
+    name?: string;
+    nameTh?: string;
+    price?: number;
+  }>;
+  /** ข้อมูลชิ้นส่วนเพิ่มเติมที่ไม่มีในคลังสินค้า (array) */
+  additionalParts?: Array<{
+    name: string;
+    nameTh?: string;
+    price: number;
+  }>;
 }
 
 /** รายการซ่อมที่ใช้สร้างข้อมูลบิล (ฟิลด์ที่จำเป็นจาก RepairsContext) */
@@ -191,7 +205,25 @@ export function validateServiceForm(
 }
 
 /** แมปรายการซ่อม → ข้อมูลสำหรับใบรับซ่อม */
-export function repairItemToBillData(item: RepairItemForBill & { selectedPartId?: string; selectedPart?: { partNumber?: string; name?: string; nameTh?: string } }, language: "th" | "en"): RepairOrderData {
+export function repairItemToBillData(
+  item: RepairItemForBill & { 
+    selectedPartId?: string; 
+    selectedPart?: { partNumber?: string; name?: string; nameTh?: string };
+    selectedParts?: Array<{
+      id?: string;
+      partNumber?: string;
+      name?: string;
+      nameTh?: string;
+      price?: number;
+    }>;
+    additionalParts?: Array<{
+      name: string;
+      nameTh?: string;
+      price: number;
+    }>;
+  }, 
+  language: "th" | "en"
+): RepairOrderData {
   const problemText = language === "th" ? item.issueTh : item.issue;
   const cost = String(item.estimatedCost);
   const service_type: ServiceType = item.tag === "endOfDay" ? "walk_in" : "drop_off";
@@ -215,5 +247,7 @@ export function repairItemToBillData(item: RepairItemForBill & { selectedPartId?
     receive_date: getTodayIsoDate(),
     receive_time: roundTimeTo30Min(rawTime),
     selectedPartId: item.selectedPartId,
+    selectedParts: item.selectedParts,
+    additionalParts: item.additionalParts,
   };
 }
