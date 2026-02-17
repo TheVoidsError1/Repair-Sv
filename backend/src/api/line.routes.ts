@@ -98,7 +98,7 @@ async function handleContact(
   lineService: LineNotificationService
 ) {
   try {
-    const contactMessage = `📞 ติดต่อเรา\n\n🏪 MacFix Service\nศูนย์ซ่อมผลิตภัณฑ์ Apple มาตรฐานครบวงจร\n\n📍 ที่อยู่:\nเยื้องโรงพยาบาลทักษิณ ติดรั้วอาชีวศึกษาสุราษฎ์ธานี\nปากซอยตลาดใหม่ 41\n\n📱 เบอร์โทร: 084-615-2244\n\n💬 LINE: @macfixservice\n\n📘 Facebook:\nhttps://www.facebook.com/macfixsurat\n\n⏰ เวลาทำการ:\nจันทร์ - เสาร์: 09:00 - 18:00 น.\n\n💬 หากมีคำถามเพิ่มเติม สามารถพิมพ์ข้อความมาหาเราได้เลยค่ะ`;
+    const contactMessage = `📞 ติดต่อเรา\n\n🏪 MacFix Service\nศูนย์ซ่อมผลิตภัณฑ์ Apple มาตรฐานครบวงจร\n\n📍 ที่อยู่:\nเยื้องโรงพยาบาลทักษิณ ติดรั้วอาชีวศึกษาสุราษฎ์ธานี\nปากซอยตลาดใหม่ 41\n\n📱 เบอร์โทร: 084-615-2244\n\n💬 LINE: @macfixservice\n\n📘 Facebook:\nhttps://www.facebook.com/macfixsurat\n\n⏰ เวลาทำการ:\n09:30 - 22:00 น. เปิดทุกวัน\n\n💬 หากมีคำถามเพิ่มเติม สามารถพิมพ์ข้อความมาหาเราได้เลยค่ะ`;
 
     await lineService.sendCustomMessage(userId, contactMessage);
   } catch (error) {
