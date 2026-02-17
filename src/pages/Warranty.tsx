@@ -52,8 +52,15 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 
-/** จำนวนวันรับประกันเริ่มต้น (ใช้จาก repair.createdAt ของงานซ่อมที่ completed) */
+/** จำนวนวันรับประกันเริ่มต้น (เริ่มนับเมื่อสถานะงานซ่อมเป็น "รับเครื่องแล้ว" / picked-up) */
 const DEFAULT_WARRANTY_DAYS = 90;
+
+/** ดึงจำนวนวันรับประกันจาก repair (ถ้าไม่มี ใช้ค่าเริ่มต้น) */
+function getWarrantyDaysFromRepair(repair: any): number {
+  const wd = Number(repair?.warrantyDays);
+  if (!Number.isFinite(wd) || !Number.isInteger(wd) || wd < 0) return DEFAULT_WARRANTY_DAYS;
+  return wd;
+}
 
 /** แปลงวันที่เป็นรูปแบบ YYYY-MM-DD */
 function formatDate(dateStr: string | Date | undefined): string {
@@ -125,7 +132,7 @@ const Warranty = () => {
   });
   const [snMismatchClaim, setSnMismatchClaim] = useState<WarrantyClaim | null>(null);
   
-  // State สำหรับงานซ่อมที่เสร็จแล้วทั้งหมด
+  // State สำหรับงานซ่อมที่ "รับเครื่องแล้ว" ทั้งหมด (เริ่มนับประกัน)
   const [allCompletedRepairs, setAllCompletedRepairs] = useState<any[]>([]);
   const [loadingCompletedRepairs, setLoadingCompletedRepairs] = useState(false);
   
@@ -182,9 +189,9 @@ const Warranty = () => {
     try {
       const response = await apiClient.getCustomerWithRepairs(customerId);
       if (response.status === 'success' && response.data) {
-        // กรองเฉพาะงานที่ completed และมี serialNumber
+        // กรองเฉพาะงานที่รับเครื่องแล้ว (picked-up) และมี serialNumber
         const completed = (response.data.repairs || []).filter((r: any) => 
-          r.status === 'completed' && r.serialNumber
+          r.status === 'picked-up' && r.serialNumber
         );
         setAllCompletedRepairs(completed);
       }
@@ -205,14 +212,14 @@ const Warranty = () => {
   const loadCompletedRepairs = async () => {
     setLoadingCompletedRepairs(true);
     try {
-      // โหลดหลายหน้าเพื่อให้ได้งานซ่อมที่ completed ทั้งหมด
+      // โหลดหลายหน้าเพื่อให้ได้งานซ่อมที่รับเครื่องแล้ว (picked-up) ทั้งหมด
       const response = await apiClient.getRepairs(1, 1000) as any;
       if (response.status === 'success' && response.data) {
-        // กรองเฉพาะงานที่ completed และมี serialNumber
+        // กรองเฉพาะงานที่รับเครื่องแล้ว (picked-up) และมี serialNumber
         const completed = response.data.filter((r: any) => 
-          r.status === 'completed' && r.serialNumber
+          r.status === 'picked-up' && r.serialNumber
         );
-        console.log('Loaded completed repairs:', completed);
+        console.log('Loaded picked-up repairs:', completed);
         setAllCompletedRepairs(completed);
       }
     } catch (error) {
@@ -237,12 +244,15 @@ const Warranty = () => {
   const inspectionComplete =
     inspectionChecks.deviceCondition && inspectionChecks.claimReasonMatch && inspectionChecks.customerVerified;
 
-  // เลือกได้เฉพาะงานซ่อมที่เสร็จแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
+  // เลือกได้เฉพาะงานซ่อมที่รับเครื่องแล้ว (และยังไม่มีเคลมของงานนี้ในบางระบบ — ที่นี่ให้เลือกซ้ำได้)
   // เรียงลำดับตามวันที่สร้าง (ใหม่สุดก่อน) และกรองเฉพาะที่มี serialNumber
   const completedRepairs = allCompletedRepairs
     .map((r) => {
-      const repairDate = formatDate(r.dateOfReport ?? r.createdAt) || formatDate(new Date());
-      const expiryDate = getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS);
+      // วันเริ่มนับประกัน: pickedUpDate (fallback เผื่อข้อมูลเก่า)
+      const repairDate =
+        formatDate(r.pickedUpDate ?? r.completedDate ?? r.dateOfReport ?? r.createdAt) ||
+        formatDate(new Date());
+      const expiryDate = getWarrantyExpiryDate(repairDate, getWarrantyDaysFromRepair(r));
       const remainingDays = getRemainingWarrantyDays(expiryDate);
       return {
         id: r.id,
@@ -308,7 +318,7 @@ const Warranty = () => {
   const approvedCount = claims.filter((c) => c.status === "approved").length;
   const rejectedCount = claims.filter((c) => c.status === "rejected").length;
 
-  // เลือกงานซ่อมจาก dropdown (เฉพาะที่ completed)
+  // เลือกงานซ่อมจาก dropdown (เฉพาะที่รับเครื่องแล้ว / picked-up)
   const [selectedRepairId, setSelectedRepairId] = useState<string>("");
   const [newClaimReason, setNewClaimReason] = useState("");
 
@@ -327,8 +337,10 @@ const Warranty = () => {
   const repairBySn = selectedRepairId
     ? allCompletedRepairs.find((r) => r.id === selectedRepairId)
     : null;
-  const repairDateBySn = formatDate(repairBySn?.dateOfReport ?? repairBySn?.createdAt);
-  const expiryDateBySn = repairDateBySn ? getWarrantyExpiryDate(repairDateBySn, DEFAULT_WARRANTY_DAYS) : "";
+  const repairDateBySn = formatDate(
+    repairBySn?.pickedUpDate ?? repairBySn?.completedDate ?? repairBySn?.dateOfReport ?? repairBySn?.createdAt
+  );
+  const expiryDateBySn = repairDateBySn ? getWarrantyExpiryDate(repairDateBySn, getWarrantyDaysFromRepair(repairBySn)) : "";
   const remainingDaysBySn = expiryDateBySn ? getRemainingWarrantyDays(expiryDateBySn) : 0;
   const previousClaimCountBySn = repairBySn
     ? claims.filter((c) => c.repairId === repairBySn.repairNumber || c.repairId === repairBySn.id).length
@@ -426,8 +438,8 @@ const Warranty = () => {
                         ? "เลือกลูกค้าที่ต้องการสร้างเคลมการรับประกัน"
                         : "Select the customer to create a warranty claim")
                     : (language === "th"
-                        ? "เลือกงานซ่อมที่เสร็จแล้วของลูกค้านี้"
-                        : "Select a completed repair for this customer")}
+                        ? "เลือกงานซ่อมที่รับเครื่องแล้วของลูกค้านี้"
+                        : "Select a picked-up repair for this customer")}
                 </DialogDescription>
               </DialogHeader>
               
@@ -572,7 +584,7 @@ const Warranty = () => {
                         <div className="py-8 text-center">
                           <Wrench className="w-12 h-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">
-                            {language === "th" ? "ลูกค้านี้ยังไม่มีงานซ่อมที่เสร็จแล้ว" : "This customer has no completed repairs"}
+                            {language === "th" ? "ลูกค้านี้ยังไม่มีงานซ่อมที่รับเครื่องแล้ว" : "This customer has no picked-up repairs"}
                           </p>
                         </div>
                       ) : (
@@ -613,7 +625,7 @@ const Warranty = () => {
                                       )}
                                     </p>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                      <span>📅 {language === "th" ? "ซ่อม" : "Repair"}: {repair.createdAt}</span>
+                                      <span>📅 {language === "th" ? "รับเครื่อง" : "Picked up"}: {repair.createdAt}</span>
                                       <span>⏰ {language === "th" ? "หมดอายุ" : "Expiry"}: {repair.expiryDate}</span>
                                     </div>
                                   </div>
@@ -815,8 +827,8 @@ const Warranty = () => {
                     ? `${repair.customer.firstName} ${repair.customer.lastName || ''}`
                     : repair?.customer || "—";
                   const reasonText = language === "th" ? claim.claimReasonTh : claim.claimReason;
-                  const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
-                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+                  const repairDate = formatDate(repair?.pickedUpDate ?? repair?.completedDate ?? repair?.dateOfReport ?? repair?.createdAt ?? claim.claimDate);
+                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, getWarrantyDaysFromRepair(repair)) : "";
                   const remainingDays = expiryDate ? getRemainingWarrantyDays(expiryDate) : 0;
                   const isExpired = remainingDays < 0;
                   const approveDisabled = isExpired || noRepairRecord || snMismatch;
@@ -1149,8 +1161,8 @@ const Warranty = () => {
                   const device = repair?.deviceModel || repair?.device || "—";
                   const reasonText =
                     language === "th" ? claim.claimReasonTh : claim.claimReason;
-                  const repairDate = formatDate(repair?.createdAt ?? claim.claimDate);
-                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+                  const repairDate = formatDate(repair?.pickedUpDate ?? repair?.completedDate ?? repair?.dateOfReport ?? repair?.createdAt ?? claim.claimDate);
+                  const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, getWarrantyDaysFromRepair(repair)) : "";
                   return (
                     <tr key={claim.id}>
                       <td>
@@ -1258,8 +1270,8 @@ const Warranty = () => {
           </DialogHeader>
           {selectedClaim && (() => {
             const repair = selectedClaim.repair || repairs.find((r) => r.id === selectedClaim.repairId);
-            const repairDate = formatDate(repair?.createdAt ?? selectedClaim.claimDate);
-            const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, DEFAULT_WARRANTY_DAYS) : "";
+            const repairDate = formatDate(repair?.pickedUpDate ?? repair?.completedDate ?? repair?.dateOfReport ?? repair?.createdAt ?? selectedClaim.claimDate);
+            const expiryDate = repairDate ? getWarrantyExpiryDate(repairDate, getWarrantyDaysFromRepair(repair)) : "";
             const remainingDays = expiryDate ? getRemainingWarrantyDays(expiryDate) : 0;
             const warrantyStatus = getWarrantyBadgeStatus(remainingDays);
             const warrantyBadgeClass =

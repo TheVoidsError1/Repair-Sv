@@ -215,6 +215,13 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelEn: "Warranty list",
             icon: ShieldCheck,
           },
+          {
+            id: "manage",
+            href: "/warranty/manage",
+            labelTh: "จัดการเคลม",
+            labelEn: "Claim management",
+            icon: ShieldCheck,
+          },
         ],
       },
     ],

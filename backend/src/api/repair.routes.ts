@@ -6,7 +6,7 @@ import { Part } from '../entities/Part.js';
 import { WarrantyClaim, WarrantyClaimStatus } from '../entities/WarrantyClaim.js';
 import { Between, In } from 'typeorm';
 import { getLineNotificationService } from '../services/line-notification.service.js';
-import { emitRepairCreated, emitRepairUpdate, emitRepairDeleted } from '../config/socket.js';
+import { emitRepairCreated, emitRepairUpdate, emitRepairDeleted, emitWarrantyCreated } from '../config/socket.js';
 
 const router = Router();
 
@@ -35,7 +35,7 @@ async function generateClaimNumber(): Promise<string> {
   return `WRN-${String(allClaims.length + 1).padStart(3, '0')}`;
 }
 
-// Helper function to create warranty claim automatically when repair is completed
+// Helper function to create warranty claim automatically when customer picked up the repaired device
 async function createAutoWarrantyClaim(repair: Repair): Promise<void> {
   try {
     const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
@@ -71,11 +71,28 @@ async function createAutoWarrantyClaim(repair: Repair): Promise<void> {
       claimReason: claimReason.trim(),
       claimReasonTh: claimReasonTh.trim(),
       status: WarrantyClaimStatus.APPROVED, // เปลี่ยนเป็น APPROVED เพื่อให้ใช้งานได้ทันที
-      claimDate: new Date(),
+      // เริ่มนับประกัน/การเคลมเมื่อ "รับเครื่องแล้ว" (picked-up)
+      claimDate: repair.pickedUpDate ?? new Date(),
     });
 
-    await warrantyRepository.save(newClaim);
+    const saved = await warrantyRepository.save(newClaim);
     console.log(`[Warranty] Auto-created warranty claim ${claimNumber} for repair ${repair.repairNumber} with status APPROVED`);
+
+    // Emit socket event for real-time update (so Warranty page updates immediately)
+    try {
+      const claimWithRelations = await warrantyRepository.findOne({
+        where: { id: saved.id },
+        relations: ['repair', 'repair.customer'],
+      });
+      if (claimWithRelations) {
+        emitWarrantyCreated(claimWithRelations);
+      } else {
+        // Fallback: emit minimal payload if relations not found for some reason
+        emitWarrantyCreated(saved);
+      }
+    } catch (emitErr) {
+      console.error('[Warranty] Error emitting warranty:created event:', emitErr);
+    }
   } catch (error) {
     // ไม่ให้ error นี้ทำให้การอัพเดท repair ล้มเหลว
     console.error('[Warranty] Error creating auto warranty claim:', error);
@@ -325,6 +342,7 @@ router.post('/', async (req, res) => {
       partsCost = 0,
       totalCost = 0,
       warrantyInfo,
+      warrantyDays,
     } = req.body;
 
     // Validate required fields
@@ -521,6 +539,7 @@ router.post('/', async (req, res) => {
       selectedPartIds: selectedPartIds && selectedPartIds.length > 0 ? JSON.stringify(selectedPartIds) : undefined, // Store as JSON string
       additionalParts: additionalParts && Array.isArray(additionalParts) && additionalParts.length > 0 ? JSON.stringify(additionalParts) : undefined, // Store as JSON string
       warrantyInfo: warrantyInfo || undefined,
+      warrantyDays: warrantyDays !== undefined ? Number(warrantyDays) : undefined,
     };
 
     const newRepair = repairRepository.create(repairData);
@@ -660,6 +679,24 @@ router.put('/:id', async (req, res) => {
         repair.completedDate = new Date();
         console.log(`[Update Repair] Setting completedDate to: ${repair.completedDate}`);
       }
+
+      // ตั้งค่า pickedUpDate เมื่อสถานะเปลี่ยนเป็น picked-up (รับเครื่องแล้ว)
+      if (repair.status === RepairStatus.PICKED_UP && oldStatus !== RepairStatus.PICKED_UP) {
+        repair.pickedUpDate = new Date();
+        console.log(`[Update Repair] Setting pickedUpDate to: ${repair.pickedUpDate}`);
+      }
+    }
+
+    // Validate warrantyDays if provided
+    if (req.body.warrantyDays !== undefined) {
+      const wd = Number(req.body.warrantyDays);
+      if (!Number.isFinite(wd) || !Number.isInteger(wd) || wd < 0 || wd > 3650) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid warrantyDays. Must be an integer between 0 and 3650',
+        });
+      }
+      req.body.warrantyDays = wd;
     }
 
     // Update other fields (excluding status which we already handled)
@@ -855,11 +892,11 @@ router.put('/:id', async (req, res) => {
     const updatedRepair = await repairRepository.save(repair);
     console.log(`[Update Repair] Saved successfully: ${updatedRepair.id}`);
     
-    // สร้าง warranty claim อัตโนมัติเมื่อสถานะเปลี่ยนเป็น completed
+    // สร้าง warranty claim อัตโนมัติเมื่อสถานะเปลี่ยนเป็น picked-up (เริ่มนับประกันเมื่อรับเครื่องแล้ว)
     if (req.body.status !== undefined && 
-        oldStatus !== RepairStatus.COMPLETED && 
-        updatedRepair.status === RepairStatus.COMPLETED) {
-      console.log(`[Warranty] Repair ${updatedRepair.repairNumber} completed, creating auto warranty claim...`);
+        oldStatus !== RepairStatus.PICKED_UP && 
+        updatedRepair.status === RepairStatus.PICKED_UP) {
+      console.log(`[Warranty] Repair ${updatedRepair.repairNumber} picked-up, creating auto warranty claim...`);
       await createAutoWarrantyClaim(updatedRepair);
     }
     

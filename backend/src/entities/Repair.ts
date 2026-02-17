@@ -146,8 +146,15 @@ export class Repair {
   @Column({ type: 'date', nullable: true })
   completedDate?: Date;
 
+  @Column({ type: 'date', nullable: true })
+  pickedUpDate?: Date; // วันที่ลูกค้ามารับเครื่อง (เริ่มนับประกัน)
+
   @Column({ type: 'text', nullable: true })
   warrantyInfo?: string;
+
+  /** จำนวนวันรับประกัน (เริ่มนับจากวันที่รับเครื่องแล้ว / pickedUpDate) */
+  @Column({ type: 'int', default: 90 })
+  warrantyDays!: number;
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -7,7 +7,7 @@ import type { UserRole } from "@/types/user";
  */
 
 /** path ที่เฉพาะเจ้าของ (owner) เท่านั้นที่เข้าได้ */
-export const ROUTES_OWNER_ONLY: string[] = ["/finance", "/admin", "/settings", "/dashboard"];
+export const ROUTES_OWNER_ONLY: string[] = ["/finance", "/admin", "/settings", "/dashboard", "/warranty/manage"];
 
 /** subject id ใน sidebar ที่เฉพาะเจ้าของเท่านั้นที่เห็น */
 export const SUBJECT_IDS_OWNER_ONLY: string[] = ["dashboard", "finance", "settings", "admin"];
