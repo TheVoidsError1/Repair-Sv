@@ -785,8 +785,8 @@ const RepairBillManagement = () => {
                       <span>฿{parseFloat(String(editFormData.estimatedPrice || 0)).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span>{language === "th" ? "รวมทั้งสิ้น (รวม VAT 7%)" : "Total (incl. VAT 7%)"}</span>
-                      <span>฿{Math.round(calculateTotalPrice() * 1.07).toLocaleString()}</span>
+                      <span>{language === "th" ? "รวมทั้งสิ้น" : "Total"}</span>
+                      <span>฿{calculateTotalPrice().toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

@@ -226,11 +226,11 @@ const RepairReceipt = () => {
     setIsSaving(true);
     try {
       // คำนวณค่าใช้จ่ายจากใบเสร็จ
-      // partsCost = ราคาสินค้าไม่รวม VAT (subtotal)
+      // partsCost = ราคาสินค้า (subtotal)
       const partsCost = receiptData.subtotal;
       // laborCost = ค่าแรง (ถ้าไม่มีให้ใช้ 0)
       const laborCost = 0; // ถ้าไม่มีค่าแรงแยก ให้ใช้ 0 หรือคำนวณจาก totalCost - partsCost
-      // totalCost = ราคารวม VAT (grandTotal)
+      // totalCost = ราคารวม (grandTotal)
       const totalCost = receiptData.grandTotal;
 
       // อัพเดท repair status เป็น completed และบันทึกข้อมูลบิล

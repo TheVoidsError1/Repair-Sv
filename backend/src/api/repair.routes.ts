@@ -485,10 +485,9 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // คำนวณ totalCost (รวมภาษี 7%)
+    // คำนวณ totalCost (ไม่รวมภาษี)
     const subtotal = calculatedPartsCost + calculatedLaborCost;
-    const taxRate = 0.07; // ภาษี 7%
-    const calculatedTotalCost = subtotal * (1 + taxRate);
+    const calculatedTotalCost = subtotal;
 
     // Create repair
     const repairData: any = {
@@ -748,12 +747,11 @@ router.put('/:id', async (req, res) => {
           otherFields.partsCost = totalPartsCost;
         }
         
-        // คำนวณ totalCost ใหม่ (รวมภาษี 7%)
+        // คำนวณ totalCost ใหม่ (ไม่รวมภาษี)
         const currentLaborCost = otherFields.laborCost !== undefined ? otherFields.laborCost : repair.laborCost;
         const currentPartsCost = otherFields.partsCost !== undefined ? otherFields.partsCost : totalPartsCost;
         const subtotal = Number(currentPartsCost) + Number(currentLaborCost);
-        const taxRate = 0.07; // ภาษี 7%
-        otherFields.totalCost = subtotal * (1 + taxRate);
+        otherFields.totalCost = subtotal;
         
         // อัพเดท repairSummaryPrice ถ้าไม่ได้ส่งมา
         if (otherFields.repairSummaryPrice === undefined) {
@@ -768,14 +766,13 @@ router.put('/:id', async (req, res) => {
       Object.assign(repair, otherFields);
     }
     
-    // คำนวณ totalCost อัตโนมัติ (รวมภาษี 7%) ถ้ามีการเปลี่ยนแปลง partsCost หรือ laborCost
+    // คำนวณ totalCost อัตโนมัติ (ไม่รวมภาษี) ถ้ามีการเปลี่ยนแปลง partsCost หรือ laborCost
     // หรือถ้า totalCost ไม่ได้ถูกส่งมา
     if (otherFields.partsCost !== undefined || otherFields.laborCost !== undefined || otherFields.totalCost === undefined) {
       const finalPartsCost = otherFields.partsCost !== undefined ? Number(otherFields.partsCost) : Number(repair.partsCost);
       const finalLaborCost = otherFields.laborCost !== undefined ? Number(otherFields.laborCost) : Number(repair.laborCost);
       const subtotal = finalPartsCost + finalLaborCost;
-      const taxRate = 0.07; // ภาษี 7%
-      repair.totalCost = subtotal * (1 + taxRate);
+      repair.totalCost = subtotal;
     }
     
     // Handle stock updates: restore old parts, deduct new parts

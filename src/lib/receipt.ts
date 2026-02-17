@@ -48,8 +48,6 @@ export interface ReceiptData {
   items: ReceiptLineItem[];
   /** รวมเงิน */
   subtotal: number;
-  /** VAT (ว่างได้) */
-  vat: number | null;
   /** จำนวนเงินทั้งสิ้น */
   grandTotal: number;
   /** ท้ายเอกสาร เช่น "ลูกค้า (FOR CUSTOMER)" */
@@ -178,9 +176,8 @@ export function mapRepairOrderToReceiptData(
     ];
   }
 
-  // คำนวณ VAT 7%
-  const vat = Math.round((subtotal * 0.07) * 100) / 100; // ปัดเป็น 2 ทศนิยม
-  const grandTotal = subtotal + vat;
+  // คำนวณยอดรวม
+  const grandTotal = subtotal;
 
   return {
     shop: {
@@ -199,7 +196,6 @@ export function mapRepairOrderToReceiptData(
     salesmanCode: options.salesmanCode ?? "",
     items,
     subtotal,
-    vat,
     grandTotal,
     copyLabel: options.copyLabel,
   };

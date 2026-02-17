@@ -26,7 +26,6 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
     salesmanCode,
     items,
     subtotal,
-    vat,
     grandTotal,
     copyLabel,
   } = data;
@@ -197,18 +196,10 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
               </div>
             </div>
           </div>
-          {/* ขวา: สรุปยอด (รวมเงิน, VAT, จำนวนเงินทั้งสิ้น) + ผู้รับบริการ */}
+          {/* ขวา: สรุปยอด (รวมเงิน, จำนวนเงินทั้งสิ้น) + ผู้รับบริการ */}
           <div className="w-full sm:w-56 shrink-0 flex flex-col items-end">
             <table className="w-full max-w-[220px] border border-gray-700 text-[11px] mb-4">
               <tbody>
-                <tr className="border-b border-gray-600">
-                  <td className="py-1.5 pl-2 pr-2 text-right">รวมเงิน</td>
-                  <td className="py-1.5 pr-2 text-right font-medium w-16 border-l border-gray-600">{formatReceiptNumber(subtotal)}</td>
-                </tr>
-                <tr className="border-b border-gray-600">
-                  <td className="py-1.5 pl-2 pr-2 text-right">VAT</td>
-                  <td className="py-1.5 pr-2 text-right w-16 border-l border-gray-600">{vat != null && vat > 0 ? formatReceiptNumber(vat) : ""}</td>
-                </tr>
                 <tr className="border-t-2 border-gray-800">
                   <td className="py-2 pl-2 pr-2 text-right font-semibold">จำนวนเงินทั้งสิ้น</td>
                   <td className="py-2 pr-2 text-right font-bold w-16 border-l border-gray-700">{formatReceiptNumber(grandTotal)}</td>
