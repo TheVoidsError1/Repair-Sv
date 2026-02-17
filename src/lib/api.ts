@@ -521,6 +521,117 @@ class ApiClient {
       }),
     });
   }
+
+  // LINE Rich Menu
+  async getRichMenuList() {
+    return this.request<Array<{
+      richMenuId: string;
+      size: { width: number; height: number };
+      selected: boolean;
+      name: string;
+      chatBarText: string;
+      areas: Array<{
+        bounds: { x: number; y: number; width: number; height: number };
+        action: any;
+      }>;
+    }>>('/api/line/richmenu');
+  }
+
+  async getRichMenu(richMenuId: string) {
+    return this.request<{
+      size: { width: number; height: number };
+      selected: boolean;
+      name: string;
+      chatBarText: string;
+      areas: Array<{
+        bounds: { x: number; y: number; width: number; height: number };
+        action: any;
+      }>;
+    }>(`/api/line/richmenu/${richMenuId}`);
+  }
+
+  async createRichMenu(data: {
+    size: { width: number; height: number };
+    selected?: boolean;
+    name: string;
+    chatBarText: string;
+    areas: Array<{
+      bounds: { x: number; y: number; width: number; height: number };
+      action: any;
+    }>;
+  }) {
+    return this.request<{ richMenuId: string }>('/api/line/richmenu', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async uploadRichMenuImage(richMenuId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${this.baseURL}/api/line/richmenu/${richMenuId}/image`;
+    const token = localStorage.getItem('authToken');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        status: 'error' as const,
+        message: data.message || 'An error occurred',
+        error: data.error,
+      };
+    }
+
+    return {
+      status: 'success' as const,
+      data: data.data || data,
+      message: data.message,
+    };
+  }
+
+  async downloadRichMenuImage(richMenuId: string): Promise<Blob> {
+    const url = `${this.baseURL}/api/line/richmenu/${richMenuId}/image`;
+    const token = localStorage.getItem('authToken');
+
+    const response = await fetch(url, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to download rich menu image');
+    }
+
+    return response.blob();
+  }
+
+  async setDefaultRichMenu(richMenuId: string) {
+    return this.request<{ message: string }>(`/api/line/richmenu/${richMenuId}/set-default`, {
+      method: 'POST',
+    });
+  }
+
+  async cancelDefaultRichMenu() {
+    return this.request<{ message: string }>('/api/line/richmenu/default', {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteRichMenu(richMenuId: string) {
+    return this.request<{ message: string }>(`/api/line/richmenu/${richMenuId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

@@ -24,6 +24,7 @@ import WarrantyManage from "./pages/WarrantyManage";
 import Finance from "./pages/Finance";
 import Settings from "./pages/Settings";
 import LineManagement from "./pages/LineManagement";
+import RichMenu from "./pages/RichMenu";
 import NetworkManagement from "./pages/NetworkManagement";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import Login from "./pages/Login";
@@ -111,6 +112,7 @@ const App = () => (
                     <Route path="/settings" element={<RoleProtectedRoute><Settings /></RoleProtectedRoute>} />
                     <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
                     <Route path="/system/line" element={<RoleProtectedRoute><LineManagement /></RoleProtectedRoute>} />
+                    <Route path="/system/line/richmenu" element={<RoleProtectedRoute><RichMenu /></RoleProtectedRoute>} />
                     <Route path="/system/network" element={<RoleProtectedRoute><NetworkManagement /></RoleProtectedRoute>} />
                     <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
                     <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />

@@ -1,12 +1,203 @@
 import { Router } from 'express';
 import { AppDataSource } from '../config/data-source.js';
 import { Customer } from '../entities/Customer.js';
+import { Repair } from '../entities/Repair.js';
 import { getLineNotificationService, LineNotificationService } from '../services/line-notification.service.js';
+import { getLineRichMenuService } from '../services/line-richmenu.service.js';
 import { Not, IsNull } from 'typeorm';
 import crypto from 'crypto';
 import axios from 'axios';
+import multer from 'multer';
 
 const router = Router();
+
+/**
+ * ฟังก์ชันช่วยสำหรับจัดการ Rich Menu Actions
+ */
+
+/**
+ * เช็คสถานะงานซ่อม - แสดงสถานะการซ่อมใบล่าสุดที่ยังไม่เสร็จ
+ */
+async function handleCheckStatus(
+  userId: string,
+  customer: Customer,
+  lineService: LineNotificationService
+) {
+  try {
+    const repairRepository = AppDataSource.getRepository(Repair);
+    
+    // ค้นหางานซ่อมที่ยังไม่เสร็จ (ไม่ใช่ completed, cancelled, picked-up) - แค่ใบล่าสุด
+    const latestActiveRepair = await repairRepository.findOne({
+      where: {
+        customerId: customer.id,
+        status: Not('completed'),
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    if (!latestActiveRepair) {
+      // ไม่มีงานซ่อมที่กำลังดำเนินการ
+      await lineService.sendCustomMessage(
+        userId,
+        `📋 สถานะงานซ่อม\n\n👤 คุณ ${customer.fullName || customer.firstName}\n\n✅ ไม่มีงานซ่อมที่กำลังดำเนินการ\n\n💡 หากต้องการดูประวัติการซ่อมทั้งหมด กดปุ่ม "ประวัติการซ่อม" ด้านล่าง`
+      );
+      return;
+    }
+
+    // สร้างข้อความแสดงสถานะงานซ่อมใบล่าสุด
+    const statusLabels: Record<string, string> = {
+      'pending': '⏳ รอดำเนินการ',
+      'in-progress': '🔧 กำลังซ่อม',
+      'waiting_parts': '⏸️ รออะไหล่',
+    };
+    const statusLabel = statusLabels[latestActiveRepair.status] || latestActiveRepair.status;
+
+    const date = new Date(latestActiveRepair.createdAt).toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    let message = `📋 สถานะงานซ่อม\n\n👤 คุณ ${customer.fullName || customer.firstName}\n\n`;
+    message += `📦 งานซ่อมล่าสุด:\n\n`;
+    message += `🔹 ${latestActiveRepair.repairNumber}\n`;
+    message += `   📅 วันที่รับ: ${date}\n`;
+    message += `   📱 อุปกรณ์: ${latestActiveRepair.deviceType}${latestActiveRepair.deviceModel ? ` ${latestActiveRepair.deviceModel}` : ''}\n`;
+    if (latestActiveRepair.serialNumber) {
+      message += `   🔢 Serial: ${latestActiveRepair.serialNumber}\n`;
+    }
+    message += `   📊 สถานะ: ${statusLabel}\n`;
+    if (latestActiveRepair.problemDescription) {
+      const problem = latestActiveRepair.problemDescription.length > 60 
+        ? latestActiveRepair.problemDescription.substring(0, 60) + '...'
+        : latestActiveRepair.problemDescription;
+      message += `   🔧 ปัญหา: ${problem}\n`;
+    }
+    if (latestActiveRepair.estimatedPrice && latestActiveRepair.estimatedPrice > 0) {
+      message += `   💰 ราคาประมาณการ: ${latestActiveRepair.estimatedPrice.toLocaleString('th-TH')} บาท\n`;
+    }
+    message += `\n💡 หากต้องการดูรายละเอียดเพิ่มเติม กรุณาติดต่อร้าน`;
+
+    await lineService.sendCustomMessage(userId, message);
+  } catch (error) {
+    console.error('[LINE Webhook] Error handling check status:', error);
+    await lineService.sendCustomMessage(
+      userId,
+      '❌ เกิดข้อผิดพลาดในการเช็คสถานะ\n\nกรุณาลองใหม่อีกครั้ง หรือติดต่อร้านโดยตรง'
+    );
+  }
+}
+
+/**
+ * ติดต่อเรา
+ */
+async function handleContact(
+  userId: string,
+  lineService: LineNotificationService
+) {
+  try {
+    const contactMessage = `📞 ติดต่อเรา\n\n🏪 MacFix Service\nศูนย์ซ่อมผลิตภัณฑ์ Apple มาตรฐานครบวงจร\n\n📍 ที่อยู่:\nเยื้องโรงพยาบาลทักษิณ ติดรั้วอาชีวศึกษาสุราษฎ์ธานี\nปากซอยตลาดใหม่ 41\n\n📱 เบอร์โทร: 084-615-2244\n\n📧 Instagram: @macfixservice\n🌐 Website: macfixservice\n\n⏰ เวลาทำการ:\nจันทร์ - เสาร์: 09:00 - 18:00 น.\n\n💬 หากมีคำถามเพิ่มเติม สามารถพิมพ์ข้อความมาหาเราได้เลยค่ะ`;
+
+    await lineService.sendCustomMessage(userId, contactMessage);
+  } catch (error) {
+    console.error('[LINE Webhook] Error handling contact:', error);
+    await lineService.sendCustomMessage(
+      userId,
+      '❌ เกิดข้อผิดพลาด\n\nกรุณาลองใหม่อีกครั้ง'
+    );
+  }
+}
+
+/**
+ * ประวัติการซ่อม - แสดง 2-3 รายการล่าสุด
+ */
+async function handleHistory(
+  userId: string,
+  customer: Customer,
+  lineService: LineNotificationService
+) {
+  try {
+    console.log(`[LINE Webhook] handleHistory: Looking for repairs for customer ${customer.id}`);
+    const repairRepository = AppDataSource.getRepository(Repair);
+    
+    // ค้นหางานซ่อมทั้งหมด (เรียงตามวันที่ล่าสุด) - แสดง 3 รายการล่าสุด
+    const recentRepairs = await repairRepository.find({
+      where: {
+        customerId: customer.id,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+      take: 3, // แสดง 3 รายการล่าสุด
+    });
+
+    console.log(`[LINE Webhook] handleHistory: Found ${recentRepairs.length} repairs for customer ${customer.id}`);
+
+    if (recentRepairs.length === 0) {
+      console.log(`[LINE Webhook] handleHistory: No repairs found, sending empty message`);
+      await lineService.sendCustomMessage(
+        userId,
+        `📜 ประวัติการซ่อม\n\n👤 คุณ ${customer.fullName || customer.firstName}\n\n📭 ยังไม่มีประวัติการซ่อม\n\n💡 หากต้องการรับบริการซ่อม กรุณานำเครื่องมาที่ร้านหรือติดต่อเรา`
+      );
+      return;
+    }
+
+    // สร้างข้อความแสดงประวัติ
+    let message = `📜 ประวัติการซ่อม\n\n👤 คุณ ${customer.fullName || customer.firstName}\n\n`;
+    message += `📦 งานซ่อมล่าสุด (${recentRepairs.length} รายการ):\n\n`;
+
+    const statusLabels: Record<string, string> = {
+      'pending': '⏳ รอดำเนินการ',
+      'in-progress': '🔧 กำลังซ่อม',
+      'waiting_parts': '⏸️ รออะไหล่',
+      'completed': '✅ ซ่อมเสร็จแล้ว',
+      'cancelled': '❌ ยกเลิกแล้ว',
+      'picked-up': '📦 รับเครื่องแล้ว',
+    };
+
+    for (let i = 0; i < recentRepairs.length; i++) {
+      const repair = recentRepairs[i];
+      const statusLabel = statusLabels[repair.status] || repair.status;
+      const date = new Date(repair.createdAt).toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      message += `${i + 1}. ${repair.repairNumber}\n`;
+      message += `   📅 วันที่: ${date}\n`;
+      message += `   📱 อุปกรณ์: ${repair.deviceType}${repair.deviceModel ? ` ${repair.deviceModel}` : ''}\n`;
+      message += `   📊 สถานะ: ${statusLabel}\n`;
+      if (repair.totalCost > 0) {
+        message += `   💰 ราคา: ${repair.totalCost.toLocaleString('th-TH')} บาท\n`;
+      }
+      message += `\n`;
+    }
+
+    // นับจำนวนงานซ่อมทั้งหมด
+    const totalCount = await repairRepository.count({
+      where: {
+        customerId: customer.id,
+      },
+    });
+
+    if (totalCount > recentRepairs.length) {
+      message += `📊 รวมทั้งหมด ${totalCount} รายการ\n\n`;
+    }
+
+    message += `💡 หากต้องการดูรายละเอียดเพิ่มเติม กรุณาติดต่อร้าน`;
+
+    await lineService.sendCustomMessage(userId, message);
+  } catch (error) {
+    console.error('[LINE Webhook] Error handling history:', error);
+    await lineService.sendCustomMessage(
+      userId,
+      '❌ เกิดข้อผิดพลาดในการดึงประวัติ\n\nกรุณาลองใหม่อีกครั้ง หรือติดต่อร้านโดยตรง'
+    );
+  }
+}
 
 // Store recent webhook events for debugging (in-memory, max 10 events)
 interface RecentWebhookEvent {
@@ -144,17 +335,122 @@ router.post('/webhook', async (req, res) => {
             }
           }
         } else {
-          // ข้อความไม่ใช่เบอร์โทร
-          console.log(`[LINE Webhook] Message is not a phone number: ${messageText}`);
-          
-          // แนะนำให้ส่งเบอร์โทร
+          // ข้อความไม่ใช่เบอร์โทร - ตรวจสอบว่ามีคำสั่งพิเศษหรือไม่
+          const messageTextLower = messageText.trim().toLowerCase();
           const lineService = getLineNotificationService();
-          if (lineService) {
+          
+          if (!lineService) {
+            continue;
+          }
+
+          // ค้นหาลูกค้าจาก LINE User ID (ถ้าเชื่อมโยงแล้ว)
+          const customerRepository = AppDataSource.getRepository(Customer);
+          const customer = await customerRepository.findOne({
+            where: { lineIdRes: userId },
+          });
+
+          // ตรวจสอบคำสั่งพิเศษ
+          if (messageTextLower.includes('ประวัติ') || messageTextLower.includes('ประวัติการซ่อม') || messageTextLower === 'history') {
+            // ประวัติการซ่อม
+            if (customer) {
+              await handleHistory(userId, customer, lineService);
+            } else {
+              await lineService.sendCustomMessage(
+                userId,
+                '❌ ยังไม่ได้เชื่อมโยงบัญชี\n\n📱 กรุณาส่งเบอร์โทรศัพท์ของคุณ (10 หลัก)\nเพื่อเชื่อมโยงบัญชีและใช้งาน Rich Menu\n\nตัวอย่าง: 0812345678'
+              );
+            }
+          } else if (messageTextLower.includes('สถานะ') || messageTextLower.includes('เช็คสถานะ') || messageTextLower.includes('check') || messageTextLower === 'status') {
+            // เช็คสถานะงานซ่อม
+            if (customer) {
+              await handleCheckStatus(userId, customer, lineService);
+            } else {
+              await lineService.sendCustomMessage(
+                userId,
+                '❌ ยังไม่ได้เชื่อมโยงบัญชี\n\n📱 กรุณาส่งเบอร์โทรศัพท์ของคุณ (10 หลัก)\nเพื่อเชื่อมโยงบัญชีและใช้งาน Rich Menu\n\nตัวอย่าง: 0812345678'
+              );
+            }
+          } else if (messageTextLower.includes('ติดต่อ') || messageTextLower.includes('contact')) {
+            // ติดต่อเรา
+            await handleContact(userId, lineService);
+          } else {
+            // ข้อความอื่นๆ - แนะนำให้ส่งเบอร์โทรหรือใช้ Rich Menu
+            if (customer) {
+              await lineService.sendCustomMessage(
+                userId,
+                '💬 หากต้องการดูข้อมูล สามารถใช้ปุ่ม Rich Menu ด้านล่างได้เลยค่ะ\n\n📋 หรือพิมพ์คำสั่ง:\n• "ประวัติการซ่อม" - ดูประวัติ\n• "เช็คสถานะ" - ดูสถานะงานซ่อม\n• "ติดต่อเรา" - ดูข้อมูลติดต่อ'
+              );
+            } else {
+              await lineService.sendCustomMessage(
+                userId,
+                '📱 กรุณาส่งเบอร์โทรศัพท์ของคุณ (10 หลัก)\nเพื่อเชื่อมโยงบัญชีและใช้งาน Rich Menu\n\nตัวอย่าง: 0812345678\n\n💡 หรือใช้ปุ่ม Rich Menu ด้านล่างได้เลยค่ะ'
+              );
+            }
+          }
+        }
+      }
+
+      // กรณี: ลูกค้ากดปุ่ม Rich Menu (Postback Event)
+      if (event.type === 'postback') {
+        const postbackData = event.postback?.data || '';
+        console.log(`[LINE Webhook] Postback event from ${userId}: ${postbackData}`);
+
+        const lineService = getLineNotificationService();
+        if (!lineService) {
+          console.warn('[LINE Webhook] LINE service not available');
+          continue;
+        }
+
+        // ค้นหาลูกค้าจาก LINE User ID
+        const customerRepository = AppDataSource.getRepository(Customer);
+        const customer = await customerRepository.findOne({
+          where: { lineIdRes: userId },
+        });
+
+        console.log(`[LINE Webhook] Customer lookup for userId ${userId}:`, customer ? `Found: ${customer.fullName || customer.firstName}` : 'Not found');
+
+        if (!customer) {
+          // ถ้ายังไม่เชื่อมโยงบัญชี
+          console.log(`[LINE Webhook] Customer not linked for userId: ${userId}`);
+          await lineService.sendCustomMessage(
+            userId,
+            '❌ ยังไม่ได้เชื่อมโยงบัญชี\n\n📱 กรุณาส่งเบอร์โทรศัพท์ของคุณ (10 หลัก)\nเพื่อเชื่อมโยงบัญชีและใช้งาน Rich Menu\n\nตัวอย่าง: 0812345678'
+          );
+          continue;
+        }
+
+        // แยก action จาก postback data
+        // รูปแบบ: "action=check_status" หรือ "action=contact" หรือ "action=history"
+        const actionMatch = postbackData.match(/action=(\w+)/);
+        const action = actionMatch ? actionMatch[1] : '';
+
+        console.log(`[LINE Webhook] Processing action: ${action} for customer: ${customer.id}`);
+
+        switch (action) {
+          case 'check_status':
+            // เช็คสถานะงานซ่อม
+            console.log(`[LINE Webhook] Handling check_status for customer: ${customer.id}`);
+            await handleCheckStatus(userId, customer, lineService);
+            break;
+
+          case 'contact':
+            // ติดต่อเรา
+            console.log(`[LINE Webhook] Handling contact`);
+            await handleContact(userId, lineService);
+            break;
+
+          case 'history':
+            // ประวัติการซ่อม
+            console.log(`[LINE Webhook] Handling history for customer: ${customer.id}`);
+            await handleHistory(userId, customer, lineService);
+            break;
+
+          default:
+            console.log(`[LINE Webhook] Unknown action: ${action}, postbackData: ${postbackData}`);
             await lineService.sendCustomMessage(
               userId,
-              '📱 กรุณาส่งเบอร์โทรศัพท์ของคุณ (10 หลัก)\n\nตัวอย่าง: 0812345678\n\n💡 หากคุณเชื่อมโยงบัญชีแล้ว ไม่ต้องส่งอีก'
+              '⚠️ ไม่รู้จักคำสั่งนี้\n\nกรุณาลองใหม่อีกครั้ง'
             );
-          }
         }
       }
 
@@ -819,6 +1115,337 @@ router.post('/test-template', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to send test message',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ============================================
+ * RICH MENU API
+ * ============================================
+ */
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only PNG and JPEG
+    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG and JPEG images are allowed'));
+    }
+  },
+});
+
+/**
+ * ดึงรายการ Rich Menu ทั้งหมด
+ * GET /api/line/richmenu
+ */
+router.get('/richmenu', async (req, res) => {
+  try {
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const richMenuList = await richMenuService.getRichMenuList();
+    
+    res.json({
+      status: 'success',
+      data: richMenuList.richmenus,
+      message: `Found ${richMenuList.richmenus.length} rich menus`,
+    });
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error getting rich menu list:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get rich menu list',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ดึงข้อมูล Rich Menu ตาม ID
+ * GET /api/line/richmenu/:richMenuId
+ */
+router.get('/richmenu/:richMenuId', async (req, res) => {
+  try {
+    const { richMenuId } = req.params;
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const richMenu = await richMenuService.getRichMenu(richMenuId);
+    
+    res.json({
+      status: 'success',
+      data: richMenu,
+      message: 'Rich menu retrieved successfully',
+    });
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error getting rich menu:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get rich menu',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * สร้าง Rich Menu ใหม่
+ * POST /api/line/richmenu
+ * Body: { size: { width, height }, selected: boolean, name: string, chatBarText: string, areas: [...] }
+ */
+router.post('/richmenu', async (req, res) => {
+  try {
+    const { size, selected, name, chatBarText, areas } = req.body;
+
+    if (!size || !name || !chatBarText || !areas) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'size, name, chatBarText, and areas are required',
+      });
+    }
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const richMenuId = await richMenuService.createRichMenu({
+      size,
+      selected: selected || false,
+      name,
+      chatBarText,
+      areas,
+    });
+    
+    res.json({
+      status: 'success',
+      data: { richMenuId },
+      message: 'Rich menu created successfully',
+    });
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error creating rich menu:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create rich menu',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * อัพโหลดรูปภาพ Rich Menu
+ * POST /api/line/richmenu/:richMenuId/image
+ * FormData: { file: image }
+ */
+router.post('/richmenu/:richMenuId/image', upload.single('file'), async (req, res) => {
+  try {
+    const { richMenuId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Image file is required',
+      });
+    }
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const contentType = req.file.mimetype;
+    const success = await richMenuService.uploadRichMenuImageFromBuffer(
+      richMenuId,
+      req.file.buffer,
+      contentType
+    );
+    
+    if (success) {
+      res.json({
+        status: 'success',
+        message: 'Rich menu image uploaded successfully',
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to upload rich menu image',
+      });
+    }
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error uploading image:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload rich menu image',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ดาวน์โหลดรูปภาพ Rich Menu
+ * GET /api/line/richmenu/:richMenuId/image
+ */
+router.get('/richmenu/:richMenuId/image', async (req, res) => {
+  try {
+    const { richMenuId } = req.params;
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const imageBuffer = await richMenuService.downloadRichMenuImage(richMenuId);
+    
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="richmenu-${richMenuId}.png"`);
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error downloading image:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to download rich menu image',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ตั้งค่า Rich Menu เป็น default
+ * POST /api/line/richmenu/:richMenuId/set-default
+ */
+router.post('/richmenu/:richMenuId/set-default', async (req, res) => {
+  try {
+    const { richMenuId } = req.params;
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const success = await richMenuService.setDefaultRichMenu(richMenuId);
+    
+    if (success) {
+      res.json({
+        status: 'success',
+        message: 'Default rich menu set successfully',
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to set default rich menu',
+      });
+    }
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error setting default rich menu:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to set default rich menu',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ลบ Rich Menu default
+ * DELETE /api/line/richmenu/default
+ */
+router.delete('/richmenu/default', async (req, res) => {
+  try {
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const success = await richMenuService.cancelDefaultRichMenu();
+    
+    if (success) {
+      res.json({
+        status: 'success',
+        message: 'Default rich menu cancelled successfully',
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to cancel default rich menu',
+      });
+    }
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error cancelling default rich menu:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to cancel default rich menu',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ลบ Rich Menu
+ * DELETE /api/line/richmenu/:richMenuId
+ */
+router.delete('/richmenu/:richMenuId', async (req, res) => {
+  try {
+    const { richMenuId } = req.params;
+
+    const richMenuService = getLineRichMenuService();
+    if (!richMenuService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE Rich Menu service is not configured',
+      });
+    }
+
+    const success = await richMenuService.deleteRichMenu(richMenuId);
+    
+    if (success) {
+      res.json({
+        status: 'success',
+        message: 'Rich menu deleted successfully',
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to delete rich menu',
+      });
+    }
+  } catch (error) {
+    console.error('[LINE Rich Menu] Error deleting rich menu:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete rich menu',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
