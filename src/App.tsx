@@ -35,6 +35,7 @@ import RepairItemsManagement from "./pages/RepairItemsManagement";
 import CustomerManagement from "./pages/CustomerManagement";
 import Customers from "./pages/Customers";
 import CustomerDetails from "./pages/CustomerDetails";
+import RepairMenu from "./pages/RepairMenu";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<RootRedirect />} />
                     <Route path="/dashboard" element={<RoleProtectedRoute><Dashboard /></RoleProtectedRoute>} />
+                    <Route path="/repairs/menu" element={<ProtectedRoute><RepairMenu /></ProtectedRoute>} />
                     <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
                     <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
                     <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />

@@ -17,6 +17,7 @@ import {
   Wrench,
   ClipboardList,
   UserSearch,
+  Grid3x3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -82,7 +83,7 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
     id: "repair",
     titleTh: "งานซ่อม",
     titleEn: "Repairs",
-    basePath: "/repairs",
+    basePath: "/repairs/menu",
     icon: Wrench,
     iconBg: "bg-blue-500/20 text-blue-400",
     sections: [
@@ -91,6 +92,13 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
         labelTh: "เมนู",
         labelEn: "Menu",
         items: [
+          {
+            id: "repair-menu-main",
+            href: "/repairs/menu",
+            labelTh: "เมนูงานซ่อม",
+            labelEn: "Repair Menu",
+            icon: Grid3x3,
+          },
           {
             id: "add-in-store",
             href: "/repairs/new?type=in-store",
@@ -345,6 +353,8 @@ export function getSubjectIdFromPath(pathname: string): string | null {
   if (pathname === "/" || pathname.startsWith("/") && pathname.length <= 1) return "dashboard";
   // Check /admin paths for admin subject
   if (pathname.startsWith("/admin")) return "admin";
+  // Check /repairs paths for repair subject (special case because basePath is /repairs/menu)
+  if (pathname.startsWith("/repairs")) return "repair";
   for (const subject of Object.values(SUBJECTS_CONFIG)) {
     if (pathname === subject.basePath || (subject.basePath !== "/" && pathname.startsWith(subject.basePath)))
       return subject.id;
