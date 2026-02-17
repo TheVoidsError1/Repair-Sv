@@ -102,7 +102,7 @@ router.post('/logout', async (req, res) => {
 
     if (user) {
       // Clear token
-      user.token = null;
+      user.token = undefined;
       await personnelRepository.save(user);
     }
 

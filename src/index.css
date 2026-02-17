@@ -126,9 +126,15 @@
     --sidebar-width: 16rem;
   }
 
-  /* Main content margin for sidebar */
+  /* Main content margin for sidebar - only on desktop */
   .main-content-with-sidebar {
-    margin-left: var(--sidebar-width);
+    margin-left: 0;
+  }
+
+  @media (min-width: 1024px) {
+    .main-content-with-sidebar {
+      margin-left: var(--sidebar-width);
+    }
   }
 
   /* For xl screens, sidebar is 19rem when expanded */
@@ -226,15 +232,24 @@
   }
 
   .data-table th {
-    @apply text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3 bg-muted/50;
+    @apply text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 sm:px-4 py-2 sm:py-3 bg-muted/50;
+    white-space: nowrap;
   }
 
   .data-table td {
-    @apply px-4 py-4 text-sm;
+    @apply px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm;
   }
 
   .data-table tr {
     @apply border-b border-border hover:bg-muted/30 transition-colors;
+  }
+
+  /* Mobile table improvements */
+  @media (max-width: 640px) {
+    .data-table th,
+    .data-table td {
+      @apply px-2 py-2;
+    }
   }
 
   .page-header {
