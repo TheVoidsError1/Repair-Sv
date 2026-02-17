@@ -20,13 +20,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Time30Select } from "@/components/ui/time-30-select";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -36,7 +29,7 @@ import { getPartStockStatus, type Part } from "@/lib/partsData";
 import { cn } from "@/lib/utils";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, X, Search, User, Phone, History, AlertTriangle } from "lucide-react";
+import { Calendar as CalendarIcon, X, Search, User, Phone, History, AlertTriangle, ArrowLeft, Package } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -168,6 +161,11 @@ const RepairNew = () => {
   const [isRepairHistoryDialogOpen, setIsRepairHistoryDialogOpen] = useState(false);
   const [customerRepairHistory, setCustomerRepairHistory] = useState<any[]>([]);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  
+  // Part selection dialog states
+  const [isPartDialogOpen, setIsPartDialogOpen] = useState(false);
+  const [partSearchQuery, setPartSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   /** รูปแบบการรับบริการ จาก URL (?type=in-store | type=leave-device) */
   const serviceType: ServiceType = getServiceTypeFromSearchParams(searchParams);
@@ -439,8 +437,77 @@ const RepairNew = () => {
   const handleAddPart = (partId: string) => {
     if (partId && !selectedPartIds.includes(partId)) {
       setSelectedPartIds([...selectedPartIds, partId]);
+      setIsPartDialogOpen(false);
+      setPartSearchQuery("");
+      setSelectedCategory(null);
     }
   };
+
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category);
+    setPartSearchQuery("");
+  };
+
+  const handleBackToCategories = () => {
+    setSelectedCategory(null);
+    setPartSearchQuery("");
+  };
+
+  const handleOpenPartDialog = () => {
+    setIsPartDialogOpen(true);
+    setPartSearchQuery("");
+    setSelectedCategory(null);
+  };
+
+  // Get unique categories from available parts
+  const getUniqueCategories = () => {
+    const categories = new Map<string, { name: string; nameTh: string; count: number }>();
+    availableParts.forEach((part) => {
+      const categoryKey = part.category || "Others";
+      const categoryTh = part.categoryTh || "อื่นๆ";
+      if (!categories.has(categoryKey)) {
+        categories.set(categoryKey, {
+          name: categoryKey,
+          nameTh: categoryTh,
+          count: 0,
+        });
+      }
+      const cat = categories.get(categoryKey)!;
+      cat.count += 1;
+    });
+    return Array.from(categories.values()).sort((a, b) => 
+      language === "th" ? a.nameTh.localeCompare(b.nameTh) : a.name.localeCompare(b.name)
+    );
+  };
+
+  // Get parts filtered by selected category
+  const getPartsByCategory = (category: string | null) => {
+    if (!category) return [];
+    return availableParts.filter((part) => {
+      const partCategory = part.category || "Others";
+      return partCategory === category;
+    });
+  };
+
+  // Filter parts based on search query and selected category
+  const filteredAvailableParts = (() => {
+    let parts = selectedCategory 
+      ? getPartsByCategory(selectedCategory)
+      : availableParts;
+    
+    if (partSearchQuery.trim()) {
+      const query = partSearchQuery.toLowerCase();
+      parts = parts.filter((part) => {
+        const nameMatch = part.name.toLowerCase().includes(query);
+        const nameThMatch = part.nameTh.toLowerCase().includes(query);
+        const categoryMatch = part.category?.toLowerCase().includes(query);
+        const categoryThMatch = part.categoryTh?.toLowerCase().includes(query);
+        return nameMatch || nameThMatch || categoryMatch || categoryThMatch;
+      });
+    }
+    
+    return parts;
+  })();
 
   const handleRemovePart = (partId: string) => {
     setSelectedPartIds(selectedPartIds.filter((id) => id !== partId));
@@ -719,28 +786,20 @@ const RepairNew = () => {
               {/* ส่วนเลือกอะไหล่ — ต่อจากอาการเสีย */}
               <div className="grid gap-2 sm:col-span-2 space-y-2">
                 <Label htmlFor="part-select">{t("selectPart")}</Label>
-                <Select 
-                  value="" 
-                  onValueChange={handleAddPart}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenPartDialog}
                   disabled={isLoadingParts || availableParts.length === 0}
+                  className="w-full justify-start text-left font-normal"
                 >
-                  <SelectTrigger id="part-select" className="w-full">
-                    <SelectValue placeholder={isLoadingParts ? (language === "th" ? "กำลังโหลด..." : "Loading...") : availableParts.length === 0 ? (language === "th" ? "ไม่มีอะไหล่เหลือ" : "No parts available") : t("selectPartPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableParts.length === 0 && !isLoadingParts ? (
-                      <SelectItem value="no-parts" disabled>
-                        {language === "th" ? "ไม่มีอะไหล่เหลือ" : "No parts available"}
-                      </SelectItem>
-                    ) : (
-                      availableParts.map((part) => (
-                        <SelectItem key={part.id} value={part.id}>
-                          {language === "th" ? part.nameTh : part.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                  <Search className="mr-2 h-4 w-4" />
+                  {isLoadingParts 
+                    ? (language === "th" ? "กำลังโหลด..." : "Loading...") 
+                    : availableParts.length === 0 
+                    ? (language === "th" ? "ไม่มีอะไหล่เหลือ" : "No parts available")
+                    : t("selectPartPlaceholder")}
+                </Button>
                 
                 {/* แสดงรายการอะไหล่ที่เลือกแล้ว */}
                 {selectedParts.length > 0 && (
@@ -1181,6 +1240,155 @@ const RepairNew = () => {
                 </CommandGroup>
               </CommandList>
             </Command>
+          </DialogContent>
+        </Dialog>
+
+        {/* Part Selection Dialog */}
+        <Dialog open={isPartDialogOpen} onOpenChange={setIsPartDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                {selectedCategory && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToCategories}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                <div className="flex-1">
+                  <DialogTitle>
+                    {selectedCategory
+                      ? language === "th"
+                        ? `อะไหล่ - ${getUniqueCategories().find(c => c.name === selectedCategory)?.nameTh || selectedCategory}`
+                        : `Parts - ${selectedCategory}`
+                      : language === "th"
+                      ? "เลือกหมวดหมู่"
+                      : "Select Category"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {selectedCategory
+                      ? language === "th"
+                        ? "เลือกอะไหล่ที่ต้องการ หรือค้นหาด้วยชื่อ"
+                        : "Select the part you want, or search by name"
+                      : language === "th"
+                      ? "เลือกหมวดหมู่เพื่อดูรายการอะไหล่"
+                      : "Select a category to view parts"}
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            {!selectedCategory ? (
+              // Step 1: Show categories
+              <Command className="rounded-lg border shadow-md">
+                {partSearchQuery && (
+                  <CommandInput
+                    placeholder={language === "th" ? "ค้นหาหมวดหมู่..." : "Search categories..."}
+                    value={partSearchQuery}
+                    onValueChange={setPartSearchQuery}
+                  />
+                )}
+                <CommandList>
+                  <CommandEmpty>
+                    {language === "th" ? "ไม่พบหมวดหมู่" : "No categories found"}
+                  </CommandEmpty>
+                  <CommandGroup heading={language === "th" ? "หมวดหมู่" : "Categories"}>
+                    {getUniqueCategories()
+                      .filter((cat) => {
+                        if (!partSearchQuery.trim()) return true;
+                        const query = partSearchQuery.toLowerCase();
+                        return (
+                          cat.name.toLowerCase().includes(query) ||
+                          cat.nameTh.toLowerCase().includes(query)
+                        );
+                      })
+                      .map((category) => (
+                        <CommandItem
+                          key={category.name}
+                          value={category.name}
+                          onSelect={() => handleSelectCategory(category.name)}
+                          className="flex items-center justify-between cursor-pointer py-3 data-[selected=true]:bg-blue-50 data-[selected=true]:dark:bg-blue-950/30 data-[selected=true]:text-blue-700 data-[selected=true]:dark:text-blue-300 data-[selected=true]:border-blue-300 data-[selected=true]:dark:border-blue-700 data-[selected=true]:border-2 data-[selected=true]:rounded-md data-[selected=true]:shadow-sm data-[selected=true]:font-semibold"
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <Package className="h-5 w-5 text-muted-foreground data-[selected=true]:text-blue-600 data-[selected=true]:dark:text-blue-400" />
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {language === "th" ? category.nameTh : category.name}
+                              </span>
+                              <span className="text-sm text-muted-foreground data-[selected=true]:text-blue-600/80 data-[selected=true]:dark:text-blue-400/80">
+                                {language === "th"
+                                  ? `${category.count} รายการ`
+                                  : `${category.count} item${category.count !== 1 ? "s" : ""}`}
+                              </span>
+                            </div>
+                          </div>
+                          <ArrowLeft className="h-4 w-4 text-muted-foreground data-[selected=true]:text-blue-600 data-[selected=true]:dark:text-blue-400" />
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            ) : (
+              // Step 2: Show parts in selected category
+              <Command className="rounded-lg border shadow-md">
+                <CommandInput
+                  placeholder={language === "th" ? "พิมพ์ชื่ออะไหล่..." : "Type part name..."}
+                  value={partSearchQuery}
+                  onValueChange={setPartSearchQuery}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {language === "th" ? "ไม่พบอะไหล่" : "No parts found"}
+                  </CommandEmpty>
+                  <CommandGroup heading={language === "th" ? "อะไหล่ที่เลือกได้" : "Available Parts"}>
+                    {filteredAvailableParts.map((part) => {
+                      const stockStatus = getPartStockStatus(part.stock);
+                      return (
+                        <CommandItem
+                          key={part.id}
+                          value={part.id}
+                          onSelect={() => handleAddPart(part.id)}
+                          className="flex items-center justify-between cursor-pointer py-3 data-[selected=true]:bg-blue-50 data-[selected=true]:dark:bg-blue-950/30 data-[selected=true]:text-blue-700 data-[selected=true]:dark:text-blue-300 data-[selected=true]:border-blue-300 data-[selected=true]:dark:border-blue-700 data-[selected=true]:border-2 data-[selected=true]:rounded-md data-[selected=true]:shadow-sm data-[selected=true]:font-semibold"
+                        >
+                          <div className="flex flex-col gap-1 flex-1">
+                            <span className="font-medium">
+                              {language === "th" ? part.nameTh : part.name}
+                            </span>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground data-[selected=true]:text-blue-600/80 data-[selected=true]:dark:text-blue-400/80">
+                              <span>
+                                {language === "th" ? "สต็อก" : "Stock"}: {part.stock.toLocaleString()}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  stockStatus === "high" &&
+                                    "border-green-500/60 bg-green-500/15 text-green-700 dark:text-green-400",
+                                  stockStatus === "low" &&
+                                    "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400",
+                                  stockStatus === "out" &&
+                                    "border-destructive/60 bg-destructive/15 text-destructive"
+                                )}
+                              >
+                                {stockStatus === "high" && t("stockStatusHigh")}
+                                {stockStatus === "low" && t("stockStatusLow")}
+                                {stockStatus === "out" && t("outOfStock")}
+                              </Badge>
+                            </div>
+                          </div>
+                          <span className="font-semibold text-primary ml-4 data-[selected=true]:text-blue-600 data-[selected=true]:dark:text-blue-400 data-[selected=true]:font-bold">
+                            ฿{part.sellPrice.toLocaleString()}
+                          </span>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            )}
           </DialogContent>
         </Dialog>
 
