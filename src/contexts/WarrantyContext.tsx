@@ -57,6 +57,22 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const { socket, isConnected } = useSocket();
 
+  const upsertClaim = useCallback((nextClaim: WarrantyClaim) => {
+    setClaims((prev) => {
+      const idx = prev.findIndex((c) => c.id === nextClaim.id);
+      if (idx === -1) return [nextClaim, ...prev];
+      const copy = prev.slice();
+      copy[idx] = nextClaim;
+      return copy;
+    });
+  }, []);
+
+  const replaceClaimsDeduped = useCallback((items: WarrantyClaim[]) => {
+    const map = new Map<string, WarrantyClaim>();
+    for (const c of items) map.set(c.id, c);
+    setClaims(Array.from(map.values()));
+  }, []);
+
   // Helper function to transform warranty claim data
   const transformClaim = (claim: any): WarrantyClaim => ({
     id: claim.id,
@@ -80,7 +96,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.getWarrantyClaims();
       if (response.status === "success" && response.data) {
         const transformedClaims = response.data.map(transformClaim);
-        setClaims(transformedClaims);
+        replaceClaimsDeduped(transformedClaims);
       } else {
         setError(response.message || "Failed to fetch warranty claims");
       }
@@ -89,7 +105,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [replaceClaimsDeduped]);
 
   // Fetch claims on mount
   useEffect(() => {
@@ -106,16 +122,14 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
     socket.on('warranty:created', (warranty: any) => {
       console.log('📡 Received warranty:created', warranty);
       const transformedClaim = transformClaim(warranty);
-      setClaims((prev) => [transformedClaim, ...prev]);
+      upsertClaim(transformedClaim);
     });
 
     // เมื่อมีการอัปเดตเคลม
     socket.on('warranty:updated', (warranty: any) => {
       console.log('📡 Received warranty:updated', warranty);
       const transformedClaim = transformClaim(warranty);
-      setClaims((prev) =>
-        prev.map((c) => (c.id === transformedClaim.id ? transformedClaim : c))
-      );
+      upsertClaim(transformedClaim);
     });
 
     // เมื่อมีการลบเคลม
@@ -157,7 +171,8 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
             updatedAt: response.data.updatedAt,
             repair: response.data.repair,
           };
-          setClaims((prev) => [newClaim, ...prev]);
+          // กันซ้ำ: backend จะ emit socket warranty:created กลับมาด้วย
+          upsertClaim(newClaim);
           return newClaim;
         } else {
           setError(response.message || "Failed to create warranty claim");
@@ -168,7 +183,7 @@ export function WarrantyProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    []
+    [upsertClaim]
   );
 
   // Update warranty claim status

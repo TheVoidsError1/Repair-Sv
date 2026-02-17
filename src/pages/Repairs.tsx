@@ -68,6 +68,9 @@ const RepairBillPreview = ({
     const num = parseFloat(value);
     return Number.isNaN(num) ? "-" : `฿${num.toLocaleString()}`;
   };
+  const [showLineQr, setShowLineQr] = useState(true);
+  const lineQrSrc = (import.meta as any)?.env?.VITE_LINE_QR_SRC || "/line-qr.png";
+  const lineQrText = (import.meta as any)?.env?.VITE_LINE_QR_TEXT || "LINE";
 
   return (
     <div className="repair-bill-single bg-white border-2 border-gray-800 rounded-lg p-4 text-gray-900">
@@ -240,20 +243,35 @@ const RepairBillPreview = ({
         <div className="bg-gray-200 border-b border-gray-800 px-2 py-1 font-semibold">
           เงื่อนไขในการซ่อม
         </div>
-        <div className="p-2 space-y-1.5 leading-relaxed">
-          <p>1. โปรดตรวจสอบรายการซ่อมให้ชัดเจนก่อนลงนามในเอกสารการซ่อม</p>
-          <p>
-            2. แจ้งผลการซ่อมภายใน 30 วัน นับจากวันที่แจ้งลูกค้า หากเกินกำหนดถือว่าสละสิทธิ์การรับประกัน
-          </p>
-          <p>
-            3. เครื่องที่เดินทางมารับเกิน 30 วัน บริษัทขอคิดค่าฝากเครื่องตามอัตราที่กำหนด
-          </p>
-          <p>
-            4. ความเสียหายจากการตก กระแทก เปียกน้ำ หรือการซ่อมแซมจากที่อื่น ไม่อยู่ในเงื่อนไขการรับประกัน
-          </p>
-          <p>
-            5. การรับประกันไม่ครอบคลุมข้อมูลภายในเครื่อง ลูกค้าควรสำรองข้อมูลก่อนส่งซ่อมทุกครั้ง
-          </p>
+        <div className="p-2 leading-relaxed flex gap-2">
+          <div className="flex-1 space-y-1.5 min-w-0">
+            <p>1. โปรดตรวจสอบรายการซ่อมให้ชัดเจนก่อนลงนามในเอกสารการซ่อม</p>
+            <p>
+              2. แจ้งผลการซ่อมภายใน 30 วัน นับจากวันที่แจ้งลูกค้า หากเกินกำหนดถือว่าสละสิทธิ์การรับประกัน
+            </p>
+            <p>
+              3. เครื่องที่เดินทางมารับเกิน 30 วัน บริษัทขอคิดค่าฝากเครื่องตามอัตราที่กำหนด
+            </p>
+            <p>
+              4. ความเสียหายจากการตก กระแทก เปียกน้ำ หรือการซ่อมแซมจากที่อื่น ไม่อยู่ในเงื่อนไขการรับประกัน
+            </p>
+            <p>
+              5. การรับประกันไม่ครอบคลุมข้อมูลภายในเครื่อง ลูกค้าควรสำรองข้อมูลก่อนส่งซ่อมทุกครั้ง
+            </p>
+          </div>
+          {showLineQr && (
+            <div className="w-[74px] shrink-0 text-center">
+              <img
+                src={lineQrSrc}
+                alt="LINE QR"
+                className="w-[74px] h-[74px] object-contain border border-gray-300 rounded-sm bg-white"
+                onError={() => setShowLineQr(false)}
+              />
+              <div className="mt-1 text-[9px] leading-tight text-gray-700 break-words">
+                {lineQrText}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

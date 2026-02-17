@@ -59,12 +59,13 @@ import {
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/runtimeConfig";
 
 // Component for displaying part image in table cell
 const PartImageCell = ({ imageUrl, alt }: { imageUrl?: string; alt: string }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+  const API_BASE_URL = getApiBaseUrl();
   
   // Build image URL
   let imageSrc: string | null = null;
@@ -540,7 +541,7 @@ const Inventory = () => {
           });
           
           const token = localStorage.getItem('authToken');
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+          const API_BASE_URL = getApiBaseUrl();
           const response = await fetch(`${API_BASE_URL}/api/parts/${backendId}`, {
             method: 'PUT',
             headers: {
@@ -612,7 +613,7 @@ const Inventory = () => {
           });
           
           const token = localStorage.getItem('authToken');
-          const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+          const API_BASE_URL = getApiBaseUrl();
           const response = await fetch(`${API_BASE_URL}/api/parts`, {
             method: 'POST',
             headers: {
@@ -991,7 +992,7 @@ const Inventory = () => {
                   <div className="relative w-full max-w-xs">
                     <div className="relative aspect-square rounded-lg border border-border overflow-hidden bg-muted">
                       <img
-                        src={imagePreview || (existingImageUrl ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}${existingImageUrl}` : '')}
+                        src={imagePreview || (existingImageUrl ? `${getApiBaseUrl()}${existingImageUrl}` : '')}
                         alt={language === "th" ? "รูปภาพสินค้า" : "Part image"}
                         className="w-full h-full object-cover"
                       />

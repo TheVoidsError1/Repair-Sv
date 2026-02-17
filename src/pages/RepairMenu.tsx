@@ -66,9 +66,9 @@ const RepairMenu = () => {
     },
     {
       id: "customer-bills",
-      titleTh: "ดูบิลของลูกค้า",
+      titleTh: "ดูใบแจ้งซ่อมของลูกค้า",
       titleEn: "Customer Bills",
-      descriptionTh: "ดูและค้นหาบิลของลูกค้า",
+      descriptionTh: "ดูและค้นหาใบแจ้งซ่อมของลูกค้า",
       descriptionEn: "View and search customer bills",
       icon: UserSearch,
       path: "/repairs/bill/customer",

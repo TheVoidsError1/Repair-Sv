@@ -1,6 +1,13 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
@@ -9,6 +16,12 @@ import { Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_WARRANTY_DAYS = 90;
+const ALLOWED_WARRANTY_DAYS = [90, 180, 365] as const;
+
+function normalizeWarrantyDays(v: unknown): 90 | 180 | 365 {
+  const n = Number(v);
+  return (ALLOWED_WARRANTY_DAYS as readonly number[]).includes(n) ? (n as any) : 90;
+}
 
 function formatDate(dateStr: string | Date | undefined): string {
   if (!dateStr) return "";
@@ -69,7 +82,7 @@ export default function WarrantyManage() {
 
       const nextDraft: Record<string, string> = {};
       pickedUp.forEach((r: any) => {
-        nextDraft[r.id] = String(r.warrantyDays ?? DEFAULT_WARRANTY_DAYS);
+        nextDraft[r.id] = String(normalizeWarrantyDays(r.warrantyDays ?? DEFAULT_WARRANTY_DAYS));
       });
       setDraftDays(nextDraft);
     } catch (e) {
@@ -104,10 +117,10 @@ export default function WarrantyManage() {
   const saveWarrantyDays = async (repairId: string) => {
     const raw = draftDays[repairId];
     const wd = Number(raw);
-    if (!Number.isFinite(wd) || !Number.isInteger(wd) || wd < 0 || wd > 3650) {
+    if (!(ALLOWED_WARRANTY_DAYS as readonly number[]).includes(wd)) {
       toast({
         title: language === "th" ? "ข้อมูลไม่ถูกต้อง" : "Invalid",
-        description: language === "th" ? "กรุณาใส่จำนวนวันเป็นเลขจำนวนเต็ม 0 - 3650" : "Warranty days must be an integer 0 - 3650",
+        description: language === "th" ? "เลือกได้เฉพาะ 3 เดือน / 6 เดือน / 1 ปี" : "Only 3/6/12 months are allowed",
         variant: "destructive",
       });
       return;
@@ -214,14 +227,19 @@ export default function WarrantyManage() {
                         <td className="font-mono text-sm">{r.serialNumber || "—"}</td>
                         <td>{startDate || "—"}</td>
                         <td>
-                          <Input
-                            value={draftDays[r.id] ?? ""}
-                            onChange={(e) => setDraftDays((prev) => ({ ...prev, [r.id]: e.target.value }))}
-                            type="number"
-                            min={0}
-                            max={3650}
-                            className="w-[120px]"
-                          />
+                          <Select
+                            value={draftDays[r.id] ?? String(DEFAULT_WARRANTY_DAYS)}
+                            onValueChange={(v) => setDraftDays((prev) => ({ ...prev, [r.id]: v }))}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue placeholder={language === "th" ? "เลือกระยะเวลา" : "Select period"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="90">{language === "th" ? "3 เดือน" : "3 months"}</SelectItem>
+                              <SelectItem value="180">{language === "th" ? "6 เดือน" : "6 months"}</SelectItem>
+                              <SelectItem value="365">{language === "th" ? "1 ปี" : "1 year"}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td>{expiry || "—"}</td>
                         <td className={cn("font-semibold", remainingClass)}>

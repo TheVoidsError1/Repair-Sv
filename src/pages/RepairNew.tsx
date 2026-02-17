@@ -16,6 +16,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -132,10 +139,10 @@ const initialFormData = {
   problemSymptoms: "",
   deposit: "",
   estimatedPrice: "",
-  repairSummaryPrice: "",
   dateOfReport: "",
   timeOfReport: "",
   scheduledPickupTime: "",
+  warrantyDays: "90",
 };
 
 const RepairNew = () => {
@@ -179,6 +186,16 @@ const RepairNew = () => {
   );
   /** วันมารับเครื่อง (YYYY-MM-DD) ใช้เฉพาะ drop_off */
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
+
+  const WARRANTY_OPTIONS: Array<{ value: "90" | "180" | "365"; labelTh: string; labelEn: string }> = [
+    { value: "90", labelTh: "3 เดือน", labelEn: "3 months" },
+    { value: "180", labelTh: "6 เดือน", labelEn: "6 months" },
+    { value: "365", labelTh: "1 ปี", labelEn: "1 year" },
+  ];
+
+  const warrantyLabel =
+    WARRANTY_OPTIONS.find((o) => o.value === formData.warrantyDays)?.[language === "th" ? "labelTh" : "labelEn"] ??
+    (language === "th" ? "3 เดือน" : "3 months");
 
   const receiveDateAsDate = receiveDate
     ? (() => {
@@ -274,8 +291,9 @@ const RepairNew = () => {
       errors.problemSymptoms = language === "th" ? "กรุณากรอกอาการเสีย" : "Please enter problem symptoms";
     }
 
-    if (!formData.repairSummaryPrice || !formData.repairSummaryPrice.trim()) {
-      errors.repairSummaryPrice = language === "th" ? "กรุณากรอกสรุปราคาซ่อม" : "Please enter repair summary price";
+    // Validate warrantyDays (must be one of the allowed options)
+    if (!WARRANTY_OPTIONS.some((o) => o.value === formData.warrantyDays)) {
+      errors.warrantyDays = language === "th" ? "กรุณาเลือกระยะเวลารับประกัน (3 เดือน / 6 เดือน / 1 ปี)" : "Please select warranty period (3/6/12 months)";
     }
 
     // If there are errors, show them and return
@@ -333,6 +351,10 @@ const RepairNew = () => {
         : "09:00";
       const scheduledPickupTimeIso = dateForPickup && receiveTime ? `${dateForPickup}T${timePart}:00` : undefined;
 
+      // สรุปราคาซ่อม (ซ่อนไม่ให้กรอกเอง): ใช้ "ประเมินราคา" เป็นหลัก, fallback เป็นผลรวมราคาอะไหล่
+      const partsTotal = selectedParts.reduce((sum, part) => sum + (Number(part.sellPrice) || 0), 0);
+      const summaryPriceStr = (formData.estimatedPrice || (partsTotal > 0 ? String(partsTotal) : "")).trim();
+
       // Prepare data for API
       const repairData = {
         customer: formData.customer.trim(),
@@ -345,13 +367,14 @@ const RepairNew = () => {
         problemSymptoms: formData.problemSymptoms.trim(),
         deposit: formData.deposit || undefined,
         estimatedPrice: formData.estimatedPrice || undefined,
-        repairSummaryPrice: formData.repairSummaryPrice || undefined,
+        repairSummaryPrice: summaryPriceStr || undefined,
         dateOfReport: formData.dateOfReport || defaultDate,
         timeOfReport: formData.timeOfReport || undefined,
         scheduledPickupTime: scheduledPickupTimeIso,
         service_type: serviceType,
         receive_date: dateForPickup,
         receive_time: receiveTime,
+        warrantyDays: Number(formData.warrantyDays),
         selectedPartIds: selectedPartIds.length > 0 ? selectedPartIds : undefined,
       };
 
@@ -733,6 +756,39 @@ const RepairNew = () => {
                 )}
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="warrantyDays">{language === "th" ? "ระยะเวลารับประกัน" : "Warranty period"}</Label>
+                <Select
+                  value={formData.warrantyDays}
+                  onValueChange={(v) => {
+                    handleInputChange("warrantyDays", v);
+                    if (fieldErrors.warrantyDays) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.warrantyDays;
+                        return next;
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger id="warrantyDays" className="h-10">
+                    <SelectValue placeholder={language === "th" ? "เลือก 3 เดือน / 6 เดือน / 1 ปี" : "Select 3/6/12 months"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WARRANTY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {language === "th" ? o.labelTh : o.labelEn}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldErrors.warrantyDays && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4" />
+                    {fieldErrors.warrantyDays}
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="model">{t("model")}</Label>
                 <Input
                   id="model"
@@ -741,6 +797,11 @@ const RepairNew = () => {
                   onChange={(e) => handleInputChange("model", e.target.value)}
                 />
               </div>
+              <p className="text-xs text-muted-foreground sm:col-span-2 -mt-2">
+                {language === "th"
+                  ? "เริ่มนับประกันเมื่อสถานะงานซ่อมเป็น “รับเครื่องแล้ว”"
+                  : "Warranty starts when repair status becomes “picked-up”."}
+              </p>
               <div className="grid gap-2">
                 <Label htmlFor="color">{t("color")}</Label>
                 <Input
@@ -943,33 +1004,7 @@ const RepairNew = () => {
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="repairSummaryPrice">
-                  {t("repairSummaryPrice")}
-                  <span className="text-destructive ml-1">*</span>
-                </Label>
-                <Input
-                  id="repairSummaryPrice"
-                  type="number"
-                  placeholder={t("enterRepairSummaryPrice")}
-                  value={formData.repairSummaryPrice}
-                  onChange={(e) => {
-                    handleInputChange("repairSummaryPrice", e.target.value);
-                    if (fieldErrors.repairSummaryPrice) {
-                      setFieldErrors((prev) => {
-                        const newErrors = { ...prev };
-                        delete newErrors.repairSummaryPrice;
-                        return newErrors;
-                      });
-                    }
-                  }}
-                  className={fieldErrors.repairSummaryPrice ? "border-destructive" : ""}
-                />
-                {fieldErrors.repairSummaryPrice && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    {fieldErrors.repairSummaryPrice}
-                  </p>
-                )}
+                {/* ลบช่อง "สรุปราคาซ่อม" ออกจากฟอร์ม: ระบบจะสรุปจาก "ประเมินราคา/อะไหล่" อัตโนมัติ */}
               </div>
             </div>
           </CardContent>
@@ -1110,16 +1145,14 @@ const RepairNew = () => {
                     <p className="font-medium">฿{Number(formData.estimatedPrice).toLocaleString()}</p>
                   </div>
                 )}
-                {formData.repairSummaryPrice && (
-                  <div className="col-span-2">
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "สรุปราคาซ่อม" : "Repair Summary Price"}
-                    </p>
-                    <p className="font-semibold text-lg text-primary">
-                      ฿{Number(formData.repairSummaryPrice).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">
+                    {language === "th" ? "สรุปราคาซ่อม (อัตโนมัติ)" : "Repair total (auto)"}
+                  </p>
+                  <p className="font-semibold text-lg text-primary">
+                    ฿{Number(formData.estimatedPrice || selectedParts.reduce((sum, part) => sum + (Number(part.sellPrice) || 0), 0)).toLocaleString()}
+                  </p>
+                </div>
               </div>
 
               {/* Pickup Time */}
@@ -1136,6 +1169,14 @@ const RepairNew = () => {
                     ? `${receiveDateAsDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB")} เวลา ${receiveTime}`
                     : `${receiveDate} ${receiveTime}`}
                 </p>
+              </div>
+
+              {/* Warranty */}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">
+                  {language === "th" ? "ระยะเวลารับประกัน" : "Warranty period"}
+                </p>
+                <p className="font-medium">{warrantyLabel}</p>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t">

@@ -491,7 +491,7 @@ const RepairBillManagement = () => {
                             <span
                               className={cn(
                                 "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
-                                item.status === "completed"
+                                item.status === "completed" || item.status === "picked-up"
                                   ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                                   : item.status === "in-progress"
                                   ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
@@ -502,6 +502,8 @@ const RepairBillManagement = () => {
                             >
                               {item.status === "completed"
                                 ? language === "th" ? "เสร็จสิ้น" : "Completed"
+                                : item.status === "picked-up"
+                                ? language === "th" ? "รับเครื่องแล้ว" : "Picked Up"
                                 : item.status === "in-progress"
                                 ? language === "th" ? "กำลังซ่อม" : "In Progress"
                                 : item.status === "pending"
@@ -518,7 +520,7 @@ const RepairBillManagement = () => {
                                 onClick={() => handleViewBill(item)}
                               >
                                 <Eye className="w-3.5 h-3.5" />
-                                {language === "th" ? "ดูบิล" : "View Bill"}
+                                {language === "th" ? "ดูใบแจ้งซ่อม" : "View Bill"}
                               </Button>
                               <Button
                                 size="sm"

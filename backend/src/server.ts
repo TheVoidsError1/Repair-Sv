@@ -17,6 +17,7 @@ import transactionRoutes from './api/transaction.routes.js';
 import lineRoutes from './api/line.routes.js';
 import { Personnel } from './entities/Personnel.js';
 import { hashPassword } from './utils/password.js';
+import { buildExpressCorsOptions } from './utils/cors.js';
 
 dotenv.config();
 
@@ -25,10 +26,9 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
-  credentials: true,
-}));
+const corsOptions = buildExpressCorsOptions(process.env.FRONTEND_URL);
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

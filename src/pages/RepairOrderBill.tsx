@@ -16,10 +16,21 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const ALLOWED_WARRANTY_DAYS = [90, 180, 365] as const;
+
+function formatWarrantyPeriod(warrantyDays: unknown, language: "th" | "en"): string {
+  const wd = Number(warrantyDays);
+  const normalized = ALLOWED_WARRANTY_DAYS.includes(wd as any) ? wd : 90;
+  if (normalized === 90) return language === "th" ? "3 เดือน" : "3 months";
+  if (normalized === 180) return language === "th" ? "6 เดือน" : "6 months";
+  return language === "th" ? "1 ปี" : "1 year";
+}
+
 export interface BillContentProps {
   data: RepairOrderData;
   formatPrice: (value: string) => string;
   copyLabel: string;
+  language: "th" | "en";
   selectedParts?: Array<{
     id?: string;
     partNumber?: string;
@@ -34,8 +45,13 @@ export interface BillContentProps {
   }>;
 }
 
-export const BillContent = ({ data, formatPrice, copyLabel, selectedParts, additionalParts }: BillContentProps) => (
-  <div className="repair-bill-single bg-white border-2 border-gray-800 rounded-lg p-4 print:p-3 text-gray-900">
+export const BillContent = ({ data, formatPrice, copyLabel, language, selectedParts, additionalParts }: BillContentProps) => {
+  const [showLineQr, setShowLineQr] = useState(true);
+  const lineQrSrc = (import.meta as any)?.env?.VITE_LINE_QR_SRC || "/line-qr.png";
+  const lineQrText = (import.meta as any)?.env?.VITE_LINE_QR_TEXT || "LINE";
+
+  return (
+    <div className="repair-bill-single bg-white border-2 border-gray-800 rounded-lg p-4 print:p-3 text-gray-900">
     <div className="flex justify-between items-start mb-3 text-xs">
       <div className="text-center">
         <p className="text-base font-extrabold tracking-tight leading-none">
@@ -142,6 +158,13 @@ export const BillContent = ({ data, formatPrice, copyLabel, selectedParts, addit
       </div>
 
       <div className="flex gap-4 items-center">
+        <span className="text-xs">รับประกัน</span>
+        <div className="flex-1 border-b border-gray-400 min-h-[20px] text-[11px] px-1">
+          {formatWarrantyPeriod((data as any).warrantyDays, language)}
+        </div>
+      </div>
+
+      <div className="flex gap-4 items-center">
         <span>ประเมินราคา</span>
         <div className="w-32 border-b border-gray-400 min-h-[20px]">
           <span className="text-[11px] leading-tight px-1">
@@ -202,12 +225,27 @@ export const BillContent = ({ data, formatPrice, copyLabel, selectedParts, addit
       <div className="bg-gray-200 border-b border-gray-800 px-2 py-1 font-semibold">
         เงื่อนไขในการซ่อม
       </div>
-      <div className="p-2 space-y-1.5 leading-relaxed">
-        <p>1. โปรดตรวจสอบรายการซ่อมให้ชัดเจนก่อนลงนามในเอกสารการซ่อม</p>
-        <p>2. แจ้งผลการซ่อมภายใน 30 วัน นับจากวันที่แจ้งลูกค้า หากเกินกำหนดถือว่าสละสิทธิ์การรับประกัน</p>
-        <p>3. เครื่องที่เดินทางมารับเกิน 30 วัน บริษัทขอคิดค่าฝากเครื่องตามอัตราที่กำหนด</p>
-        <p>4. ความเสียหายจากการตก กระแทก เปียกน้ำ หรือการซ่อมแซมจากที่อื่น ไม่อยู่ในเงื่อนไขการรับประกัน</p>
-        <p>5. การรับประกันไม่ครอบคลุมข้อมูลภายในเครื่อง ลูกค้าควรสำรองข้อมูลก่อนส่งซ่อมทุกครั้ง</p>
+      <div className="p-2 leading-relaxed flex gap-2">
+        <div className="flex-1 space-y-1.5 min-w-0">
+          <p>1. โปรดตรวจสอบรายการซ่อมให้ชัดเจนก่อนลงนามในเอกสารการซ่อม</p>
+          <p>2. แจ้งผลการซ่อมภายใน 30 วัน นับจากวันที่แจ้งลูกค้า หากเกินกำหนดถือว่าสละสิทธิ์การรับประกัน</p>
+          <p>3. เครื่องที่เดินทางมารับเกิน 30 วัน บริษัทขอคิดค่าฝากเครื่องตามอัตราที่กำหนด</p>
+          <p>4. ความเสียหายจากการตก กระแทก เปียกน้ำ หรือการซ่อมแซมจากที่อื่น ไม่อยู่ในเงื่อนไขการรับประกัน</p>
+          <p>5. การรับประกันไม่ครอบคลุมข้อมูลภายในเครื่อง ลูกค้าควรสำรองข้อมูลก่อนส่งซ่อมทุกครั้ง</p>
+        </div>
+        {showLineQr && (
+          <div className="w-[74px] shrink-0 text-center">
+            <img
+              src={lineQrSrc}
+              alt="LINE QR"
+              className="w-[74px] h-[74px] object-contain border border-gray-300 rounded-sm bg-white"
+              onError={() => setShowLineQr(false)}
+            />
+            <div className="mt-1 text-[9px] leading-tight text-gray-700 break-words">
+              {lineQrText}
+            </div>
+          </div>
+        )}
       </div>
     </div>
 
@@ -221,8 +259,9 @@ export const BillContent = ({ data, formatPrice, copyLabel, selectedParts, addit
         <p>ผู้รับซ่อม</p>
       </div>
     </div>
-  </div>
-);
+    </div>
+  );
+};
 
 function getDefaultReportDateTime(language: "th" | "en") {
   const now = new Date();
@@ -455,6 +494,7 @@ const RepairOrderBill = () => {
         }
       })() : dataFromNav.receive_date || todayIso,
       receive_time: fullRepairData.receiveTime || dataFromNav.receive_time,
+      warrantyDays: Number(fullRepairData.warrantyDays ?? (dataFromNav as any).warrantyDays ?? 90),
       selectedPartId: dataFromNav.selectedPartId,
       selectedParts: dataFromNav.selectedParts,
       additionalParts: dataFromNav.additionalParts,
@@ -533,6 +573,7 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={leftCopyLabel}
+                  language={language}
                   selectedParts={selectedParts}
                   additionalParts={additionalParts}
                 />
@@ -542,6 +583,7 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={rightCopyLabel}
+                  language={language}
                   selectedParts={selectedParts}
                   additionalParts={additionalParts}
                 />
@@ -558,6 +600,7 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={leftCopyLabel}
+                  language={language}
                   selectedParts={selectedParts}
                   additionalParts={additionalParts}
                 />
@@ -567,6 +610,7 @@ const RepairOrderBill = () => {
                   data={effectiveData}
                   formatPrice={formatPrice}
                   copyLabel={rightCopyLabel}
+                  language={language}
                   selectedParts={selectedParts}
                   additionalParts={additionalParts}
                 />

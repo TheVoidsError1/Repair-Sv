@@ -139,7 +139,7 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
           {
             id: "customer-bills",
             href: "/repairs/bill/customer",
-            labelTh: "ดูบิลของลูกค้า",
+            labelTh: "ดูใบแจ้งซ่อมของลูกค้า",
             labelEn: "Customer Bills",
             icon: UserSearch,
           },

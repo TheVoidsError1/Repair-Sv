@@ -9,9 +9,9 @@ Backend API server for Repair Hub Pro application with PostgreSQL database conne
 npm install
 ```
 
-2. Create a `.env` file in the backend directory (copy from `.env.example`):
+2. Create a `.env` file in the backend directory (copy from `env.example`):
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
 3. Update the `.env` file with your PostgreSQL credentials:

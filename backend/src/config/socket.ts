@@ -1,12 +1,13 @@
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { makeOriginValidator } from '../utils/cors.js';
 
 let io: SocketIOServer | null = null;
 
 export const initializeSocket = (httpServer: HTTPServer) => {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+      origin: makeOriginValidator(process.env.FRONTEND_URL),
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     },

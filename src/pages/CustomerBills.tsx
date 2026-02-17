@@ -1,6 +1,6 @@
 /**
- * หน้าดูบิลของลูกค้า
- * ให้เลือกลูกค้าแล้วแสดงบิลทั้งหมดของลูกค้านั้นๆ
+ * หน้าดูใบแจ้งซ่อมของลูกค้า
+ * ให้เลือกลูกค้าแล้วแสดงใบแจ้งซ่อมทั้งหมดของลูกค้านั้นๆ
  */
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -157,11 +157,11 @@ const CustomerBills = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="page-title">
-              {language === "th" ? "ดูบิลของลูกค้า" : "Customer Bills"}
+              {language === "th" ? "ดูใบแจ้งซ่อมของลูกค้า" : "Customer Bills"}
             </h1>
             <p className="page-description">
               {language === "th"
-                ? "เลือกลูกค้าเพื่อดูบิลทั้งหมดของลูกค้า"
+                ? "เลือกลูกค้าเพื่อดูใบแจ้งซ่อมทั้งหมดของลูกค้า"
                 : "Select a customer to view all their bills"}
             </p>
           </div>
@@ -182,7 +182,7 @@ const CustomerBills = () => {
             </CardTitle>
             <CardDescription>
               {language === "th"
-                ? "คลิกปุ่มค้นหาเพื่อเลือกลูกค้าที่ต้องการดูบิล"
+                ? "คลิกปุ่มค้นหาเพื่อเลือกลูกค้าที่ต้องการดูใบแจ้งซ่อม"
                 : "Click search to select a customer to view their bills"}
             </CardDescription>
           </CardHeader>
@@ -252,7 +252,7 @@ const CustomerBills = () => {
                               <td className="p-3 text-center">
                                 <span
                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                    item.status === "completed"
+                                    item.status === "completed" || item.status === "picked-up"
                                       ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                                       : item.status === "in-progress"
                                       ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
@@ -263,6 +263,8 @@ const CustomerBills = () => {
                                 >
                                   {item.status === "completed"
                                     ? language === "th" ? "เสร็จสิ้น" : "Completed"
+                                    : item.status === "picked-up"
+                                    ? language === "th" ? "รับเครื่องแล้ว" : "Picked Up"
                                     : item.status === "in-progress"
                                     ? language === "th" ? "กำลังซ่อม" : "In Progress"
                                     : item.status === "pending"
@@ -279,7 +281,7 @@ const CustomerBills = () => {
                                      onClick={() => handleViewBill(item)}
                                    >
                                      <Eye className="w-3.5 h-3.5" />
-                                     {language === "th" ? "ดูบิล" : "View Bill"}
+                                     {language === "th" ? "ดูใบแจ้งซ่อม" : "View Bill"}
                                    </Button>
                                    <Button
                                      size="sm"

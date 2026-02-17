@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+import { getApiBaseUrl } from "@/lib/runtimeConfig";
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiResponse<T> {
   status: 'success' | 'error';

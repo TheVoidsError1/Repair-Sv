@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getApiBaseUrl } from "@/lib/runtimeConfig";
 
 interface SocketContextValue {
   socket: Socket | null;
@@ -8,7 +9,7 @@ interface SocketContextValue {
 
 const SocketContext = createContext<SocketContextValue | null>(null);
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const SOCKET_URL = getApiBaseUrl();
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);

@@ -10,6 +10,12 @@ import { emitRepairCreated, emitRepairUpdate, emitRepairDeleted, emitWarrantyCre
 
 const router = Router();
 
+const ALLOWED_WARRANTY_DAYS = [90, 180, 365] as const;
+function isAllowedWarrantyDays(v: unknown): v is (typeof ALLOWED_WARRANTY_DAYS)[number] {
+  const n = Number(v);
+  return Number.isFinite(n) && Number.isInteger(n) && (ALLOWED_WARRANTY_DAYS as readonly number[]).includes(n);
+}
+
 // Helper function to generate warranty claim number (WRN-001, WRN-002, etc.)
 async function generateClaimNumber(): Promise<string> {
   const warrantyRepository = AppDataSource.getRepository(WarrantyClaim);
@@ -371,6 +377,16 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Validate warrantyDays if provided (only allow fixed options)
+    if (warrantyDays !== undefined) {
+      if (!isAllowedWarrantyDays(warrantyDays)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid warrantyDays. Must be one of: 90, 180, 365',
+        });
+      }
+    }
+
     // Find or create customer
     // Check if customer exists with both phone AND name (to avoid updating existing customers)
     const trimmedCustomerName = customerName.trim();
@@ -687,16 +703,15 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // Validate warrantyDays if provided
+    // Validate warrantyDays if provided (only allow fixed options)
     if (req.body.warrantyDays !== undefined) {
-      const wd = Number(req.body.warrantyDays);
-      if (!Number.isFinite(wd) || !Number.isInteger(wd) || wd < 0 || wd > 3650) {
+      if (!isAllowedWarrantyDays(req.body.warrantyDays)) {
         return res.status(400).json({
           status: 'error',
-          message: 'Invalid warrantyDays. Must be an integer between 0 and 3650',
+          message: 'Invalid warrantyDays. Must be one of: 90, 180, 365',
         });
       }
-      req.body.warrantyDays = wd;
+      req.body.warrantyDays = Number(req.body.warrantyDays);
     }
 
     // Update other fields (excluding status which we already handled)

@@ -42,7 +42,7 @@ import {
     Wrench,
     XCircle,
 } from "lucide-react";
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useMemo, useState, useEffect } from "react";
 import {
     Pagination,
     PaginationContent,
@@ -135,6 +135,10 @@ const Warranty = () => {
   // State สำหรับงานซ่อมที่ "รับเครื่องแล้ว" ทั้งหมด (เริ่มนับประกัน)
   const [allCompletedRepairs, setAllCompletedRepairs] = useState<any[]>([]);
   const [loadingCompletedRepairs, setLoadingCompletedRepairs] = useState(false);
+
+  // State สำหรับ "งานซ่อมทั้งหมด" (ใช้หา SN ล่าสุดของลูกค้าใน Step 1)
+  const [globalCompletedRepairs, setGlobalCompletedRepairs] = useState<any[]>([]);
+  const [loadingGlobalCompletedRepairs, setLoadingGlobalCompletedRepairs] = useState(false);
   
   // State สำหรับ 2-step dialog
   const [dialogStep, setDialogStep] = useState<"customer" | "repair">("customer");
@@ -153,8 +157,52 @@ const Warranty = () => {
   useEffect(() => {
     if (isDialogOpen && dialogStep === "customer") {
       loadCustomers();
+      loadGlobalCompletedRepairs();
     }
   }, [isDialogOpen, dialogStep]);
+
+  const loadGlobalCompletedRepairs = async () => {
+    setLoadingGlobalCompletedRepairs(true);
+    try {
+      // ดึงงานซ่อมจำนวนมากพอเพื่อหา SN ล่าสุดของลูกค้า (เฉพาะ picked-up และมี serialNumber)
+      const response = await apiClient.getRepairs(1, 1000) as any;
+      if (response.status === "success" && Array.isArray(response.data)) {
+        const completed = response.data.filter(
+          (r: any) => r?.status === "picked-up" && typeof r?.serialNumber === "string" && r.serialNumber.trim()
+        );
+        setGlobalCompletedRepairs(completed);
+      } else {
+        setGlobalCompletedRepairs([]);
+      }
+    } catch (error) {
+      console.error("Failed to load global completed repairs:", error);
+      setGlobalCompletedRepairs([]);
+    } finally {
+      setLoadingGlobalCompletedRepairs(false);
+    }
+  };
+
+  const latestSnByCustomerId = useMemo(() => {
+    const map = new Map<string, { sn: string; date: string }>();
+    for (const r of globalCompletedRepairs) {
+      const customerId = r?.customer?.id;
+      const sn = typeof r?.serialNumber === "string" ? r.serialNumber.trim() : "";
+      if (!customerId || !sn) continue;
+
+      const date =
+        formatDate(r?.pickedUpDate ?? r?.completedDate ?? r?.dateOfReport ?? r?.createdAt) || "";
+      const prev = map.get(customerId);
+      if (!prev) {
+        map.set(customerId, { sn, date });
+        continue;
+      }
+      // ถ้ามีวันที่ ให้ใช้ตัวที่ใหม่กว่า (YYYY-MM-DD เทียบแบบ string ได้)
+      if (date && (!prev.date || date > prev.date)) {
+        map.set(customerId, { sn, date });
+      }
+    }
+    return map;
+  }, [globalCompletedRepairs]);
 
   // โหลดงานซ่อมของลูกค้าที่เลือก
   useEffect(() => {
@@ -454,12 +502,17 @@ const Warranty = () => {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="customerSearch"
-                        placeholder={language === "th" ? "🔍 ค้นหาด้วยชื่อหรือเบอร์โทร..." : "🔍 Search by name or phone..."}
+                        placeholder={language === "th" ? "🔍 ค้นหาด้วยชื่อหรือ SN..." : "🔍 Search by name or SN..."}
                         value={customerSearchTerm}
                         onChange={(e) => setCustomerSearchTerm(e.target.value)}
                         className="pl-9"
                       />
                     </div>
+                    {loadingGlobalCompletedRepairs && (
+                      <p className="text-xs text-muted-foreground">
+                        {language === "th" ? "กำลังโหลดข้อมูล SN..." : "Loading SN data..."}
+                      </p>
+                    )}
                   </div>
 
                   {/* Customer List */}
@@ -478,10 +531,12 @@ const Warranty = () => {
                         if (!customerSearchTerm.trim()) return true;
                         const term = customerSearchTerm.toLowerCase();
                         const fullName = c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim();
+                        const latestSn = (latestSnByCustomerId.get(c.id)?.sn ?? "").toLowerCase();
                         return (
                           fullName.toLowerCase().includes(term) ||
                           c.firstName?.toLowerCase().includes(term) ||
                           c.lastName?.toLowerCase().includes(term) ||
+                          latestSn.includes(term) ||
                           c.phone?.includes(term)
                         );
                       });
@@ -501,6 +556,7 @@ const Warranty = () => {
                         <div className="divide-y divide-border">
                           {filteredCustomers.map((customer) => {
                             const fullName = customer.fullName || `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+                            const latestSn = latestSnByCustomerId.get(customer.id)?.sn ?? "";
                             return (
                               <button
                                 key={customer.id}
@@ -513,11 +569,9 @@ const Warranty = () => {
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex-1">
                                     <p className="font-semibold text-foreground">{fullName}</p>
-                                    {customer.phone && (
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        📞 {customer.phone}
-                                      </p>
-                                    )}
+                                    <p className="text-sm text-muted-foreground mt-1 font-mono">
+                                      SN: {latestSn || "-"}
+                                    </p>
                                   </div>
                                   <ArrowRight className="w-5 h-5 text-muted-foreground" />
                                 </div>
@@ -536,6 +590,7 @@ const Warranty = () => {
                     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
                     if (!selectedCustomer) return null;
                     const fullName = selectedCustomer.fullName || `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim();
+                    const latestSn = latestSnByCustomerId.get(selectedCustomerId)?.sn ?? "";
                     return (
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -544,9 +599,7 @@ const Warranty = () => {
                           </div>
                           <div>
                             <p className="font-semibold text-foreground">{fullName}</p>
-                            {selectedCustomer.phone && (
-                              <p className="text-sm text-muted-foreground">📞 {selectedCustomer.phone}</p>
-                            )}
+                            <p className="text-sm text-muted-foreground font-mono">SN: {latestSn || "-"}</p>
                           </div>
                         </div>
                         <Button
