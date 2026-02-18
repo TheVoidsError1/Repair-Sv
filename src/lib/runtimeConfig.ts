@@ -26,13 +26,19 @@ export function getApiBaseUrl(): string {
 
     // Check if it's a Vercel domain (vercel.app) or production domain
     // In production, we should use VITE_API_BASE_URL environment variable
-    // If not set, use relative path which will work with vercel.json rewrites
-    // (assuming backend is deployed separately and configured in rewrites)
     if (hostname.includes("vercel.app") || hostname.includes("vercel.com")) {
-      // Use empty string to make API calls relative (e.g., /api/auth/login)
-      // This requires VITE_API_BASE_URL to be set to the backend URL
-      // OR vercel.json rewrites to proxy to backend
-      // For now, return empty to use relative paths
+      // VITE_API_BASE_URL should be set in Vercel environment variables
+      // If not set, show warning and return empty (will cause API calls to fail with clear error)
+      if (!fromEnv.trim()) {
+        console.error(
+          "❌ VITE_API_BASE_URL is not configured!\n" +
+          "Please set VITE_API_BASE_URL environment variable in Vercel:\n" +
+          "1. Go to Vercel Dashboard → Project Settings → Environment Variables\n" +
+          "2. Add: VITE_API_BASE_URL = https://your-backend-url.com\n" +
+          "3. Redeploy your project"
+        );
+      }
+      // Return empty string to use relative paths (will fail gracefully with better error message)
       return "";
     }
 

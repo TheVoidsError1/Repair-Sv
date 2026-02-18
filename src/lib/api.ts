@@ -36,7 +36,35 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
+      let data;
+      if (isJson) {
+        data = await response.json();
+      } else {
+        // If not JSON (e.g., HTML 404 page), read as text
+        const text = await response.text();
+        if (!response.ok) {
+          return {
+            status: 'error',
+            message: `Backend API not found. Please configure VITE_API_BASE_URL environment variable. (Status: ${response.status})`,
+            error: `Received non-JSON response: ${text.substring(0, 100)}...`,
+          };
+        }
+        // Try to parse as JSON anyway
+        try {
+          data = JSON.parse(text);
+        } catch {
+          return {
+            status: 'error',
+            message: 'Invalid response format from server',
+            error: text.substring(0, 200),
+          };
+        }
+      }
 
       if (!response.ok) {
         return {
@@ -52,6 +80,14 @@ class ApiClient {
         message: data.message,
       };
     } catch (error) {
+      // Network errors or other fetch errors
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          status: 'error',
+          message: 'Cannot connect to backend API. Please check VITE_API_BASE_URL configuration.',
+          error: error.message,
+        };
+      }
       return {
         status: 'error',
         message: error instanceof Error ? error.message : 'Network error',
