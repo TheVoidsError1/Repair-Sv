@@ -1239,6 +1239,107 @@ router.post('/customers/:id/send-message', async (req, res) => {
 });
 
 /**
+ * ส่งใบเสร็จรับเงินให้ลูกค้าผ่าน LINE (Manual)
+ * POST /api/line/customers/:id/send-receipt
+ * Body: { receiptNo, date, items: [{description, quantity, unitPrice}], note? }
+ */
+router.post('/customers/:id/send-receipt', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { receiptNo, date, items, note } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'กรุณาระบุรายการสินค้า/บริการอย่างน้อย 1 รายการ',
+      });
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({ where: { id } });
+
+    if (!customer) {
+      return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    if (!customer.lineIdRes) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ลูกค้ายังไม่ได้เชื่อมโยงบัญชี LINE',
+      });
+    }
+
+    const lineService = getLineNotificationService();
+    if (!lineService) {
+      return res.status(500).json({ status: 'error', message: 'LINE service is not configured' });
+    }
+
+    const customerName = customer.fullName || `${customer.firstName} ${customer.lastName || ''}`.trim();
+    const today = date || new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const receiptNumber = receiptNo || `R-${Date.now()}`;
+
+    // คำนวณยอดรวม
+    const totalAmount = items.reduce((sum: number, item: any) => {
+      const qty = parseFloat(item.quantity) || 1;
+      const price = parseFloat(item.unitPrice) || 0;
+      return sum + qty * price;
+    }, 0);
+
+    // สร้างรายการสินค้า
+    const itemLines = items.map((item: any, index: number) => {
+      const qty = parseFloat(item.quantity) || 1;
+      const price = parseFloat(item.unitPrice) || 0;
+      const amount = qty * price;
+      const description = item.description || 'รายการบริการ';
+      return `${index + 1}. ${description}\n   จำนวน: ${qty} x ${price.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท\n   รวม: ${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`;
+    }).join('\n\n');
+
+    const message = [
+      `🧾 ใบเสร็จรับเงิน`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `🏪 MacFix Service`,
+      `📍 เยื้องโรงพยาบาลทักษิณ สุราษฎร์ธานี`,
+      `📞 084-615-2244`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `👤 ลูกค้า: ${customerName}`,
+      `📅 วันที่: ${today}`,
+      `🔢 เลขที่: ${receiptNumber}`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `📋 รายการ:`,
+      ``,
+      itemLines,
+      ``,
+      `━━━━━━━━━━━━━━━━━━`,
+      `💰 รวมทั้งสิ้น: ${totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`,
+      `━━━━━━━━━━━━━━━━━━`,
+      note ? `📝 หมายเหตุ: ${note}\n` : '',
+      `✅ ขอบคุณที่ใช้บริการ MacFix Service`,
+      `💚 หากมีปัญหาใดๆ กรุณาติดต่อเรา`,
+    ].filter(line => line !== undefined).join('\n');
+
+    const success = await lineService.sendCustomMessage(customer.lineIdRes, message);
+
+    if (success) {
+      console.log(`[LINE Send Receipt] Sent receipt to customer ${customer.id} (${customerName})`);
+      res.json({
+        status: 'success',
+        message: 'ส่งใบเสร็จสำเร็จ',
+        data: { customerId: customer.id, customerName, lineUserId: customer.lineIdRes, totalAmount, receiptNo: receiptNumber },
+      });
+    } else {
+      res.status(500).json({ status: 'error', message: 'Failed to send receipt via LINE' });
+    }
+  } catch (error) {
+    console.error('[LINE Send Receipt] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to send receipt',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * ดึงเทมเพลตข้อความสถานะทั้งหมด
  * GET /api/line/status-templates
  */

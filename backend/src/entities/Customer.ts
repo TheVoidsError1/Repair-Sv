@@ -31,6 +31,9 @@ export class Customer {
   @Column({ type: 'text', nullable: true })
   lineIdRes?: string;
 
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  device?: string; // ยี่ห้อ/รุ่นเครื่องของลูกค้า
+
   @OneToMany(() => Repair, (repair) => repair.customer)
   repairs!: Repair[];
 

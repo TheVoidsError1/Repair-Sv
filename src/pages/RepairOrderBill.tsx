@@ -432,7 +432,94 @@ const RepairOrderBill = () => {
     !!dataFromNav,
   ]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    // หา element ใบแจ้งซ่อม 2 คอลัมน์ที่แสดงบนหน้าจอ
+    const billEl = document.querySelector('.repair-bill-two-col');
+    if (!billEl) {
+      window.print();
+      return;
+    }
+
+    // รวบรวม <link rel="stylesheet"> ทั้งหมดจาก head
+    const linkTags = Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+    )
+      .map((link) => link.outerHTML)
+      .join('\n');
+
+    // รวบรวม <style> ทั้งหมดจาก head
+    const styleTags = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.outerHTML)
+      .join('\n');
+
+    // เปิดหน้าต่างใหม่
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      // ถ้า popup ถูกบล็อก ให้ fallback พิมพ์หน้าปัจจุบัน
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>ใบแจ้งซ่อม</title>
+  ${linkTags}
+  ${styleTags}
+  <style>
+    @page { size: A4 landscape; margin: 6mm; }
+    body  { margin: 0; padding: 0; background: #fff; }
+    /* บังคับให้แสดง 2 คอลัมน์ทั้งบนหน้าจอและเวลาพิมพ์ */
+    .repair-bill-two-col {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 4mm !important;
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 2mm 0 !important;
+    }
+    .repair-bill-two-col > div {
+      flex: 1 1 0 !important;
+      max-width: 50% !important;
+      min-width: 0 !important;
+    }
+    .repair-bill-single {
+      width: 100% !important;
+      height: auto !important;
+      box-sizing: border-box !important;
+      border-radius: 0 !important;
+      font-size: 11px !important;
+    }
+    @media print {
+      .repair-bill-two-col {
+        display: flex !important;
+        position: relative;
+      }
+      .repair-bill-two-col > div {
+        flex: 0 0 calc(50% - 2mm) !important;
+        max-width: calc(50% - 2mm) !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${billEl.outerHTML}
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.print();
+        window.onafterprint = function () { window.close(); };
+      }, 600);
+    });
+  </script>
+</body>
+</html>
+    `);
+    printWindow.document.close();
+  };
 
   const formatPrice = (value: string) => {
     const num = parseFloat(value);

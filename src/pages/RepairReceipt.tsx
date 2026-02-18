@@ -202,7 +202,68 @@ const RepairReceipt = () => {
     !!dataFromNav,
   ]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    // หา element ใบเสร็จในหน้า
+    const receiptEl = document.querySelector('.receipt-document');
+    if (!receiptEl) {
+      window.print();
+      return;
+    }
+
+    // รวบรวม <link rel="stylesheet"> ทั้งหมดจาก head
+    const linkTags = Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+    )
+      .map((link) => link.outerHTML)
+      .join('\n');
+
+    // รวบรวม <style> ทั้งหมดจาก head
+    const styleTags = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.outerHTML)
+      .join('\n');
+
+    // เปิดหน้าต่างใหม่
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      // ถ้า popup ถูกบล็อก ให้ fallback เป็นพิมพ์หน้าปัจจุบัน
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>ใบเสร็จรับเงิน</title>
+  ${linkTags}
+  ${styleTags}
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    body  { margin: 0; padding: 0; background: #fff; }
+    .receipt-document {
+      max-width: none !important;
+      width: 100%;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+  </style>
+</head>
+<body>
+  ${receiptEl.outerHTML}
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.print();
+        window.onafterprint = function () { window.close(); };
+      }, 600);
+    });
+  </script>
+</body>
+</html>
+    `);
+    printWindow.document.close();
+  };
 
   const handleSaveBill = async () => {
     if (!dataFromNav?.repairId) {

@@ -488,6 +488,24 @@ class ApiClient {
     });
   }
 
+  async sendReceiptViaLine(customerId: string, data: {
+    receiptNo?: string;
+    date?: string;
+    items: Array<{ description: string; quantity: number; unitPrice: number }>;
+    note?: string;
+  }) {
+    return this.request<{
+      customerId: string;
+      customerName: string;
+      lineUserId: string;
+      totalAmount: number;
+      receiptNo: string;
+    }>(`/api/line/customers/${customerId}/send-receipt`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async unlinkLineFromCustomer(customerId: string) {
     return this.request<{
       customerId: string;

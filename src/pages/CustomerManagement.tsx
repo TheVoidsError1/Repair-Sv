@@ -43,6 +43,7 @@ interface Customer {
   phone?: string;
   lineId?: string;
   lineIdRes?: string;
+  device?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +62,7 @@ const CustomerManagement = () => {
     lastName: "",
     phone: "",
     lineId: "",
+    device: "",
   });
 
   // โหลดข้อมูลลูกค้า
@@ -153,6 +155,7 @@ const CustomerManagement = () => {
       lastName: "",
       phone: "",
       lineId: "",
+      device: "",
     });
     setEditingCustomer(null);
   };
@@ -171,6 +174,7 @@ const CustomerManagement = () => {
       lastName: customer.lastName || "",
       phone: customer.phone || "",
       lineId: customer.lineId || customer.lineIdRes || "",
+      device: customer.device || "",
     });
     setIsDialogOpen(true);
   };
@@ -214,6 +218,7 @@ const CustomerManagement = () => {
           lastName: form.lastName.trim(),
           phone: form.phone.trim() || null,
           lineId: form.lineId.trim() || null,
+          device: form.device.trim() || null,
         });
 
         if (response.status === "success") {
@@ -240,6 +245,7 @@ const CustomerManagement = () => {
           lastName: form.lastName.trim(),
           phone: form.phone.trim() || null,
           lineId: form.lineId.trim() || null,
+          device: form.device.trim() || null,
         });
 
         if (response.status === "success") {
@@ -580,6 +586,19 @@ const CustomerManagement = () => {
                   value={form.lineId}
                   onChange={(e) =>
                     setForm({ ...form, lineId: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="device">
+                  {language === "th" ? "เครื่อง (ยี่ห้อ/รุ่น)" : "Device (Brand/Model)"}
+                </Label>
+                <Input
+                  id="device"
+                  placeholder={language === "th" ? "เช่น iPhone 15, Samsung S24" : "e.g. iPhone 15, Samsung S24"}
+                  value={form.device}
+                  onChange={(e) =>
+                    setForm({ ...form, device: e.target.value })
                   }
                 />
               </div>

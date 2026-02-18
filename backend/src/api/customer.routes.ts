@@ -161,7 +161,7 @@ router.get('/:id', async (req, res) => {
 // Create customer
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, phone, email, lineId } = req.body;
+    const { firstName, lastName, phone, email, lineId, device } = req.body;
 
     // Validation
     if (!firstName || !firstName.trim()) {
@@ -212,6 +212,7 @@ router.post('/', async (req, res) => {
       lastName: lastName.trim(),
       phone: phone?.trim() || null,
       lineId: lineId?.trim() || null,
+      device: device?.trim() || null,
     });
 
     const savedCustomer = await customerRepository.save(newCustomer);
@@ -244,7 +245,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, email, lineId } = req.body;
+    const { firstName, lastName, phone, email, lineId, device } = req.body;
     
     const customerRepository = AppDataSource.getRepository(Customer);
     const customer = await customerRepository.findOne({ where: { id } });
@@ -293,6 +294,7 @@ router.put('/:id', async (req, res) => {
     if (lastName !== undefined) customer.lastName = lastName.trim();
     if (phone !== undefined) customer.phone = phone?.trim() || null;
     if (lineId !== undefined) customer.lineId = lineId?.trim() || null;
+    if (device !== undefined) customer.device = device?.trim() || null;
 
     const updatedCustomer = await customerRepository.save(customer);
 
