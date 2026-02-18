@@ -4,7 +4,7 @@ import { Customer } from '../entities/Customer.js';
 import { Repair, RepairStatus } from '../entities/Repair.js';
 import { getLineNotificationService, LineNotificationService } from '../services/line-notification.service.js';
 import { getLineRichMenuService } from '../services/line-richmenu.service.js';
-import { Not, IsNull } from 'typeorm';
+import { Not, IsNull, Like } from 'typeorm';
 import crypto from 'crypto';
 import axios from 'axios';
 import multer from 'multer';
@@ -891,6 +891,348 @@ router.post('/unlink-customer', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to unlink LINE User ID',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ============================================
+ * CUSTOMER MANAGEMENT API
+ * ============================================
+ */
+
+// Validation helper functions
+const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^[0-9]{9,10}$/;
+  return phoneRegex.test(phone.replace(/[-\s]/g, ''));
+};
+
+/**
+ * ค้นหาลูกค้า
+ * GET /api/line/customers/search?q=searchTerm
+ */
+router.get('/customers/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    const customerRepository = AppDataSource.getRepository(Customer);
+    
+    // ถ้าไม่มี query หรือ query ว่าง ให้ดึงลูกค้าทั้งหมด (จำกัด 50 รายการ)
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      const customers = await customerRepository.find({
+        relations: ['repairs'],
+        order: { createdAt: 'DESC' },
+        take: 50,
+      });
+
+      return res.json({
+        status: 'success',
+        data: customers,
+        count: customers.length,
+      });
+    }
+
+    const searchTerm = q.trim();
+    
+    // ค้นหาตามชื่อ (firstName, lastName, fullName) หรือเบอร์โทร
+    const customers = await customerRepository.find({
+      where: [
+        { firstName: Like(`%${searchTerm}%`) },
+        { lastName: Like(`%${searchTerm}%`) },
+        { fullName: Like(`%${searchTerm}%`) },
+        { phone: Like(`%${searchTerm}%`) },
+      ],
+      relations: ['repairs'],
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+
+    res.json({
+      status: 'success',
+      data: customers,
+      count: customers.length,
+    });
+  } catch (error) {
+    console.error('[LINE Customer Search] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to search customers',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ดึงข้อมูลลูกค้าแบบละเอียด (พร้อมประวัติการซ่อม)
+ * GET /api/line/customers/:id
+ */
+router.get('/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const customerRepository = AppDataSource.getRepository(Customer);
+    
+    const customer = await customerRepository.findOne({
+      where: { id },
+      relations: ['repairs'],
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'ไม่พบข้อมูลลูกค้า',
+      });
+    }
+
+    // เรียงลำดับงานซ่อมตามวันที่ (ใหม่สุดก่อน)
+    if (customer.repairs) {
+      customer.repairs.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
+    res.json({
+      status: 'success',
+      data: customer,
+    });
+  } catch (error) {
+    console.error('[LINE Customer Detail] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch customer details',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * สร้างลูกค้าใหม่
+ * POST /api/line/customers
+ * Body: { firstName: string, lastName?: string, fullName?: string, phone?: string, lineId?: string }
+ */
+router.post('/customers', async (req, res) => {
+  try {
+    const { firstName, lastName, fullName, phone, lineId } = req.body;
+
+    // Validation
+    if (!firstName || !firstName.trim()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ชื่อจำเป็นต้องระบุ',
+      });
+    }
+
+    if (phone && !validatePhone(phone)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'รูปแบบเบอร์โทรไม่ถูกต้อง (ควรเป็น 9-10 หลัก)',
+      });
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    
+    // ตรวจสอบว่าเบอร์โทรซ้ำหรือไม่
+    if (phone) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { phone: phone.trim() },
+      });
+      if (existingCustomer) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'เบอร์โทรนี้ถูกใช้งานแล้ว',
+        });
+      }
+    }
+
+    const newCustomer = customerRepository.create({
+      firstName: firstName.trim(),
+      lastName: lastName?.trim() || null,
+      fullName: fullName?.trim() || null,
+      phone: phone?.trim() || null,
+      lineId: lineId?.trim() || null,
+    });
+
+    const savedCustomer = await customerRepository.save(newCustomer);
+
+    res.status(201).json({
+      status: 'success',
+      data: savedCustomer,
+      message: 'เพิ่มลูกค้าสำเร็จ',
+    });
+  } catch (error) {
+    console.error('[LINE Create Customer] Error:', error);
+    
+    // จัดการข้อผิดพลาดจากฐานข้อมูล
+    if (error instanceof Error && error.message.includes('duplicate')) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ข้อมูลลูกค้านี้มีอยู่แล้ว',
+      });
+    }
+
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create customer',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * อัพเดทข้อมูลลูกค้า
+ * PUT /api/line/customers/:id
+ * Body: { firstName?: string, lastName?: string, fullName?: string, phone?: string, lineId?: string }
+ */
+router.put('/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, fullName, phone, lineId } = req.body;
+    
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({ where: { id } });
+
+    if (!customer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'ไม่พบข้อมูลลูกค้า',
+      });
+    }
+
+    // Validation
+    if (firstName !== undefined && (!firstName || !firstName.trim())) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ชื่อไม่สามารถเป็นค่าว่างได้',
+      });
+    }
+
+    if (phone && !validatePhone(phone)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'รูปแบบเบอร์โทรไม่ถูกต้อง (ควรเป็น 9-10 หลัก)',
+      });
+    }
+
+    // ตรวจสอบว่าเบอร์โทรซ้ำหรือไม่ (ยกเว้นลูกค้าคนนี้)
+    if (phone) {
+      const existingCustomer = await customerRepository.findOne({
+        where: { phone: phone.trim() },
+      });
+      if (existingCustomer && existingCustomer.id !== id) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'เบอร์โทรนี้ถูกใช้งานโดยลูกค้าคนอื่นแล้ว',
+        });
+      }
+    }
+
+    // อัพเดทเฉพาะฟิลด์ที่ระบุ
+    if (firstName !== undefined) customer.firstName = firstName.trim();
+    if (lastName !== undefined) customer.lastName = lastName?.trim() || null;
+    if (fullName !== undefined) customer.fullName = fullName?.trim() || null;
+    if (phone !== undefined) customer.phone = phone?.trim() || null;
+    if (lineId !== undefined) customer.lineId = lineId?.trim() || null;
+
+    const updatedCustomer = await customerRepository.save(customer);
+
+    res.json({
+      status: 'success',
+      data: updatedCustomer,
+      message: 'อัพเดทข้อมูลลูกค้าสำเร็จ',
+    });
+  } catch (error) {
+    console.error('[LINE Update Customer] Error:', error);
+    
+    // จัดการข้อผิดพลาดจากฐานข้อมูล
+    if (error instanceof Error && error.message.includes('duplicate')) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ข้อมูลลูกค้านี้มีอยู่แล้ว',
+      });
+    }
+
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update customer',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ส่งข้อความให้ลูกค้าผ่าน LINE
+ * POST /api/line/customers/:id/send-message
+ * Body: { message: string }
+ */
+router.post('/customers/:id/send-message', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ข้อความจำเป็นต้องระบุ',
+      });
+    }
+
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({
+      where: { id },
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'ไม่พบข้อมูลลูกค้า',
+      });
+    }
+
+    if (!customer.lineIdRes) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ลูกค้ายังไม่ได้เชื่อมโยงบัญชี LINE',
+      });
+    }
+
+    const lineService = getLineNotificationService();
+    if (!lineService) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'LINE service is not configured',
+      });
+    }
+
+    const success = await lineService.sendCustomMessage(
+      customer.lineIdRes,
+      message.trim()
+    );
+
+    if (success) {
+      const customerName = customer.fullName || 
+                          `${customer.firstName} ${customer.lastName || ''}`.trim();
+      
+      console.log(`[LINE Send Message] Sent message to customer ${customer.id} (${customerName})`);
+
+      res.json({
+        status: 'success',
+        message: 'ส่งข้อความสำเร็จ',
+        data: {
+          customerId: customer.id,
+          customerName,
+          lineUserId: customer.lineIdRes,
+        },
+      });
+    } else {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to send message. Please check backend console for details.',
+      });
+    }
+  } catch (error) {
+    console.error('[LINE Send Message] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to send message',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
