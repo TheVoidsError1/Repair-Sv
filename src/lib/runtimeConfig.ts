@@ -24,7 +24,19 @@ export function getApiBaseUrl(): string {
       return "http://localhost:3001";
     }
 
-    // When accessed via IP/domain, hit backend on same host (port 3001)
+    // Check if it's a Vercel domain (vercel.app) or production domain
+    // In production, we should use VITE_API_BASE_URL environment variable
+    // If not set, use relative path which will work with vercel.json rewrites
+    // (assuming backend is deployed separately and configured in rewrites)
+    if (hostname.includes("vercel.app") || hostname.includes("vercel.com")) {
+      // Use empty string to make API calls relative (e.g., /api/auth/login)
+      // This requires VITE_API_BASE_URL to be set to the backend URL
+      // OR vercel.json rewrites to proxy to backend
+      // For now, return empty to use relative paths
+      return "";
+    }
+
+    // When accessed via IP/domain (not Vercel), hit backend on same host (port 3001)
     return `${protocol}//${hostname}:3001`;
   }
 

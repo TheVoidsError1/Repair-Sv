@@ -20,7 +20,9 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+    // If baseURL is empty, use relative path (for production with rewrites)
+    // Otherwise, use absolute URL
+    const url = this.baseURL ? `${this.baseURL}${endpoint}` : endpoint;
     const token = localStorage.getItem('authToken');
 
     const config: RequestInit = {
