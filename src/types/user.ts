@@ -9,6 +9,8 @@ export interface User {
   role: UserRole;
   status: "active" | "inactive";
   lastLogin: string | null;
+  email?: string;
+  phone?: string;
 }
 
 export interface AuthSession {

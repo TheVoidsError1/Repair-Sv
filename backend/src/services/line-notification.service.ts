@@ -106,6 +106,333 @@ interface NotificationMessage {
   }>;
 }
 
+// ============================================================
+// Receipt Flex Message Builder
+// ============================================================
+
+export interface ReceiptFlexItem {
+  itemCode?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+}
+
+export interface ReceiptFlexData {
+  shopName: string;
+  shopAddress: string;
+  shopPhone: string;
+  receiptNo: string;
+  issueDate: string;
+  customerName: string;
+  items: ReceiptFlexItem[];
+  grandTotal: number;
+  note?: string;
+}
+
+function formatThaiNumber(n: number): string {
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * สร้าง LINE Flex Message JSON สำหรับใบเสร็จรับเงิน
+ * ดีไซน์เหมือนใบเสร็จจริง มีส่วนหัว รายการ และยอดรวม
+ */
+export function buildReceiptFlexMessage(data: ReceiptFlexData): object {
+  const {
+    shopName,
+    shopAddress,
+    shopPhone,
+    receiptNo,
+    issueDate,
+    customerName,
+    items,
+    grandTotal,
+    note,
+  } = data;
+
+  // สร้าง rows ของรายการสินค้า
+  const itemRows: object[] = items.map((item) => ({
+    type: 'box',
+    layout: 'horizontal',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    contents: [
+      {
+        type: 'text',
+        text: item.itemCode || '-',
+        size: 'xs',
+        color: '#555555',
+        flex: 2,
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text: item.description,
+        size: 'xs',
+        color: '#333333',
+        flex: 5,
+        wrap: true,
+      },
+      {
+        type: 'text',
+        text: String(item.quantity),
+        size: 'xs',
+        color: '#555555',
+        align: 'center',
+        flex: 1,
+      },
+      {
+        type: 'text',
+        text: formatThaiNumber(item.unitPrice),
+        size: 'xs',
+        color: '#555555',
+        align: 'end',
+        flex: 3,
+      },
+      {
+        type: 'text',
+        text: formatThaiNumber(item.amount),
+        size: 'xs',
+        color: '#333333',
+        align: 'end',
+        flex: 3,
+        weight: 'bold',
+      },
+    ],
+  }));
+
+  // footer content
+  const footerContents: object[] = [];
+  if (note) {
+    footerContents.push({
+      type: 'text',
+      text: `📝 หมายเหตุ: ${note}`,
+      size: 'xs',
+      color: '#888888',
+      wrap: true,
+      margin: 'sm',
+    });
+  }
+  footerContents.push(
+    {
+      type: 'separator',
+      margin: 'sm',
+    },
+    {
+      type: 'text',
+      text: '✅ ขอบคุณที่ใช้บริการ MacFix Service',
+      size: 'sm',
+      color: '#27AE60',
+      align: 'center',
+      margin: 'sm',
+    },
+    {
+      type: 'text',
+      text: '💚 หากมีปัญหาใดๆ กรุณาติดต่อเรา',
+      size: 'xs',
+      color: '#888888',
+      align: 'center',
+    }
+  );
+
+  const flexContents = {
+    type: 'bubble',
+    size: 'giga',
+    header: {
+      type: 'box',
+      layout: 'horizontal',
+      backgroundColor: '#FFFFFF',
+      paddingAll: '14px',
+      contents: [
+        {
+          type: 'box',
+          layout: 'vertical',
+          flex: 5,
+          contents: [
+            {
+              type: 'text',
+              text: shopName,
+              weight: 'bold',
+              size: 'sm',
+              color: '#222222',
+            },
+            {
+              type: 'text',
+              text: shopAddress,
+              size: 'xxs',
+              color: '#777777',
+              wrap: true,
+              margin: 'xs',
+            },
+            {
+              type: 'text',
+              text: shopPhone,
+              size: 'xxs',
+              color: '#777777',
+            },
+          ],
+        },
+        {
+          type: 'box',
+          layout: 'vertical',
+          flex: 4,
+          contents: [
+            {
+              type: 'text',
+              text: 'MacFix service',
+              weight: 'bold',
+              size: 'md',
+              color: '#1565C0',
+              align: 'end',
+            },
+            {
+              type: 'text',
+              text: `เลขที่ ${receiptNo}`,
+              size: 'xxs',
+              color: '#555555',
+              align: 'end',
+              margin: 'sm',
+            },
+            {
+              type: 'text',
+              text: `วันที่ ${issueDate}`,
+              size: 'xxs',
+              color: '#555555',
+              align: 'end',
+            },
+          ],
+        },
+      ],
+    },
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '14px',
+      spacing: 'sm',
+      contents: [
+        // ชื่อเอกสาร
+        {
+          type: 'box',
+          layout: 'vertical',
+          paddingTop: '4px',
+          paddingBottom: '4px',
+          contents: [
+            {
+              type: 'text',
+              text: 'ใบเสร็จรับเงิน',
+              weight: 'bold',
+              size: 'xl',
+              align: 'center',
+              color: '#222222',
+            },
+            {
+              type: 'text',
+              text: 'RECEIPT',
+              size: 'xs',
+              align: 'center',
+              color: '#E67E22',
+            },
+          ],
+        },
+        { type: 'separator' },
+        // ชื่อลูกค้า
+        {
+          type: 'box',
+          layout: 'vertical',
+          paddingTop: '6px',
+          paddingBottom: '6px',
+          contents: [
+            {
+              type: 'text',
+              text: 'ชื่อลูกค้า',
+              size: 'xxs',
+              color: '#888888',
+            },
+            {
+              type: 'text',
+              text: customerName,
+              weight: 'bold',
+              size: 'md',
+              color: '#222222',
+              margin: 'xs',
+            },
+          ],
+        },
+        { type: 'separator' },
+        // Header ตาราง
+        {
+          type: 'box',
+          layout: 'horizontal',
+          backgroundColor: '#F5F5F5',
+          paddingTop: '6px',
+          paddingBottom: '6px',
+          paddingStart: '4px',
+          paddingEnd: '4px',
+          contents: [
+            { type: 'text', text: 'รหัส', size: 'xxs', color: '#666666', flex: 2, weight: 'bold' },
+            { type: 'text', text: 'รายการ', size: 'xxs', color: '#666666', flex: 5, weight: 'bold' },
+            { type: 'text', text: 'จำนวน', size: 'xxs', color: '#666666', flex: 1, align: 'center', weight: 'bold' },
+            { type: 'text', text: 'ราคา/หน่วย', size: 'xxs', color: '#666666', flex: 3, align: 'end', weight: 'bold' },
+            { type: 'text', text: 'รวม', size: 'xxs', color: '#666666', flex: 3, align: 'end', weight: 'bold' },
+          ],
+        },
+        { type: 'separator' },
+        // รายการสินค้า
+        ...itemRows,
+        { type: 'separator' },
+        // ยอดรวม
+        {
+          type: 'box',
+          layout: 'horizontal',
+          paddingTop: '8px',
+          paddingBottom: '4px',
+          contents: [
+            {
+              type: 'text',
+              text: 'จำนวนเงินทั้งสิ้น',
+              weight: 'bold',
+              size: 'sm',
+              color: '#222222',
+              flex: 5,
+            },
+            {
+              type: 'text',
+              text: `${formatThaiNumber(grandTotal)} บาท`,
+              weight: 'bold',
+              size: 'lg',
+              color: '#C0392B',
+              align: 'end',
+              flex: 4,
+            },
+          ],
+        },
+      ],
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '12px',
+      backgroundColor: '#FAFAFA',
+      contents: footerContents,
+    },
+    styles: {
+      header: {
+        separator: true,
+      },
+      footer: {
+        separator: true,
+      },
+    },
+  };
+
+  return {
+    type: 'flex',
+    altText: `ใบเสร็จรับเงิน - ${customerName} - ${formatThaiNumber(grandTotal)} บาท`,
+    contents: flexContents,
+  };
+}
+
 export class LineNotificationService {
   private channelAccessToken: string;
   private apiUrl = 'https://api.line.me/v2/bot/message/push';
@@ -338,6 +665,49 @@ export class LineNotificationService {
    */
   async sendCustomMessage(userId: string, message: string): Promise<boolean> {
     return await this.sendNotification(userId, message);
+  }
+
+  /**
+   * ส่ง Flex Message ไปยังลูกค้า (สำหรับใบเสร็จรับเงิน)
+   */
+  async sendFlexMessage(userId: string, flexMessage: object): Promise<boolean> {
+    if (!userId || !this.channelAccessToken) {
+      console.warn('[LINE] Cannot send flex message: Missing userId or access token');
+      return false;
+    }
+
+    try {
+      const payload = {
+        to: userId,
+        messages: [flexMessage],
+      };
+
+      const response = await axios.post(this.apiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.channelAccessToken}`,
+        },
+      });
+
+      if (response.status === 200) {
+        console.log(`[LINE] Flex message sent successfully to ${userId}`);
+        return true;
+      } else {
+        console.error(`[LINE] Failed to send flex message: ${response.status}`, response.data);
+        return false;
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('[LINE] Error sending flex message:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          userId,
+        });
+      } else {
+        console.error('[LINE] Unknown error sending flex message:', error);
+      }
+      return false;
+    }
   }
 }
 

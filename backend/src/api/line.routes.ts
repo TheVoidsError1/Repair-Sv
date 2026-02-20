@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { AppDataSource } from '../config/data-source.js';
 import { Customer } from '../entities/Customer.js';
 import { Repair, RepairStatus } from '../entities/Repair.js';
-import { getLineNotificationService, LineNotificationService } from '../services/line-notification.service.js';
+import { getLineNotificationService, LineNotificationService, buildReceiptFlexMessage } from '../services/line-notification.service.js';
 import { getLineRichMenuService } from '../services/line-richmenu.service.js';
 import { Not, IsNull, Like } from 'typeorm';
 import crypto from 'crypto';
 import axios from 'axios';
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
 
@@ -1285,39 +1287,32 @@ router.post('/customers/:id/send-receipt', async (req, res) => {
       return sum + qty * price;
     }, 0);
 
-    // สร้างรายการสินค้า
-    const itemLines = items.map((item: any, index: number) => {
+    // สร้าง Flex Message ใบเสร็จรับเงิน
+    const receiptFlexItems = items.map((item: any) => {
       const qty = parseFloat(item.quantity) || 1;
       const price = parseFloat(item.unitPrice) || 0;
-      const amount = qty * price;
-      const description = item.description || 'รายการบริการ';
-      return `${index + 1}. ${description}\n   จำนวน: ${qty} x ${price.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท\n   รวม: ${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`;
-    }).join('\n\n');
+      return {
+        itemCode: item.itemCode || '',
+        description: item.description || 'รายการบริการ',
+        quantity: qty,
+        unitPrice: price,
+        amount: qty * price,
+      };
+    });
 
-    const message = [
-      `🧾 ใบเสร็จรับเงิน`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `🏪 MacFix Service`,
-      `📍 เยื้องโรงพยาบาลทักษิณ สุราษฎร์ธานี`,
-      `📞 084-615-2244`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `👤 ลูกค้า: ${customerName}`,
-      `📅 วันที่: ${today}`,
-      `🔢 เลขที่: ${receiptNumber}`,
-      `━━━━━━━━━━━━━━━━━━`,
-      `📋 รายการ:`,
-      ``,
-      itemLines,
-      ``,
-      `━━━━━━━━━━━━━━━━━━`,
-      `💰 รวมทั้งสิ้น: ${totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท`,
-      `━━━━━━━━━━━━━━━━━━`,
-      note ? `📝 หมายเหตุ: ${note}\n` : '',
-      `✅ ขอบคุณที่ใช้บริการ MacFix Service`,
-      `💚 หากมีปัญหาใดๆ กรุณาติดต่อเรา`,
-    ].filter(line => line !== undefined).join('\n');
+    const flexMessage = buildReceiptFlexMessage({
+      shopName: 'Macfix Service',
+      shopAddress: 'ตรงข้าม รพ.ทักษิณ ต.ตลาด อ.เมือง จ.สุราษฎร์ธานี',
+      shopPhone: 'โทร. 084-615-2244',
+      receiptNo: receiptNumber,
+      issueDate: today,
+      customerName,
+      items: receiptFlexItems,
+      grandTotal: totalAmount,
+      note: note || undefined,
+    });
 
-    const success = await lineService.sendCustomMessage(customer.lineIdRes, message);
+    const success = await lineService.sendFlexMessage(customer.lineIdRes, flexMessage);
 
     if (success) {
       console.log(`[LINE Send Receipt] Sent receipt to customer ${customer.id} (${customerName})`);
@@ -1334,6 +1329,118 @@ router.post('/customers/:id/send-receipt', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to send receipt',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * ส่งรูปภาพใบเสร็จให้ลูกค้าผ่าน LINE
+ * POST /api/line/customers/:id/send-receipt-image
+ * Body: multipart/form-data { image: File (JPEG/PNG), receiptNo?: string }
+ */
+// multer สำหรับรับรูปภาพใบเสร็จ (เก็บเป็น buffer)
+const receiptImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG and PNG images are allowed'));
+    }
+  },
+});
+
+router.post('/customers/:id/send-receipt-image', receiptImageUpload.single('image'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const receiptNo: string = req.body?.receiptNo || `R-${Date.now()}`;
+
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'กรุณาแนบไฟล์รูปภาพ' });
+    }
+
+    // ค้นหาลูกค้า
+    const customerRepository = AppDataSource.getRepository(Customer);
+    const customer = await customerRepository.findOne({ where: { id } });
+
+    if (!customer) {
+      return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูลลูกค้า' });
+    }
+
+    if (!customer.lineIdRes) {
+      return res.status(400).json({ status: 'error', message: 'ลูกค้ายังไม่ได้เชื่อมโยงบัญชี LINE' });
+    }
+
+    const lineService = getLineNotificationService();
+    if (!lineService) {
+      return res.status(500).json({ status: 'error', message: 'LINE service is not configured' });
+    }
+
+    // สร้าง directory สำหรับเก็บรูปใบเสร็จ
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'receipts');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // บันทึกไฟล์รูปภาพ
+    const ext = req.file.mimetype === 'image/png' ? 'png' : 'jpg';
+    const filename = `receipt-${crypto.randomUUID()}.${ext}`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, req.file.buffer);
+
+    // สร้าง public URL
+    const backendPublicUrl = (process.env.BACKEND_PUBLIC_URL || '').replace(/\/$/, '');
+    if (!backendPublicUrl) {
+      fs.unlinkSync(filepath); // ลบไฟล์ก่อน return
+      return res.status(500).json({
+        status: 'error',
+        message: 'BACKEND_PUBLIC_URL ยังไม่ได้ตั้งค่า กรุณาเพิ่ม BACKEND_PUBLIC_URL=https://your-ngrok-url ในไฟล์ .env',
+      });
+    }
+
+    const imageUrl = `${backendPublicUrl}/uploads/receipts/${filename}`;
+
+    // ส่งรูปภาพไปยัง LINE
+    const imageMessage = {
+      type: 'image',
+      originalContentUrl: imageUrl,
+      previewImageUrl: imageUrl,
+    };
+
+    const success = await lineService.sendFlexMessage(customer.lineIdRes, imageMessage);
+
+    // ตั้ง timer ลบไฟล์หลัง 30 นาที (เพื่อไม่ให้เต็ม disk)
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+          console.log(`[LINE Receipt Image] Cleaned up: ${filename}`);
+        }
+      } catch (e) {
+        console.warn(`[LINE Receipt Image] Failed to clean up ${filename}:`, e);
+      }
+    }, 30 * 60 * 1000);
+
+    const customerName = customer.fullName || `${customer.firstName} ${customer.lastName || ''}`.trim();
+
+    if (success) {
+      console.log(`[LINE Receipt Image] Sent to ${customerName} (${customer.lineIdRes}): ${imageUrl}`);
+      res.json({
+        status: 'success',
+        message: 'ส่งรูปใบเสร็จสำเร็จ',
+        data: { customerId: customer.id, customerName, lineUserId: customer.lineIdRes, imageUrl, receiptNo },
+      });
+    } else {
+      fs.unlinkSync(filepath);
+      res.status(500).json({ status: 'error', message: 'ไม่สามารถส่งรูปภาพไปยัง LINE ได้' });
+    }
+  } catch (error) {
+    console.error('[LINE Receipt Image] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to send receipt image',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

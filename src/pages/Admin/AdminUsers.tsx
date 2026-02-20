@@ -32,7 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import type { User, UserRole } from "@/types/user";
-import { Edit, Plus, Trash2, UserCircle } from "lucide-react";
+import { Edit, Lock, Mail, Phone, Plus, Shield, Trash2, User as UserIcon, UserCircle, UserPlus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -46,6 +46,8 @@ const AdminUsers = () => {
   const [form, setForm] = useState({
     name: "",
     username: "",
+    email: "",
+    phone: "",
     role: "staff" as UserRole,
     password: "",
     confirmPassword: "",
@@ -56,6 +58,8 @@ const AdminUsers = () => {
     setForm({
       name: "",
       username: "",
+      email: "",
+      phone: "",
       role: "staff",
       password: "",
       confirmPassword: "",
@@ -74,6 +78,8 @@ const AdminUsers = () => {
     setForm({
       name: user.name,
       username: user.username,
+      email: user.email || "",
+      phone: user.phone || "",
       role: user.role,
       password: "",
       confirmPassword: "",
@@ -100,6 +106,8 @@ const AdminUsers = () => {
       }
       updateUser(editingUser.id, {
         name: form.name,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
         role: form.role,
         status: editingUser.status,
         ...(form.password ? { password: form.password } : {}),
@@ -136,6 +144,8 @@ const AdminUsers = () => {
       username: form.username.trim(),
       password: form.password,
       name: form.name.trim(),
+      email: form.email.trim() || undefined,
+      phone: form.phone.trim() || undefined,
       role: form.role,
       status: "active",
     });
@@ -182,104 +192,180 @@ const AdminUsers = () => {
                 {t("addUser")}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{editingUser ? t("editUser") : t("addNewUser")}</DialogTitle>
-                <DialogDescription>
-                  {editingUser
-                    ? (language === "th" ? "แก้ไขข้อมูลผู้ใช้" : "Edit user details")
-                    : t("createNewStaffAccount")}
-                </DialogDescription>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg">
+                      {editingUser ? t("editUser") : t("addNewUser")}
+                    </DialogTitle>
+                    <DialogDescription className="text-sm">
+                      {editingUser
+                        ? (language === "th" ? "แก้ไขข้อมูลผู้ใช้" : "Edit user details")
+                        : t("createNewStaffAccount")}
+                    </DialogDescription>
+                  </div>
+                </div>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
+
+              <div className="space-y-4 py-2">
+                {/* ชื่อ-นามสกุล */}
+                <div className="space-y-1.5">
                   <Label htmlFor="admin-name">
                     {t("fullName")} <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="admin-name"
-                    placeholder={t("enterFullName")}
-                    value={form.name}
-                    onChange={(e) => {
-                      setForm((f) => ({ ...f, name: e.target.value }));
-                      if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
-                    }}
-                    className={formErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="admin-name"
+                      placeholder={t("enterFullName")}
+                      value={form.name}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, name: e.target.value }));
+                        if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
+                      }}
+                      className={cn("pl-10", formErrors.name ? "border-destructive focus-visible:ring-destructive" : "")}
+                    />
+                  </div>
                   {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
                 </div>
-                <div className="grid gap-2">
+
+                {/* ชื่อผู้ใช้ */}
+                <div className="space-y-1.5">
                   <Label htmlFor="admin-username">
-                    {t("userName")} <span className="text-destructive">*</span>
+                    {language === "th" ? "ชื่อผู้ใช้" : "Username"} <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="admin-username"
-                    placeholder={t("enterUsername")}
-                    value={form.username}
-                    onChange={(e) => {
-                      setForm((f) => ({ ...f, username: e.target.value }));
-                      if (formErrors.username) setFormErrors((prev) => ({ ...prev, username: "" }));
-                    }}
-                    disabled={!!editingUser}
-                    className={formErrors.username ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="admin-username"
+                      placeholder={language === "th" ? "กรอกชื่อผู้ใช้" : "Enter username"}
+                      value={form.username}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, username: e.target.value }));
+                        if (formErrors.username) setFormErrors((prev) => ({ ...prev, username: "" }));
+                      }}
+                      disabled={!!editingUser}
+                      className={cn("pl-10", formErrors.username ? "border-destructive focus-visible:ring-destructive" : "")}
+                    />
+                  </div>
                   {formErrors.username && <p className="text-xs text-destructive">{formErrors.username}</p>}
                 </div>
-                <div className="grid gap-2">
+
+                {/* อีเมล + เบอร์โทร (2 คอลัมน์) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-email">
+                      {language === "th" ? "อีเมล" : "Email"}
+                      <span className="text-muted-foreground text-xs ml-1">({language === "th" ? "ไม่บังคับ" : "Optional"})</span>
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="admin-email"
+                        type="email"
+                        placeholder={language === "th" ? "กรอกอีเมล" : "Enter email"}
+                        value={form.email}
+                        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-phone">
+                      {language === "th" ? "เบอร์โทร" : "Phone"}
+                      <span className="text-muted-foreground text-xs ml-1">({language === "th" ? "ไม่บังคับ" : "Optional"})</span>
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="admin-phone"
+                        type="tel"
+                        placeholder={language === "th" ? "กรอกเบอร์โทร" : "Enter phone"}
+                        value={form.phone}
+                        onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* บทบาท */}
+                <div className="space-y-1.5">
                   <Label htmlFor="admin-role">{t("role")}</Label>
-                  <Select
-                    value={form.role}
-                    onValueChange={(v) => setForm((f) => ({ ...f, role: v as UserRole }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("selectRole")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="staff">{t("staff")}</SelectItem>
-                      <SelectItem value="owner">{t("owner")}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
+                    <Select
+                      value={form.role}
+                      onValueChange={(v) => setForm((f) => ({ ...f, role: v as UserRole }))}
+                    >
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder={t("selectRole")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="staff">{t("staff")}</SelectItem>
+                        <SelectItem value="owner">{t("owner")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="admin-password">
-                    {t("password")} {!editingUser && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="admin-password"
-                    type="password"
-                    placeholder={editingUser ? (language === "th" ? "เว้นว่างถ้าไม่เปลี่ยน" : "Leave blank to keep current") : t("enterPassword")}
-                    value={form.password}
-                    onChange={(e) => {
-                      setForm((f) => ({ ...f, password: e.target.value }));
-                      if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: "" }));
-                    }}
-                    className={formErrors.password ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {formErrors.password && <p className="text-xs text-destructive">{formErrors.password}</p>}
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="admin-confirmPassword">
-                    {t("confirmPassword")} {!editingUser && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="admin-confirmPassword"
-                    type="password"
-                    placeholder={t("enterConfirmPassword")}
-                    value={form.confirmPassword}
-                    onChange={(e) => {
-                      setForm((f) => ({ ...f, confirmPassword: e.target.value }));
-                      if (formErrors.confirmPassword) setFormErrors((prev) => ({ ...prev, confirmPassword: "" }));
-                    }}
-                    className={formErrors.confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {formErrors.confirmPassword && <p className="text-xs text-destructive">{formErrors.confirmPassword}</p>}
+
+                {/* รหัสผ่าน + ยืนยัน (2 คอลัมน์) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-password">
+                      {t("password")} {!editingUser && <span className="text-destructive">*</span>}
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="admin-password"
+                        type="password"
+                        placeholder={editingUser ? (language === "th" ? "เว้นว่างถ้าไม่เปลี่ยน" : "Leave blank") : t("enterPassword")}
+                        value={form.password}
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, password: e.target.value }));
+                          if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: "" }));
+                        }}
+                        className={cn("pl-10", formErrors.password ? "border-destructive focus-visible:ring-destructive" : "")}
+                      />
+                    </div>
+                    {formErrors.password && <p className="text-xs text-destructive">{formErrors.password}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-confirmPassword">
+                      {t("confirmPassword")} {!editingUser && <span className="text-destructive">*</span>}
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="admin-confirmPassword"
+                        type="password"
+                        placeholder={language === "th" ? "ยืนยันรหัสผ่าน" : "Confirm"}
+                        value={form.confirmPassword}
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, confirmPassword: e.target.value }));
+                          if (formErrors.confirmPassword) setFormErrors((prev) => ({ ...prev, confirmPassword: "" }));
+                        }}
+                        className={cn("pl-10", formErrors.confirmPassword ? "border-destructive focus-visible:ring-destructive" : "")}
+                      />
+                    </div>
+                    {formErrors.confirmPassword && <p className="text-xs text-destructive">{formErrors.confirmPassword}</p>}
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => { setIsUserDialogOpen(false); resetForm(); }}>
+
+              <DialogFooter className="gap-2 pt-2">
+                <Button variant="outline" onClick={() => { setIsUserDialogOpen(false); resetForm(); }} className="flex-1">
                   {t("cancel")}
                 </Button>
-                <Button onClick={handleSaveUser}>
+                <Button onClick={handleSaveUser} className="flex-1 gap-2">
+                  <UserPlus className="w-4 h-4" />
                   {editingUser ? t("saveChanges") : t("createUser")}
                 </Button>
               </DialogFooter>

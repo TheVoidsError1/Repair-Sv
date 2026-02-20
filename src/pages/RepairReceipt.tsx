@@ -14,8 +14,8 @@ import {
     getTodayIsoDate,
     roundTimeTo30Min,
 } from "@/types/repairOrder";
-import { ArrowLeft, Printer, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, Printer, Save, Download, Share2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useRepairs } from "@/contexts/RepairsContext";
@@ -53,8 +53,10 @@ const RepairReceipt = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { refreshRepairs } = useRepairs();
+  const receiptRef = useRef<HTMLDivElement>(null);
   const dataFromNav = location.state as (RepairOrderData & { repairId?: string; returnTo?: string }) | null | undefined;
   const [reportDate, setReportDate] = useState(() => getInitialReportDateTime().dateOfReport);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [reportTime, setReportTime] = useState(() => getInitialReportDateTime().timeOfReport);
   const [serviceType, setServiceType] = useState<ServiceType>("walk_in");
   const [receiveTime, setReceiveTime] = useState(() => getInitialReportDateTime().timeOfReport);
@@ -63,6 +65,7 @@ const RepairReceipt = () => {
   const [selectedParts, setSelectedParts] = useState<Array<{ partNumber?: string; name?: string; nameTh?: string; price?: number }>>([]);
   const [additionalParts, setAdditionalParts] = useState<Array<{ name: string; nameTh?: string; price: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingToLine, setIsSendingToLine] = useState(false);
 
   // Load repair data from API if repairId is provided
   useEffect(() => {
@@ -265,6 +268,168 @@ const RepairReceipt = () => {
     printWindow.document.close();
   };
 
+  const handleDownloadPDF = async () => {
+    const receiptEl = receiptRef.current?.querySelector('.receipt-document') as HTMLElement | null
+      || document.querySelector('.receipt-document') as HTMLElement | null;
+
+    if (!receiptEl) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่พบข้อมูลใบเสร็จ" : "Receipt element not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      // Capture element as canvas (scale 2 = retina quality)
+      const canvas = await html2canvas(receiptEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();   // 210 mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297 mm
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // ถ้าภาพสูงเกิน 1 หน้า ให้แบ่งหลายหน้า
+      if (imgHeight <= pdfHeight) {
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      } else {
+        let yOffset = 0;
+        let remainingHeight = imgHeight;
+        let page = 0;
+        while (remainingHeight > 0) {
+          if (page > 0) pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, -yOffset, imgWidth, imgHeight);
+          yOffset += pdfHeight;
+          remainingHeight -= pdfHeight;
+          page++;
+        }
+      }
+
+      const receiptNo = dataFromNav?.repairId || "receipt";
+      pdf.save(`ใบเสร็จ-${receiptNo}.pdf`);
+
+      toast({
+        title: language === "th" ? "ดาวน์โหลดสำเร็จ" : "Downloaded",
+        description: language === "th" ? "บันทึกไฟล์ PDF เรียบร้อยแล้ว" : "PDF file saved successfully",
+      });
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่สามารถสร้างไฟล์ PDF ได้" : "Failed to generate PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // ส่งรูปภาพใบเสร็จไปยัง LINE ของลูกค้า
+  const handleSendToLine = async () => {
+    const receiptEl =
+      receiptRef.current?.querySelector(".receipt-document") as HTMLElement | null
+      || document.querySelector(".receipt-document") as HTMLElement | null;
+
+    if (!receiptEl) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่พบข้อมูลใบเสร็จ" : "Receipt element not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!dataFromNav?.repairId) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === "th" ? "ไม่พบข้อมูลงานซ่อม" : "Repair data not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingToLine(true);
+    try {
+      // ค้นหา customerId จาก repair
+      const repairsRes = await apiClient.getRepairs();
+      const repair =
+        repairsRes.status === "success" &&
+        repairsRes.data?.find(
+          (r: any) =>
+            r.repairNumber === dataFromNav.repairId ||
+            r.id === dataFromNav.repairId
+        );
+
+      if (!repair) {
+        throw new Error(language === "th" ? "ไม่พบข้อมูลงานซ่อม" : "Repair not found");
+      }
+
+      const customerId: string = repair.customerId || repair.customer?.id;
+      if (!customerId) {
+        throw new Error(language === "th" ? "ไม่พบข้อมูลลูกค้า" : "Customer not found");
+      }
+
+      // Capture ใบเสร็จเป็น PNG blob
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(receiptEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Failed to create image blob"))),
+          "image/jpeg",
+          0.92
+        )
+      );
+
+      const receiptNo = dataFromNav.repairId || `receipt-${Date.now()}`;
+      const result = await apiClient.sendReceiptImageViaLine(customerId, blob, receiptNo);
+
+      toast({
+        title: language === "th" ? "ส่งสำเร็จ ✅" : "Sent Successfully ✅",
+        description:
+          language === "th"
+            ? `ส่งรูปใบเสร็จไปยัง LINE ของ ${result.data?.customerName || "ลูกค้า"} เรียบร้อยแล้ว`
+            : `Receipt image sent to ${result.data?.customerName || "customer"}'s LINE`,
+      });
+    } catch (error) {
+      console.error("[Send to LINE] Error:", error);
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : language === "th"
+            ? "ไม่สามารถส่งรูปใบเสร็จไปยัง LINE ได้"
+            : "Failed to send receipt image to LINE",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingToLine(false);
+    }
+  };
+
   const handleSaveBill = async () => {
     if (!dataFromNav?.repairId) {
       toast({
@@ -426,6 +591,28 @@ const RepairReceipt = () => {
                 ? (language === "th" ? "กำลังบันทึก..." : "Saving...") 
                 : (language === "th" ? "บันทึกบิล" : "Save Bill")}
             </Button>
+            <Button
+              onClick={handleDownloadPDF}
+              variant="outline"
+              className="gap-2 w-fit"
+              disabled={isDownloading}
+            >
+              <Download className="w-4 h-4" />
+              {isDownloading
+                ? (language === "th" ? "กำลังสร้าง PDF..." : "Generating PDF...")
+                : (language === "th" ? "ดาวน์โหลด PDF" : "Download PDF")}
+            </Button>
+            <Button
+              onClick={handleSendToLine}
+              variant="outline"
+              className="gap-2 w-fit border-[#06C755] text-[#06C755] hover:bg-[#06C755] hover:text-white"
+              disabled={isSendingToLine}
+            >
+              <Share2 className="w-4 h-4" />
+              {isSendingToLine
+                ? (language === "th" ? "กำลังส่ง LINE..." : "Sending to LINE...")
+                : (language === "th" ? "ส่งรูปใบเสร็จไป LINE" : "Send Receipt to LINE")}
+            </Button>
             <Button onClick={handlePrint} className="gap-2 w-fit">
               <Printer className="w-4 h-4" />
               {t("printBill")}
@@ -437,7 +624,7 @@ const RepairReceipt = () => {
           {receiptData && <ReceiptContent data={receiptData} />}
         </div>
 
-        <div className="print:hidden flex flex-col w-full max-w-[210mm] mx-auto">
+        <div ref={receiptRef} className="print:hidden flex flex-col w-full max-w-[210mm] mx-auto">
           {receiptData && <ReceiptContent data={receiptData} />}
         </div>
         <p className="print:hidden text-center text-sm text-muted-foreground mt-4">

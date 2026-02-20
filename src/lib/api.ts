@@ -506,6 +506,36 @@ class ApiClient {
     });
   }
 
+  async sendReceiptImageViaLine(customerId: string, imageBlob: Blob, receiptNo?: string) {
+    const formData = new FormData();
+    formData.append('image', imageBlob, `receipt-${receiptNo || Date.now()}.jpg`);
+    if (receiptNo) formData.append('receiptNo', receiptNo);
+
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const endpoint = `/api/line/customers/${customerId}/send-receipt-image`;
+    const url = this.baseURL ? `${this.baseURL}${endpoint}` : endpoint;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error((errData as any)?.message || `HTTP error ${response.status}`);
+    }
+
+    return response.json() as Promise<{
+      status: string;
+      message: string;
+      data: { customerId: string; customerName: string; lineUserId: string; imageUrl: string; receiptNo: string };
+    }>;
+  }
+
   async unlinkLineFromCustomer(customerId: string) {
     return this.request<{
       customerId: string;
