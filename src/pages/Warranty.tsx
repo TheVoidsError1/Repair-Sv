@@ -1090,8 +1090,8 @@ const Warranty = () => {
                 if (!inspectionClaim || !inspectionComplete) return;
                 await updateClaimStatus(inspectionClaim.id, "approved");
                 toast({
-                  title: language === "th" ? "อนุมัติแล้ว" : "Approved",
-                  description: `${inspectionClaim.claimNumber} ${language === "th" ? "อนุมัติเคลมแล้ว" : "claim approved"}`,
+                  title: language === "th" ? "เคลมเสร็จสิ้น" : "Claim Completed",
+                  description: `${inspectionClaim.claimNumber} ${language === "th" ? "เคลมเสร็จสิ้นแล้ว" : "claim completed"}`,
                 });
                 resetInspectionModal();
               }}

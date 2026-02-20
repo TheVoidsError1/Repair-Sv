@@ -36,10 +36,6 @@ import {
   ExternalLink,
   Link,
   UserPlus,
-  FileText,
-  Edit,
-  RotateCcw,
-  Eye,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -70,12 +66,6 @@ interface RecentWebhookEvent {
   message?: string;
 }
 
-interface StatusTemplate {
-  status: string;
-  template: string;
-  description: string;
-}
-
 const LineManagement = () => {
   const { t, language } = useLanguage();
   const [lineStatus, setLineStatus] = useState<LineStatus>({
@@ -102,12 +92,6 @@ const LineManagement = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [allCustomers, setAllCustomers] = useState<CustomerWithLine[]>([]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
-  const [templates, setTemplates] = useState<Record<string, StatusTemplate>>({});
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
-  const [editedTemplateText, setEditedTemplateText] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewStatus, setPreviewStatus] = useState<string>("");
 
   // ตรวจสอบสถานะ LINE
   const checkLineStatus = async () => {
@@ -396,119 +380,10 @@ const LineManagement = () => {
     window.open("http://127.0.0.1:4040", "_blank");
   };
 
-  // โหลดเทมเพลตทั้งหมด
-  const loadTemplates = async () => {
-    setLoadingTemplates(true);
-    try {
-      const response = await apiClient.getLineStatusTemplates();
-      if (response.status === "success" && response.data) {
-        setTemplates(response.data);
-      }
-    } catch (error) {
-      console.error("Error loading templates:", error);
-      toast.error(
-        language === "th"
-          ? "ไม่สามารถโหลดเทมเพลตได้"
-          : "Failed to load templates"
-      );
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-
-  // แก้ไขเทมเพลต
-  const handleEditTemplate = (status: string) => {
-    setEditingTemplate(status);
-    setEditedTemplateText(templates[status]?.template || "");
-  };
-
-  // บันทึกเทมเพลต
-  const handleSaveTemplate = async (status: string) => {
-    try {
-      const response = await apiClient.updateLineStatusTemplate(status, editedTemplateText);
-      if (response.status === "success") {
-        toast.success(
-          language === "th"
-            ? "✅ บันทึกเทมเพลตสำเร็จ"
-            : "✅ Template saved successfully"
-        );
-        setEditingTemplate(null);
-        loadTemplates(); // Refresh templates
-      } else {
-        toast.error(response.message || (language === "th" ? "บันทึกไม่สำเร็จ" : "Failed to save"));
-      }
-    } catch (error: any) {
-      console.error("Error saving template:", error);
-      toast.error(
-        error?.message ||
-          (language === "th"
-            ? "เกิดข้อผิดพลาดในการบันทึก"
-            : "Error saving template")
-      );
-    }
-  };
-
-  // รีเซ็ตเทมเพลต
-  const handleResetTemplate = async (status?: string) => {
-    try {
-      const response = await apiClient.resetLineStatusTemplate(status);
-      if (response.status === "success") {
-        toast.success(
-          language === "th"
-            ? `✅ รีเซ็ตเทมเพลต${status ? `สำหรับสถานะ ${status}` : "ทั้งหมด"}สำเร็จ`
-            : `✅ Template${status ? ` for ${status}` : "s"} reset successfully`
-        );
-        setEditingTemplate(null);
-        loadTemplates(); // Refresh templates
-      } else {
-        toast.error(response.message || (language === "th" ? "รีเซ็ตไม่สำเร็จ" : "Failed to reset"));
-      }
-    } catch (error: any) {
-      console.error("Error resetting template:", error);
-      toast.error(
-        error?.message ||
-          (language === "th"
-            ? "เกิดข้อผิดพลาดในการรีเซ็ต"
-            : "Error resetting template")
-      );
-    }
-  };
-
-  // ดูตัวอย่างเทมเพลต
-  const handlePreviewTemplate = (status: string) => {
-    setPreviewStatus(status);
-    setShowPreview(true);
-  };
-
-  // สร้างข้อความตัวอย่าง
-  const getPreviewMessage = (status: string): string => {
-    const template = templates[status]?.template || "";
-    return template
-      .replace(/{customerName}/g, "สมชาย ใจดี")
-      .replace(/{repairNumber}/g, "RP-2024-0001")
-      .replace(/{deviceType}/g, "iPhone 13 Pro")
-      .replace(/{status}/g, status)
-      .replace(/{additionalInfo}/g, "หมายเหตุ: ตรวจสอบทุกอย่างเรียบร้อยแล้ว\n");
-  };
-
-  // แปลชื่อสถานะเป็นภาษาไทย
-  const getStatusLabel = (status: string): string => {
-    const labels: Record<string, string> = {
-      'pending': 'รอดำเนินการ',
-      'in-progress': 'กำลังซ่อม',
-      'waiting_parts': 'รออะไหล่',
-      'completed': 'ซ่อมเสร็จแล้ว',
-      'cancelled': 'ยกเลิกแล้ว',
-      'picked-up': 'รับเครื่องแล้ว',
-    };
-    return language === "th" ? (labels[status] || status) : status;
-  };
-
   useEffect(() => {
     checkLineStatus();
     loadCustomers();
     loadRecentEvents();
-    loadTemplates();
   }, []);
 
   // กรองลูกค้าตามคำค้นหา
@@ -554,7 +429,7 @@ const LineManagement = () => {
       </div>
 
       <Tabs defaultValue="status" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[1000px]">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[800px]">
           <TabsTrigger value="status" className="gap-2">
             <Smartphone className="w-4 h-4" />
             <span className="hidden sm:inline">
@@ -571,12 +446,6 @@ const LineManagement = () => {
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">
               {language === "th" ? "ทดสอบ" : "Test"}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="templates" className="gap-2">
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {language === "th" ? "เทมเพลต" : "Templates"}
             </span>
           </TabsTrigger>
           <TabsTrigger value="customers" className="gap-2">
@@ -1197,175 +1066,6 @@ const LineManagement = () => {
           </div>
         </TabsContent>
 
-        {/* Templates Tab */}
-        <TabsContent value="templates" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                {language === "th"
-                  ? "จัดการเทมเพลตข้อความสถานะ"
-                  : "Manage Status Message Templates"}
-              </h3>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={loadTemplates}
-                  disabled={loadingTemplates}
-                  className="gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loadingTemplates ? 'animate-spin' : ''}`} />
-                  {language === "th" ? "รีเฟรช" : "Refresh"}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    if (confirm(language === "th" 
-                      ? "ต้องการรีเซ็ตเทมเพลตทั้งหมดกลับไปใช้ค่าเริ่มต้นหรือไม่?" 
-                      : "Reset all templates to default?")) {
-                      handleResetTemplate();
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  {language === "th" ? "รีเซ็ตทั้งหมด" : "Reset All"}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
-                  💡 {language === "th" ? "ตัวแปรที่สามารถใช้ได้:" : "Available Variables:"}
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs text-blue-600 dark:text-blue-400">
-                  <code className="bg-blue-500/20 px-2 py-1 rounded">{"{customerName}"}</code>
-                  <span>- {language === "th" ? "ชื่อลูกค้า" : "Customer name"}</span>
-                  <code className="bg-blue-500/20 px-2 py-1 rounded">{"{repairNumber}"}</code>
-                  <span>- {language === "th" ? "หมายเลขงานซ่อม" : "Repair number"}</span>
-                  <code className="bg-blue-500/20 px-2 py-1 rounded">{"{deviceType}"}</code>
-                  <span>- {language === "th" ? "ประเภทอุปกรณ์" : "Device type"}</span>
-                  <code className="bg-blue-500/20 px-2 py-1 rounded">{"{status}"}</code>
-                  <span>- {language === "th" ? "สถานะ" : "Status"}</span>
-                  <code className="bg-blue-500/20 px-2 py-1 rounded">{"{additionalInfo}"}</code>
-                  <span>- {language === "th" ? "ข้อมูลเพิ่มเติม" : "Additional info"}</span>
-                </div>
-              </div>
-            </div>
-
-            {loadingTemplates ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(templates).map(([status, template]) => (
-                  <div
-                    key={status}
-                    className="border border-border rounded-lg p-4 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-foreground">
-                          {getStatusLabel(status)}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {template.description}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {editingTemplate === status ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingTemplate(null);
-                                setEditedTemplateText("");
-                              }}
-                            >
-                              {language === "th" ? "ยกเลิก" : "Cancel"}
-                            </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleSaveTemplate(status)}
-                              className="gap-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              {language === "th" ? "บันทึก" : "Save"}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handlePreviewTemplate(status)}
-                              className="gap-2"
-                            >
-                              <Eye className="w-4 h-4" />
-                              {language === "th" ? "ดูตัวอย่าง" : "Preview"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditTemplate(status)}
-                              className="gap-2"
-                            >
-                              <Edit className="w-4 h-4" />
-                              {language === "th" ? "แก้ไข" : "Edit"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (confirm(language === "th" 
-                                  ? `รีเซ็ตเทมเพลต "${getStatusLabel(status)}" กลับไปใช้ค่าเริ่มต้นหรือไม่?` 
-                                  : `Reset template for "${status}" to default?`)) {
-                                  handleResetTemplate(status);
-                                }
-                              }}
-                              className="gap-2"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {editingTemplate === status ? (
-                      <div className="space-y-2">
-                        <Label>
-                          {language === "th" ? "แก้ไขเทมเพลต:" : "Edit Template:"}
-                        </Label>
-                        <textarea
-                          className="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
-                          value={editedTemplateText}
-                          onChange={(e) => setEditedTemplateText(e.target.value)}
-                          placeholder={
-                            language === "th"
-                              ? "กรอกเทมเพลต..."
-                              : "Enter template..."
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-3 rounded-lg bg-muted/50">
-                        <pre className="text-xs whitespace-pre-wrap font-mono">
-                          {template.template}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
         {/* Customers Tab */}
         <TabsContent value="customers" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
@@ -1459,46 +1159,6 @@ const LineManagement = () => {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Dialog: ดูตัวอย่างเทมเพลต */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {language === "th"
-                ? `ตัวอย่างข้อความ: ${getStatusLabel(previewStatus)}`
-                : `Preview: ${previewStatus}`}
-            </DialogTitle>
-            <DialogDescription>
-              {language === "th"
-                ? "ตัวอย่างข้อความที่จะส่งไปหาลูกค้า"
-                : "Example message that will be sent to customers"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <pre className="text-sm whitespace-pre-wrap">
-                {getPreviewMessage(previewStatus)}
-              </pre>
-            </div>
-
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <p className="text-xs text-blue-600 dark:text-blue-400">
-                💡 {language === "th" 
-                  ? "นี่คือตัวอย่างข้อความที่จะถูกส่งไปหาลูกค้า โดยใช้ข้อมูลตัวอย่าง" 
-                  : "This is an example message using sample data"}
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button onClick={() => setShowPreview(false)}>
-              {language === "th" ? "ปิด" : "Close"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog: เชื่อมโยงลูกค้า */}
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>

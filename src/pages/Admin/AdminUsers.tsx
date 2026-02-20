@@ -50,6 +50,7 @@ const AdminUsers = () => {
     password: "",
     confirmPassword: "",
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const resetForm = useCallback(() => {
     setForm({
@@ -59,6 +60,7 @@ const AdminUsers = () => {
       password: "",
       confirmPassword: "",
     });
+    setFormErrors({});
     setEditingUser(null);
   }, []);
 
@@ -80,9 +82,20 @@ const AdminUsers = () => {
   };
 
   const handleSaveUser = () => {
+    const errors: Record<string, string> = {};
+
     if (editingUser) {
+      if (!form.name.trim()) {
+        errors.name = language === "th" ? "กรุณากรอกชื่อ-นามสกุล" : "Please enter full name";
+      }
+      if (form.password && form.password.length < 4) {
+        errors.password = language === "th" ? "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" : "Password must be at least 4 characters";
+      }
       if (form.password && form.password !== form.confirmPassword) {
-        toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
+        errors.confirmPassword = language === "th" ? "รหัสผ่านไม่ตรงกัน" : "Passwords do not match";
+      }
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
         return;
       }
       updateUser(editingUser.id, {
@@ -96,28 +109,39 @@ const AdminUsers = () => {
       resetForm();
       return;
     }
+
+    if (!form.name.trim()) {
+      errors.name = language === "th" ? "กรุณากรอกชื่อ-นามสกุล" : "Please enter full name";
+    }
     if (!form.username.trim()) {
-      toast.error(language === "th" ? "กรอกชื่อผู้ใช้" : "Enter username");
+      errors.username = language === "th" ? "กรุณากรอกชื่อผู้ใช้" : "Please enter username";
+    }
+    if (!form.password) {
+      errors.password = language === "th" ? "กรุณากรอกรหัสผ่าน" : "Please enter password";
+    } else if (form.password.length < 4) {
+      errors.password = language === "th" ? "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" : "Password must be at least 4 characters";
+    }
+    if (!form.confirmPassword) {
+      errors.confirmPassword = language === "th" ? "กรุณายืนยันรหัสผ่าน" : "Please confirm password";
+    } else if (form.password && form.password !== form.confirmPassword) {
+      errors.confirmPassword = language === "th" ? "รหัสผ่านไม่ตรงกัน" : "Passwords do not match";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
-    if (!form.password || form.password.length < 4) {
-      toast.error(language === "th" ? "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" : "Password must be at least 4 characters");
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      toast.error(t("confirmNewPassword") + " " + (language === "th" ? "ไม่ตรงกัน" : "do not match"));
-      return;
-    }
+
     const result = addUser({
       username: form.username.trim(),
       password: form.password,
-      name: form.name.trim() || form.username.trim(),
+      name: form.name.trim(),
       role: form.role,
       status: "active",
     });
     if (!result.success) {
       if (result.error === "username_exists") {
-        toast.error(t("usernameExists"));
+        setFormErrors({ username: t("usernameExists") });
       } else {
         toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong");
       }
@@ -169,23 +193,37 @@ const AdminUsers = () => {
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-name">{t("fullName")}</Label>
+                  <Label htmlFor="admin-name">
+                    {t("fullName")} <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="admin-name"
                     placeholder={t("enterFullName")}
                     value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, name: e.target.value }));
+                      if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: "" }));
+                    }}
+                    className={formErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-username">{t("userName")}</Label>
+                  <Label htmlFor="admin-username">
+                    {t("userName")} <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="admin-username"
                     placeholder={t("enterUsername")}
                     value={form.username}
-                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, username: e.target.value }));
+                      if (formErrors.username) setFormErrors((prev) => ({ ...prev, username: "" }));
+                    }}
                     disabled={!!editingUser}
+                    className={formErrors.username ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {formErrors.username && <p className="text-xs text-destructive">{formErrors.username}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="admin-role">{t("role")}</Label>
@@ -203,24 +241,38 @@ const AdminUsers = () => {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-password">{t("password")}</Label>
+                  <Label htmlFor="admin-password">
+                    {t("password")} {!editingUser && <span className="text-destructive">*</span>}
+                  </Label>
                   <Input
                     id="admin-password"
                     type="password"
                     placeholder={editingUser ? (language === "th" ? "เว้นว่างถ้าไม่เปลี่ยน" : "Leave blank to keep current") : t("enterPassword")}
                     value={form.password}
-                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, password: e.target.value }));
+                      if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: "" }));
+                    }}
+                    className={formErrors.password ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {formErrors.password && <p className="text-xs text-destructive">{formErrors.password}</p>}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-confirmPassword">{t("confirmPassword")}</Label>
+                  <Label htmlFor="admin-confirmPassword">
+                    {t("confirmPassword")} {!editingUser && <span className="text-destructive">*</span>}
+                  </Label>
                   <Input
                     id="admin-confirmPassword"
                     type="password"
                     placeholder={t("enterConfirmPassword")}
                     value={form.confirmPassword}
-                    onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, confirmPassword: e.target.value }));
+                      if (formErrors.confirmPassword) setFormErrors((prev) => ({ ...prev, confirmPassword: "" }));
+                    }}
+                    className={formErrors.confirmPassword ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {formErrors.confirmPassword && <p className="text-xs text-destructive">{formErrors.confirmPassword}</p>}
                 </div>
               </div>
               <DialogFooter>

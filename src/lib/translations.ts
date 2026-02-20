@@ -465,7 +465,7 @@ export const translations = {
     pickedUp: "รับเครื่องแล้ว",
     pendingReview: "รอตรวจสอบ",
     underInspection: "กำลังตรวจสอบ",
-    approved: "อนุมัติ",
+    approved: "เคลมเสร็จสิ้น",
     rejected: "ปฏิเสธ",
 
     // Inventory

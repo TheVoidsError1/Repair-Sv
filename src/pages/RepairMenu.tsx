@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "react-router-dom";
-import { Store, Package, List, FileText, ClipboardList, UserSearch } from "lucide-react";
+import { Store, Package, List, FileText, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const RepairMenu = () => {
@@ -63,17 +63,6 @@ const RepairMenu = () => {
       path: "/repairs/bill/management",
       iconBg: "bg-cyan-500/10",
       iconColor: "text-cyan-500",
-    },
-    {
-      id: "customer-bills",
-      titleTh: "ดูใบแจ้งซ่อมของลูกค้า",
-      titleEn: "Customer Bills",
-      descriptionTh: "ดูและค้นหาใบแจ้งซ่อมของลูกค้า",
-      descriptionEn: "View and search customer bills",
-      icon: UserSearch,
-      path: "/repairs/bill/customer",
-      iconBg: "bg-pink-500/10",
-      iconColor: "text-pink-500",
     },
   ];
 

@@ -1,5 +1,5 @@
 /**
- * หน้าดูใบแจ้งซ่อมของลูกค้า
+ * หน้าดูข้อมูลลูกค้า
  * ให้เลือกลูกค้าแล้วแสดงใบแจ้งซ่อมทั้งหมดของลูกค้านั้นๆ
  */
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -157,12 +157,12 @@ const CustomerBills = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="page-title">
-              {language === "th" ? "ดูใบแจ้งซ่อมของลูกค้า" : "Customer Bills"}
+              {language === "th" ? "ดูข้อมูลลูกค้า" : "Customer Info"}
             </h1>
             <p className="page-description">
               {language === "th"
-                ? "เลือกลูกค้าเพื่อดูใบแจ้งซ่อมทั้งหมดของลูกค้า"
-                : "Select a customer to view all their bills"}
+                ? "เลือกลูกค้าเพื่อดูข้อมูลทั้งหมดของลูกค้า"
+                : "Select a customer to view all their information"}
             </p>
           </div>
           <div className="flex gap-2">
@@ -182,8 +182,8 @@ const CustomerBills = () => {
             </CardTitle>
             <CardDescription>
               {language === "th"
-                ? "คลิกปุ่มค้นหาเพื่อเลือกลูกค้าที่ต้องการดูใบแจ้งซ่อม"
-                : "Click search to select a customer to view their bills"}
+                ? "คลิกปุ่มค้นหาเพื่อเลือกลูกค้าที่ต้องการดูข้อมูล"
+                : "Click search to select a customer to view their information"}
             </CardDescription>
           </CardHeader>
           <CardContent>

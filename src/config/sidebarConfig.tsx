@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   List,
   MessageSquare,
-  Network,
   Package,
   Settings,
   ShieldCheck,
@@ -136,13 +135,6 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelEn: "Manage Repair Bills",
             icon: ClipboardList,
           },
-          {
-            id: "customer-bills",
-            href: "/repairs/bill/customer",
-            labelTh: "ดูใบแจ้งซ่อมของลูกค้า",
-            labelEn: "Customer Bills",
-            icon: UserSearch,
-          },
         ],
       },
     ],
@@ -246,6 +238,13 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelEn: "Customer list",
             icon: Users,
           },
+          {
+            id: "customer-bills",
+            href: "/repairs/bill/customer",
+            labelTh: "ดูข้อมูลลูกค้า",
+            labelEn: "Customer Info",
+            icon: UserSearch,
+          },
         ],
       },
     ],
@@ -329,13 +328,6 @@ export const SUBJECTS_CONFIG: Record<string, SidebarSubjectConfig> = {
             labelEn: "LINE Management",
             icon: MessageSquare,
           },
-          {
-            id: "network",
-            href: "/system/network",
-            labelTh: "Network",
-            labelEn: "Network",
-            icon: Network,
-          },
         ],
       },
     ],
@@ -360,6 +352,8 @@ export function getSubjectIdFromPath(pathname: string): string | null {
   if (pathname === "/" || pathname.startsWith("/") && pathname.length <= 1) return "dashboard";
   // Check /admin paths for admin subject
   if (pathname.startsWith("/admin")) return "admin";
+  // /repairs/bill/customer อยู่ใน subject ลูกค้า
+  if (pathname === "/repairs/bill/customer") return "customers";
   // Check /repairs paths for repair subject (special case because basePath is /repairs/menu)
   if (pathname.startsWith("/repairs")) return "repair";
   for (const subject of Object.values(SUBJECTS_CONFIG)) {
