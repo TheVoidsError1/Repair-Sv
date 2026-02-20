@@ -280,6 +280,9 @@ export const translations = {
     // Login
     loginTitle: "Welcome Back",
     loginSubtitle: "Sign in to your account to continue",
+    loginAsRole: "Login as",
+    loginAsOwner: "Shop Owner",
+    loginAsStaff: "Employee",
     rememberMe: "Remember me",
     forgotPassword: "Forgot password?",
     loginButton: "Sign In",
@@ -607,6 +610,9 @@ export const translations = {
     // Login
     loginTitle: "ยินดีต้อนรับกลับมา",
     loginSubtitle: "เข้าสู่ระบบเพื่อดำเนินการต่อ",
+    loginAsRole: "เข้าสู่ระบบในฐานะ",
+    loginAsOwner: "เจ้าของร้าน",
+    loginAsStaff: "พนักงาน",
     rememberMe: "จดจำฉัน",
     forgotPassword: "ลืมรหัสผ่าน?",
     loginButton: "เข้าสู่ระบบ",

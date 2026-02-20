@@ -25,6 +25,9 @@ export class Customer {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone?: string;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phoneBackup?: string;
+
   @Column({ type: 'text', nullable: true })
   lineId?: string;
 

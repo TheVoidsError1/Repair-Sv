@@ -132,6 +132,7 @@ const initialFormData = {
   serialNumber: "",
   customer: "",
   phone: "",
+  phoneBackup: "",
   lineId: "",
   model: "",
   color: "",
@@ -359,6 +360,7 @@ const RepairNew = () => {
       const repairData = {
         customer: formData.customer.trim(),
         phone: formData.phone.trim(),
+        phoneBackup: formData.phoneBackup.trim() || undefined,
         lineId: formData.lineId.trim() || undefined,
         serialNumber: sn || undefined,
         model: formData.model.trim(),
@@ -607,6 +609,7 @@ const RepairNew = () => {
       ...prev,
       customer: customerName,
       phone: customerData.phone || "",
+      phoneBackup: customerData.phoneBackup || "", // เบอร์สำรอง
       lineId: customerData.lineId || "", // Line ID หลัก
       serialNumber: latestSerialNumber, // Serial Number จากประวัติการซ่อมล่าสุด
     }));
@@ -721,6 +724,17 @@ const RepairNew = () => {
                   placeholder={t("enterPhoneNumber")}
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phoneBackup">
+                  {language === "th" ? "เบอร์สำรอง" : "Backup Phone"}
+                </Label>
+                <Input
+                  id="phoneBackup"
+                  placeholder={language === "th" ? "กรอกเบอร์สำรอง (ถ้ามี)" : "Enter backup phone (optional)"}
+                  value={formData.phoneBackup}
+                  onChange={(e) => handleInputChange("phoneBackup", e.target.value)}
                 />
               </div>
               <div className="grid gap-2">

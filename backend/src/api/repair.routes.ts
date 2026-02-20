@@ -315,6 +315,7 @@ router.post('/', async (req, res) => {
     const {
       customer: customerName,
       phone,
+      phoneBackup,
       lineId,
       lineIdRes,
       // Repair data
@@ -423,12 +424,16 @@ router.post('/', async (req, res) => {
         lastName: lastName || undefined,
         fullName: trimmedCustomerName,
         phone: trimmedPhone,
+        phoneBackup: phoneBackup?.trim() || undefined,
         lineId: lineId?.trim() || undefined,
         lineIdRes: lineIdRes?.trim() || undefined,
       });
       customer = await customerRepository.save(customer);
     } else {
-      // If customer found, update lineId and lineIdRes if provided
+      // If customer found, update phoneBackup, lineId and lineIdRes if provided
+      if (phoneBackup !== undefined) {
+        customer.phoneBackup = phoneBackup?.trim() || undefined;
+      }
       if (lineId !== undefined) {
         customer.lineId = lineId?.trim() || undefined;
       }

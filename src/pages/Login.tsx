@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Mail, Lock, Settings2, Smartphone, Wrench } from "lucide-react";
+import { Mail, Lock, Settings2, Smartphone, Wrench, UserCircle2, Crown } from "lucide-react";
 import { type FormEvent, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiClient } from "@/lib/api";
@@ -14,6 +14,7 @@ const Login = () => {
   const { loginFromApi } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [selectedRole, setSelectedRole] = useState<"owner" | "staff">("staff");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -195,7 +196,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.login(email, password);
+      const response = await apiClient.login(email, password, selectedRole);
 
       if (response.status === 'success' && response.data) {
         // Save token and user data
@@ -213,14 +214,17 @@ const Login = () => {
           localStorage.removeItem('rememberedLogin');
         }
 
-        // Sync with AuthContext
+        // Sync with AuthContext — map backend role to frontend role
+        const backendRole = response.data.user.role;
+        const frontendRole = backendRole === 'admin' ? 'owner' : 'staff';
+
         loginFromApi({
           email: response.data.user.email || email,
           username: response.data.user.username,
           firstName: response.data.user.firstName,
           lastName: response.data.user.lastName,
           name: response.data.user.name,
-          role: response.data.user.role || (response.data.user.isOwner ? "owner" : "staff"),
+          role: frontendRole,
         });
 
         const userName = response.data.user.name || 
@@ -325,6 +329,80 @@ const Login = () => {
             <p className="mt-2 text-slate-500 text-sm">{t("loginSubtitle")}</p>
           </div>
 
+          {/* Role Selector */}
+          <div className="animate-fade-in-up-delay">
+            <p className="text-sm font-medium text-slate-600 mb-3">{t("loginAsRole")}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {/* พนักงาน */}
+              <button
+                type="button"
+                onClick={() => setSelectedRole("staff")}
+                className={`
+                  flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer
+                  ${selectedRole === "staff"
+                    ? "border-indigo-500 bg-indigo-50 shadow-md shadow-indigo-100 scale-[1.02]"
+                    : "border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-50 hover:scale-[1.01]"
+                  }
+                `}
+              >
+                <div className={`
+                  flex items-center justify-center w-11 h-11 rounded-full transition-all duration-300
+                  ${selectedRole === "staff"
+                    ? "bg-indigo-500 text-white shadow-lg shadow-indigo-200"
+                    : "bg-slate-200 text-slate-500"
+                  }
+                `}>
+                  <UserCircle2 className="w-6 h-6" strokeWidth={1.8} />
+                </div>
+                <div className="text-center">
+                  <p className={`text-sm font-semibold transition-colors duration-300 ${selectedRole === "staff" ? "text-indigo-700" : "text-slate-600"}`}>
+                    {t("loginAsStaff")}
+                  </p>
+                  <p className={`text-xs mt-0.5 transition-colors duration-300 ${selectedRole === "staff" ? "text-indigo-400" : "text-slate-400"}`}>
+                    Employee
+                  </p>
+                </div>
+                {selectedRole === "staff" && (
+                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500" />
+                )}
+              </button>
+
+              {/* เจ้าของร้าน */}
+              <button
+                type="button"
+                onClick={() => setSelectedRole("owner")}
+                className={`
+                  flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer relative
+                  ${selectedRole === "owner"
+                    ? "border-amber-500 bg-amber-50 shadow-md shadow-amber-100 scale-[1.02]"
+                    : "border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-50 hover:scale-[1.01]"
+                  }
+                `}
+              >
+                <div className={`
+                  flex items-center justify-center w-11 h-11 rounded-full transition-all duration-300
+                  ${selectedRole === "owner"
+                    ? "bg-amber-500 text-white shadow-lg shadow-amber-200"
+                    : "bg-slate-200 text-slate-500"
+                  }
+                `}>
+                  <Crown className="w-6 h-6" strokeWidth={1.8} />
+                </div>
+                <div className="text-center">
+                  <p className={`text-sm font-semibold transition-colors duration-300 ${selectedRole === "owner" ? "text-amber-700" : "text-slate-600"}`}>
+                    {t("loginAsOwner")}
+                  </p>
+                  <p className={`text-xs mt-0.5 transition-colors duration-300 ${selectedRole === "owner" ? "text-amber-400" : "text-slate-400"}`}>
+                    Owner
+                  </p>
+                </div>
+                {selectedRole === "owner" && (
+                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-500" />
+                )}
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5 animate-fade-in-up-delay-2">
             <div className="space-y-2 group">
               <label
@@ -389,15 +467,20 @@ const Login = () => {
 
             <Button
               type="submit"
-              className="w-full h-11 text-base font-medium relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:hover:scale-100 disabled:hover:shadow-none"
+              className={`w-full h-11 text-base font-medium relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:hover:scale-100 disabled:hover:shadow-none ${
+                selectedRole === "owner"
+                  ? "bg-amber-500 hover:bg-amber-600 border-amber-500"
+                  : "bg-indigo-600 hover:bg-indigo-700 border-indigo-600"
+              }`}
               disabled={isLoading}
             >
-              <span className="relative z-10">
-              {isLoading ? t("loggingIn") : t("loginButton")}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {selectedRole === "owner"
+                  ? <Crown className="w-4 h-4" strokeWidth={2} />
+                  : <UserCircle2 className="w-4 h-4" strokeWidth={2} />
+                }
+                {isLoading ? t("loggingIn") : t("loginButton")}
               </span>
-              {!isLoading && (
-                <span className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              )}
             </Button>
           </form>
 

@@ -9,7 +9,7 @@ const router = Router();
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, loginAs } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -28,6 +28,23 @@ router.post('/login', async (req, res) => {
         status: 'error',
         message: 'Invalid email or password',
       });
+    }
+
+    // ตรวจสอบว่า role ของ user ตรงกับที่เลือก login หรือไม่
+    if (loginAs) {
+      const isOwner = user.role === 'admin';
+      if (loginAs === 'owner' && !isOwner) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Invalid email or password',
+        });
+      }
+      if (loginAs === 'staff' && isOwner) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Invalid email or password',
+        });
+      }
     }
 
     // Check if password is hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)

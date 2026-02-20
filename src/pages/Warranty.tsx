@@ -919,7 +919,7 @@ const Warranty = () => {
                             }}
                           >
                             <CheckCircle2 className="w-4 h-4" />
-                            {language === "th" ? "อนุมัติ" : "Approve"}
+                            {language === "th" ? "เคลมเรียบร้อย" : "Approve"}
                           </Button>
                           <Button
                             size="sm"
@@ -935,7 +935,7 @@ const Warranty = () => {
                             }}
                           >
                             <XCircle className="w-4 h-4" />
-                            {language === "th" ? "ปฏิเสธ" : "Reject"}
+                            {language === "th" ? "ปฏิเสธเคลม" : "Reject"}
                           </Button>
                         </div>
                       </td>
