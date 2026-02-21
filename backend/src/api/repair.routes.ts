@@ -1,12 +1,12 @@
 import { Router } from 'express';
+import { Between, In } from 'typeorm';
 import { AppDataSource } from '../config/data-source.js';
-import { Repair, RepairStatus, ServiceType } from '../entities/Repair.js';
+import { emitRepairCreated, emitRepairDeleted, emitRepairUpdate, emitWarrantyCreated } from '../config/socket.js';
 import { Customer } from '../entities/Customer.js';
 import { Part } from '../entities/Part.js';
+import { Repair, RepairStatus, ServiceType } from '../entities/Repair.js';
 import { WarrantyClaim, WarrantyClaimStatus } from '../entities/WarrantyClaim.js';
-import { Between, In } from 'typeorm';
 import { getLineNotificationService } from '../services/line-notification.service.js';
-import { emitRepairCreated, emitRepairUpdate, emitRepairDeleted, emitWarrantyCreated } from '../config/socket.js';
 
 const router = Router();
 
@@ -344,7 +344,7 @@ router.post('/', async (req, res) => {
       problemDescription,
       diagnosis,
       repairNotes,
-      status = RepairStatus.PENDING,
+      status = RepairStatus.IN_PROGRESS,
       laborCost = 0,
       partsCost = 0,
       totalCost = 0,

@@ -6,6 +6,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { ReceiptContent } from "@/components/receipt/ReceiptContent";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useRepairs } from "@/contexts/RepairsContext";
+import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
 import { mapRepairOrderToReceiptData } from "@/lib/receipt";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
@@ -14,11 +16,9 @@ import {
     getTodayIsoDate,
     roundTimeTo30Min,
 } from "@/types/repairOrder";
-import { ArrowLeft, Printer, Save, Download, Share2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Save, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { useRepairs } from "@/contexts/RepairsContext";
 
 function getDefaultReportDateTime(language: "th" | "en") {
   const now = new Date();
@@ -75,9 +75,11 @@ const RepairReceipt = () => {
         setSelectedParts(dataFromNav.selectedParts as any);
       }
 
-      // ถ้ามี additionalParts ใน dataFromNav ให้ใช้เลย
-      if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts) {
-        setAdditionalParts(dataFromNav.additionalParts as any);
+      // ถ้ามี additionalParts ใน dataFromNav ให้ใช้เลย (รองรับทั้ง array และ JSON string)
+      if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+        const raw = dataFromNav.additionalParts;
+        const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+        setAdditionalParts(Array.isArray(arr) ? arr : []);
       }
 
       // ถ้ามี selectedPart ใน dataFromNav (backward compatibility) ให้ใช้เลย
@@ -142,9 +144,11 @@ const RepairReceipt = () => {
               });
             }
 
-            // โหลด additionalParts (ถ้ามี)
-            if (repair.additionalParts && Array.isArray(repair.additionalParts) && repair.additionalParts.length > 0) {
-              setAdditionalParts(repair.additionalParts);
+            // โหลด additionalParts (ถ้ามี) — รองรับทั้ง array และ JSON string จาก API
+            if (repair.additionalParts != null) {
+              const raw = repair.additionalParts;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+              if (Array.isArray(arr) && arr.length > 0) setAdditionalParts(arr);
             }
           }
         }
@@ -488,7 +492,7 @@ const RepairReceipt = () => {
 
         // Navigate back to bill list
         setTimeout(() => {
-          navigate("/repairs/bill");
+          navigate("/repairs/bill/management");
         }, 1000);
       } else {
         throw new Error(response.message || 'Failed to save bill');
@@ -539,6 +543,7 @@ const RepairReceipt = () => {
     };
   })();
 
+  const additionalPartsSafe = Array.isArray(additionalParts) ? additionalParts : [];
   const receiptData = effectiveData
     ? mapRepairOrderToReceiptData(effectiveData, {
         receiptNo: (dataFromNav as { repairId?: string })?.repairId ?? "—",
@@ -546,7 +551,7 @@ const RepairReceipt = () => {
         copyLabel: t("receiptForCustomer"),
         selectedPart: selectedPart, // backward compatibility
         selectedParts: selectedParts.length > 0 ? selectedParts : undefined,
-        additionalParts: additionalParts.length > 0 ? additionalParts : undefined,
+        additionalParts: additionalPartsSafe.length > 0 ? additionalPartsSafe : undefined,
       })
     : null;
 
@@ -576,7 +581,7 @@ const RepairReceipt = () => {
     <MainLayout>
       <div className="max-w-6xl mx-auto repair-receipt-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 print:hidden">
-          <Button variant="outline" onClick={() => navigate("/repairs/bill")} className="gap-2 w-fit">
+          <Button variant="outline" onClick={() => navigate("/repairs/bill/management")} className="gap-2 w-fit">
             <ArrowLeft className="w-4 h-4" />
             {language === "th" ? "กลับรายการ" : "Back to list"}
           </Button>

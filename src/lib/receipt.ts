@@ -111,9 +111,10 @@ export function mapRepairOrderToReceiptData(
   let subtotal = 0;
 
   // เพิ่มรายการจาก selectedParts (ชิ้นส่วนที่มีในคลังสินค้า)
-  if (options.selectedParts && options.selectedParts.length > 0) {
+  const selectedPartsList = Array.isArray(options.selectedParts) ? options.selectedParts : [];
+  if (selectedPartsList.length > 0) {
     // สร้างรายการสำหรับแต่ละ part
-    const selectedPartItems = options.selectedParts.map((part) => {
+    const selectedPartItems = selectedPartsList.map((part) => {
       // แปลงราคาให้เป็น number เสมอ (เผื่อ backend ส่งมาเป็น string จาก decimal)
       const partPrice = part.price != null ? parseFloat(String(part.price)) : 0;
       subtotal += partPrice;
@@ -145,8 +146,9 @@ export function mapRepairOrderToReceiptData(
   }
 
   // เพิ่มรายการจาก additionalParts (ชิ้นส่วนที่ไม่มีในคลังสินค้า)
-  if (options.additionalParts && options.additionalParts.length > 0) {
-    const additionalPartItems = options.additionalParts.map((part) => {
+  const additionalPartsList = Array.isArray(options.additionalParts) ? options.additionalParts : [];
+  if (additionalPartsList.length > 0) {
+    const additionalPartItems = additionalPartsList.map((part) => {
       const partPrice = part.price != null ? parseFloat(String(part.price)) : 0;
       subtotal += partPrice;
       return {

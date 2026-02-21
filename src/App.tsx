@@ -1,42 +1,41 @@
+import { SessionExpiryHandler } from "@/components/SessionExpiryHandler";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { RepairsProvider } from "@/contexts/RepairsContext";
-import { WarrantyProvider } from "@/contexts/WarrantyContext";
 import { SocketProvider } from "@/contexts/SocketContext";
+import { WarrantyProvider } from "@/contexts/WarrantyContext";
 import { canAccessRoute } from "@/lib/roleConfig";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
-import { SessionExpiryHandler } from "@/components/SessionExpiryHandler";
-import Dashboard from "./pages/Dashboard";
-import Repairs from "./pages/Repairs";
-import RepairNew from "./pages/RepairNew";
-import RepairBill from "./pages/RepairBill";
-import RepairOrderBill from "./pages/RepairOrderBill";
-import RepairReceipt from "./pages/RepairReceipt";
-import RepairBillManagement from "./pages/RepairBillManagement";
-import CustomerBills from "./pages/CustomerBills";
-import Inventory from "./pages/Inventory";
-import Warranty from "./pages/Warranty";
-import WarrantyManage from "./pages/WarrantyManage";
-import Finance from "./pages/Finance";
-import Settings from "./pages/Settings";
-import LineManagement from "./pages/LineManagement";
-import RichMenu from "./pages/RichMenu";
-import AdminUsers from "./pages/Admin/AdminUsers";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
-import NotFound from "./pages/NotFound";
-import SystemManagement from "./pages/SystemManagement";
-import Register from "./pages/Register";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AccountManagement from "./pages/AccountManagement";
-import RepairItemsManagement from "./pages/RepairItemsManagement";
+import AdminUsers from "./pages/Admin/AdminUsers";
+import CustomerBills from "./pages/CustomerBills";
+import CustomerDetails from "./pages/CustomerDetails";
 import CustomerManagement from "./pages/CustomerManagement";
 import Customers from "./pages/Customers";
-import CustomerDetails from "./pages/CustomerDetails";
+import Dashboard from "./pages/Dashboard";
+import Finance from "./pages/Finance";
+import ForgotPassword from "./pages/ForgotPassword";
+import Inventory from "./pages/Inventory";
+import LineManagement from "./pages/LineManagement";
+import Login from "./pages/Login";
+import NotFound from "./pages/NotFound";
+import Register from "./pages/Register";
+import RepairBillManagement from "./pages/RepairBillManagement";
+import RepairItemsManagement from "./pages/RepairItemsManagement";
 import RepairMenu from "./pages/RepairMenu";
+import RepairNew from "./pages/RepairNew";
+import RepairOrderBill from "./pages/RepairOrderBill";
+import RepairReceipt from "./pages/RepairReceipt";
+import Repairs from "./pages/Repairs";
+import RichMenu from "./pages/RichMenu";
+import Settings from "./pages/Settings";
+import SystemManagement from "./pages/SystemManagement";
+import Warranty from "./pages/Warranty";
+import WarrantyManage from "./pages/WarrantyManage";
 
 const queryClient = new QueryClient();
 
@@ -97,7 +96,7 @@ const App = () => (
                     <Route path="/repairs/menu" element={<ProtectedRoute><RepairMenu /></ProtectedRoute>} />
                     <Route path="/repairs" element={<ProtectedRoute><Repairs /></ProtectedRoute>} />
                     <Route path="/repairs/new" element={<ProtectedRoute><RepairNew /></ProtectedRoute>} />
-                    <Route path="/repairs/bill" element={<ProtectedRoute><RepairBill /></ProtectedRoute>} />
+                    <Route path="/repairs/bill" element={<Navigate to="/repairs/bill/management" replace />} />
                     <Route path="/repairs/bill/order" element={<ProtectedRoute><RepairOrderBill /></ProtectedRoute>} />
                     <Route path="/repairs/bill/receipt" element={<ProtectedRoute><RepairReceipt /></ProtectedRoute>} />
                     <Route path="/repairs/bill/management" element={<ProtectedRoute><RepairBillManagement /></ProtectedRoute>} />

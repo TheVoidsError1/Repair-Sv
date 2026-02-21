@@ -1,14 +1,4 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +11,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem
+} from "@/components/ui/pagination";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,22 +26,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useRepairs, type RepairItem, type RepairTag } from "@/contexts/RepairsContext";
+import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
-import { repairItemToBillData, type RepairOrderData } from "@/types/repairOrder";
-import { ChevronLeft, ChevronRight, Eye, FileText, Filter, Pencil, Search, X } from "lucide-react";
+import { type RepairOrderData } from "@/types/repairOrder";
+import { ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
@@ -298,11 +285,6 @@ const Repairs = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState<"all" | "endOfDay" | "leaveDevice">("all");
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedRepair, setSelectedRepair] = useState<RepairItem | null>(null);
-  const [detailOrder, setDetailOrder] = useState<RepairOrderData | null>(null);
-  const [isDetailEditing, setIsDetailEditing] = useState(false);
-  const [detailTag, setDetailTag] = useState<RepairTag | "">("");
   const [editOpen, setEditOpen] = useState(false);
   const [editingRepair, setEditingRepair] = useState<RepairItem | null>(null);
   const [editingStatus, setEditingStatus] = useState<
@@ -365,65 +347,6 @@ const Repairs = () => {
       refreshRepairs(newPage, pagination.limit);
     }
   };
-
-  // ซิงค์ selectedRepair กับ repairs เมื่อเปลี่ยนสถานะจาก dropdown ในตาราง (ให้ Dialog แสดงสถานะล่าสุด)
-  useEffect(() => {
-    if (detailOpen && selectedRepair) {
-      const updated = repairs.find((r) => r.id === selectedRepair.id);
-      if (updated && updated.status !== selectedRepair.status) {
-        setSelectedRepair(updated);
-      }
-    }
-  }, [detailOpen, repairs, selectedRepair?.id]);
-
-  const handleViewDetails = (repair: RepairItem) => {
-    const orderData = repairItemToBillData(repair, language === "th" ? "th" : "en");
-    setSelectedRepair(repair);
-    setDetailOrder(orderData);
-    setDetailTag(repair.tag ?? "");
-    setIsDetailEditing(false);
-    setDetailOpen(true);
-  };
-
-  const handleSaveDetail = () => {
-    if (!selectedRepair || !detailOrder) return;
-    setRepairs((prev) =>
-      prev.map((r) =>
-        r.id === selectedRepair.id
-          ? {
-              ...r,
-              customer: detailOrder.customer,
-              phone: detailOrder.phone,
-              device: detailOrder.model,
-              issue: detailOrder.problemSymptoms,
-              issueTh: detailOrder.problemSymptoms,
-              estimatedCost: Number(detailOrder.estimatedPrice || r.estimatedCost),
-              tag: detailTag === "" ? undefined : (detailTag as RepairTag),
-            }
-          : r
-      )
-    );
-    setSelectedRepair((prev) =>
-      prev
-        ? {
-            ...prev,
-            customer: detailOrder.customer,
-            phone: detailOrder.phone,
-            device: detailOrder.model,
-            issue: detailOrder.problemSymptoms,
-            issueTh: detailOrder.problemSymptoms,
-            estimatedCost: Number(detailOrder.estimatedPrice || prev.estimatedCost),
-            tag: detailTag === "" ? undefined : (detailTag as RepairTag),
-          }
-        : null
-    );
-    setIsDetailEditing(false);
-    toast({
-      title: language === "th" ? "บันทึกสำเร็จ" : "Saved",
-      description: language === "th" ? "อัปเดตรายละเอียดงานซ่อมแล้ว" : "Repair details have been updated.",
-    });
-  };
-
 
   const handleEditOrder = (repair: RepairItem) => {
     setEditingRepair(repair);
@@ -624,12 +547,6 @@ const Repairs = () => {
                   {t("allStatus")}
                 </span>
               </SelectItem>
-              <SelectItem value="pending">
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-pending))]" />
-                  {t("pending")}
-                </span>
-              </SelectItem>
               <SelectItem value="in-progress">
                 <span className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[hsl(var(--status-in-progress))]" />
@@ -705,7 +622,6 @@ const Repairs = () => {
                     <th>{t("estCost")}</th>
                     <th>{t("status")}</th>
                     <th>{t("tagLabel")}</th>
-                    <th>{t("viewDetails")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -734,9 +650,6 @@ const Repairs = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="pending">
-                              {t("pending")}
-                            </SelectItem>
                             <SelectItem value="in-progress">
                               {language === "th" ? "กำลังซ่อม" : t("inProgress")}
                             </SelectItem>
@@ -769,16 +682,6 @@ const Repairs = () => {
                           <span className="text-muted-foreground text-xs">–</span>
                         )}
                       </td>
-                      <td className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewDetails(repair)}
-                          aria-label={t("viewDetails")}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -798,14 +701,6 @@ const Repairs = () => {
                         <p className="text-xs text-muted-foreground">{repair.phone}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleViewDetails(repair)}
-                      aria-label={t("viewDetails")}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
                   </div>
 
                   {/* Device & Issue */}
@@ -838,9 +733,6 @@ const Repairs = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">
-                          {t("pending")}
-                        </SelectItem>
                         <SelectItem value="in-progress">
                           {language === "th" ? "กำลังซ่อม" : t("inProgress")}
                         </SelectItem>
@@ -964,294 +856,6 @@ const Repairs = () => {
         )}
       </div>
 
-      {/* รายละเอียดงานซ่อม — ดู / แก้ไข / ลบ ได้ */}
-      <Dialog
-        open={detailOpen}
-        onOpenChange={(open) => {
-          setDetailOpen(open);
-          if (!open) {
-            setSelectedRepair(null);
-            setDetailOrder(null);
-            setIsDetailEditing(false);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto p-0 gap-0 w-[95vw]">
-          {selectedRepair && detailOrder && (
-            <>
-              <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-4 border-b border-border">
-                <div className="space-y-1 flex-1">
-                  <DialogTitle className="text-lg sm:text-xl">
-                    {language === "th" ? "รายละเอียดงานซ่อม" : "Repair details"}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs sm:text-sm">
-                    {language === "th"
-                      ? "ดู หรือแก้ไขรายการงานซ่อม"
-                      : "View or edit this repair order."}
-                  </DialogDescription>
-                </div>
-                <span className="text-sm font-semibold text-foreground shrink-0">
-                  {selectedRepair.id}
-                </span>
-              </DialogHeader>
-
-              <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
-                {/* ข้อมูลคำสั่งซ่อม */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="w-1 h-4 bg-primary rounded-full" />
-                    {language === "th" ? "ข้อมูลคำสั่งซ่อม" : "Order Information"}
-                  </h3>
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{t("orderId")}</Label>
-                      <span className="text-sm font-medium text-foreground">{selectedRepair.id}</span>
-                    </div>
-                    {selectedRepair.serialNumber && (
-                      <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                        <Label className="text-sm text-muted-foreground">
-                          {language === "th" ? "IMEI / SN" : "IMEI / Serial"}
-                        </Label>
-                        <span className="text-sm font-mono text-foreground">{selectedRepair.serialNumber}</span>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{t("date")}</Label>
-                      <span className="text-sm text-foreground">{selectedRepair.createdAt}</span>
-                    </div>
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{t("status")}</Label>
-                      <span className={`status-badge inline-flex w-fit ${statusStyles[selectedRepair.status]}`}>
-                        {selectedRepair.status === "in-progress"
-                          ? (language === "th" ? "กำลังซ่อม" : t("inProgress"))
-                          : selectedRepair.status === "completed"
-                            ? (language === "th" ? "ซ่อมเสร็จแล้ว" : t("completed"))
-                            : selectedRepair.status === "picked-up"
-                              ? (language === "th" ? "รับเครื่องแล้ว" : t("pickedUp"))
-                              : selectedRepair.status === "cancelled"
-                                ? (language === "th" ? "ยกเลิกงานซ่อม" : t("cancelled"))
-                                : t("pending")}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{language === "th" ? "แท็ก" : "Tag"}</Label>
-                      {isDetailEditing ? (
-                        <Select value={detailTag || "none"} onValueChange={(v) => setDetailTag(v === "none" ? "" : (v as RepairTag))}>
-                          <SelectTrigger className="w-full max-w-[240px] h-9">
-                            <SelectValue placeholder={language === "th" ? "ทุกแท็ก" : "All tags"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">–</SelectItem>
-                            <SelectItem value="endOfDay">{language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in"}</SelectItem>
-                            <SelectItem value="leaveDevice">{language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off"}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-sm text-foreground">
-                          {detailTag === "endOfDay"
-                            ? (language === "th" ? "รับซ่อมหน้าร้าน" : "Walk-in")
-                            : detailTag === "leaveDevice"
-                              ? (language === "th" ? "รับซ่อมฝากเครื่อง" : "Drop-off")
-                              : "–"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ข้อมูลลูกค้า */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="w-1 h-4 bg-primary rounded-full" />
-                    {language === "th" ? "ข้อมูลลูกค้า" : "Customer Information"}
-                  </h3>
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{t("customer")}</Label>
-                      {isDetailEditing ? (
-                        <Input
-                          value={detailOrder.customer}
-                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, customer: e.target.value } : p))}
-                          className="h-9"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium text-foreground">{detailOrder.customer}</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{language === "th" ? "เบอร์โทร" : "Phone"}</Label>
-                      {isDetailEditing ? (
-                        <Input
-                          value={detailOrder.phone}
-                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, phone: e.target.value } : p))}
-                          className="h-9"
-                        />
-                      ) : (
-                        <span className="text-sm text-foreground">{detailOrder.phone}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ข้อมูลเครื่อง */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="w-1 h-4 bg-primary rounded-full" />
-                    {language === "th" ? "ข้อมูลเครื่อง" : "Device Information"}
-                  </h3>
-                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{t("device")}</Label>
-                      {isDetailEditing ? (
-                        <Input
-                          value={detailOrder.model}
-                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, model: e.target.value } : p))}
-                          className="h-9"
-                        />
-                      ) : (
-                        <span className="text-sm text-foreground">{detailOrder.model}</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-start">
-                      <Label className="text-sm text-muted-foreground pt-2">{t("issue")}</Label>
-                      {isDetailEditing ? (
-                        <Textarea
-                          value={detailOrder.problemSymptoms}
-                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, problemSymptoms: e.target.value } : p))}
-                          rows={3}
-                          className="resize-none"
-                        />
-                      ) : (
-                        <span className="text-sm text-foreground whitespace-pre-wrap">{detailOrder.problemSymptoms || "–"}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* อะไหล่ที่ใช้ */}
-                {selectedRepair.selectedParts && selectedRepair.selectedParts.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <span className="w-1 h-4 bg-primary rounded-full" />
-                      {language === "th" ? "อะไหล่ที่ใช้" : "Parts Used"}
-                    </h3>
-                    <div className="bg-muted/30 rounded-lg p-4">
-                      <div className="space-y-2">
-                        {selectedRepair.selectedParts.map((part, index) => (
-                          <div
-                            key={part.id || index}
-                            className="flex items-start justify-between gap-3 p-3 bg-background rounded-md border border-border"
-                          >
-                            <div className="flex-1 space-y-1">
-                              <p className="text-sm font-medium text-foreground">
-                                {language === "th" ? part.nameTh || part.name : part.name || part.nameTh}
-                              </p>
-                              {part.partNumber && (
-                                <p className="text-xs text-muted-foreground font-mono">
-                                  {language === "th" ? "รหัสอะไหล่" : "Part No."}: {part.partNumber}
-                                </p>
-                              )}
-                            </div>
-                            {part.price !== undefined && (
-                              <div className="text-right">
-                                <p className="text-sm font-semibold text-foreground">
-                                  ฿{typeof part.price === 'number' 
-                                    ? part.price.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                    : Number(part.price || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {selectedRepair.selectedParts.length > 0 && (
-                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-border">
-                            <span className="text-sm font-semibold text-foreground">
-                              {language === "th" ? "รวมราคาอะไหล่" : "Total Parts Cost"}
-                            </span>
-                            <span className="text-sm font-bold text-foreground">
-                              ฿{selectedRepair.selectedParts
-                                .reduce((sum, part) => {
-                                  const price = typeof part.price === 'number' ? part.price : Number(part.price) || 0;
-                                  return sum + price;
-                                }, 0)
-                                .toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ราคา */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span className="w-1 h-4 bg-primary rounded-full" />
-                    {language === "th" ? "ราคา" : "Pricing"}
-                  </h3>
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="grid grid-cols-[100px_1fr] gap-3 items-center">
-                      <Label className="text-sm text-muted-foreground">{language === "th" ? "ราคาประมาณ" : "Est. price"}</Label>
-                      {isDetailEditing ? (
-                        <Input
-                          type="number"
-                          value={detailOrder.estimatedPrice || ""}
-                          onChange={(e) => setDetailOrder((p) => (p ? { ...p, estimatedPrice: e.target.value } : p))}
-                          className="h-9"
-                        />
-                      ) : (
-                        <span className="text-sm font-semibold text-foreground">
-                          ฿{Number(detailOrder.estimatedPrice || 0).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-2 sm:gap-3">
-                {isDetailEditing ? (
-                  <>
-                    <Button variant="outline" onClick={() => setIsDetailEditing(false)} className="gap-2 w-full sm:w-auto">
-                      <X className="w-4 h-4" />
-                      {language === "th" ? "ไม่บันทึก" : "Discard"}
-                    </Button>
-                    <Button onClick={handleSaveDetail} className="gap-2 w-full sm:w-auto sm:min-w-[100px]">
-                      <Pencil className="w-4 h-4" />
-                      {language === "th" ? "บันทึก" : "Save"}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="ghost" onClick={() => setDetailOpen(false)} className="gap-2 text-muted-foreground w-full sm:w-auto">
-                      {language === "th" ? "ปิด" : "Close"}
-                    </Button>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      <Button variant="outline" onClick={() => setIsDetailEditing(true)} className="gap-2 w-full sm:w-auto">
-                        <Pencil className="w-4 h-4" />
-                        {language === "th" ? "แก้ไข" : "Edit"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="gap-2 w-full sm:w-auto"
-                        onClick={() => {
-                          setDetailOpen(false);
-                          navigate("/repairs/bill", { state: { highlightRepairId: selectedRepair.id } });
-                        }}
-                      >
-                        <FileText className="w-4 h-4" />
-                        {language === "th" ? "ไปออกบิล" : "Issue bill"}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-
       {/* Edit repair status dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
@@ -1357,9 +961,6 @@ const Repairs = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">
-                          {t("pending")}
-                        </SelectItem>
                         <SelectItem value="in-progress">
                           {language === "th"
                             ? "กำลังซ่อม"

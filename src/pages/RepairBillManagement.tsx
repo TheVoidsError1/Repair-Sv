@@ -3,33 +3,9 @@
  * ให้พนักงานสามารถดู แก้ไข และพิมพ์ใบแจ้งซ่อมได้
  */
 import { MainLayout } from "@/components/layout/MainLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
-import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import { repairItemToBillData } from "@/types/repairOrder";
 import {
   Command,
   CommandEmpty,
@@ -38,9 +14,33 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileText, Eye, Printer, Search, Edit, Plus, Trash2, X, Receipt } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { repairItemToBillData } from "@/types/repairOrder";
+import { ArrowLeft, Edit, Eye, FileText, Plus, Receipt, Search, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const RepairBillManagement = () => {
@@ -116,27 +116,66 @@ const RepairBillManagement = () => {
     });
   };
 
+  const formatDateForInput = (d: Date | string | undefined) => {
+    if (!d) return "";
+    const date = typeof d === "string" ? new Date(d) : d;
+    if (isNaN(date.getTime())) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const formatTimeHHmm = (t: string | undefined) => (t && /^\d{1,2}:\d{2}/.test(t) ? t.slice(0, 5) : "");
+
   const handleEditBill = async (item: RepairItem) => {
     setIsLoadingRepair(true);
     setEditingRepair(item);
     try {
-      // Load full repair data from API
       const response = await apiClient.getRepairById(item.id);
       if (response.status === 'success' && response.data) {
         const repair = response.data;
+        const customer = repair.customer || {};
+        const customerName = customer.fullName || [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() || "";
         setEditFormData({
-          deviceColor: repair.deviceColor || "",
-          screenLockCode: repair.screenLockCode || "",
-          problemSymptoms: repair.problemSymptoms || repair.problemDescription || "",
-          estimatedPrice: repair.estimatedPrice || 0,
-          repairSummaryPrice: repair.repairSummaryPrice || repair.totalCost || 0,
+          customerId: repair.customer?.id ?? null,
+          customerName: customerName || item.customer,
+          phone: customer.phone ?? repair.phone ?? item.phone ?? "",
+          phoneBackup: customer.phoneBackup ?? "",
+          lineId: customer.lineId ?? "",
+          deviceType: repair.deviceType ?? "",
+          deviceModel: repair.deviceModel ?? repair.deviceBrand ?? item.device ?? "",
+          serialNumber: repair.serialNumber ?? repair.deviceSerialNumber ?? item.serialNumber ?? "",
+          deviceColor: repair.deviceColor ?? "",
+          screenLockCode: repair.screenLockCode ?? "",
+          problemSymptoms: repair.problemSymptoms ?? repair.problemDescription ?? "",
+          diagnosis: repair.diagnosis ?? "",
+          repairNotes: repair.repairNotes ?? "",
+          deposit: repair.deposit ?? 0,
+          estimatedPrice: repair.estimatedPrice ?? 0,
+          repairSummaryPrice: repair.repairSummaryPrice ?? repair.totalCost ?? 0,
+          warrantyDays: repair.warrantyDays ?? 90,
+          serviceType: repair.serviceType ?? "walk_in",
+          dateOfReport: formatDateForInput(repair.dateOfReport),
+          timeOfReport: formatTimeHHmm(repair.timeOfReport) || (repair.timeOfReport && String(repair.timeOfReport).slice(0, 5)) || "",
+          receiveDate: formatDateForInput(repair.receiveDate) || formatDateForInput(repair.dateOfReport),
+          receiveTime: formatTimeHHmm(repair.receiveTime) || formatTimeHHmm(repair.timeOfReport) || (repair.receiveTime && String(repair.receiveTime).slice(0, 5)) || "",
+          scheduledPickupTime: repair.scheduledPickupTime
+            ? (() => {
+                const d = new Date(repair.scheduledPickupTime);
+                return isNaN(d.getTime()) ? "" : d.toLocaleString(language === "th" ? "th-TH" : "en-GB", { dateStyle: "short", timeStyle: "short" });
+              })()
+            : "",
+          status: repair.status ?? item.status,
           selectedParts: repair.selectedParts || [],
           additionalParts: repair.additionalParts || [],
         });
         setEditDialogOpen(true);
       } else {
-        // Fallback to item data
         setEditFormData({
+          customerName: item.customer,
+          phone: item.phone ?? "",
+          deviceModel: item.device ?? "",
+          serialNumber: item.serialNumber ?? "",
           deviceColor: "",
           screenLockCode: "",
           problemSymptoms: language === "th" ? item.issueTh : item.issue,
@@ -149,8 +188,11 @@ const RepairBillManagement = () => {
       }
     } catch (error) {
       console.error('Error loading repair data:', error);
-      // Fallback to item data
       setEditFormData({
+        customerName: item.customer,
+        phone: item.phone ?? "",
+        deviceModel: item.device ?? "",
+        serialNumber: item.serialNumber ?? "",
         deviceColor: "",
         screenLockCode: "",
         problemSymptoms: language === "th" ? item.issueTh : item.issue,
@@ -304,33 +346,52 @@ const RepairBillManagement = () => {
 
     setIsSaving(true);
     try {
-      // Calculate total from parts
       const totalPrice = calculateTotalPrice();
       const taxRate = 0.07;
       const subtotal = totalPrice;
       const totalCost = subtotal * (1 + taxRate);
 
+      if (editFormData.customerId && (editFormData.customerName ?? editFormData.phone ?? editFormData.lineId)) {
+        const nameParts = (editFormData.customerName || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || (editFormData.customerName || "").trim();
+        const lastName = nameParts.slice(1).join(" ") || undefined;
+        await apiClient.updateCustomer(editFormData.customerId, {
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          phone: (editFormData.phone || "").trim() || undefined,
+          lineId: (editFormData.lineId || "").trim() || undefined,
+        });
+      }
+
+      const receiveDate = (editFormData.receiveDate || "").trim();
+      const receiveTime = (editFormData.receiveTime || "").trim().slice(0, 5);
+      const scheduledPickupIso =
+        receiveDate && receiveTime ? `${receiveDate}T${receiveTime}:00` : undefined;
+
       const updateData: any = {
-        deviceColor: editFormData.deviceColor || undefined,
-        screenLockCode: editFormData.screenLockCode || undefined,
-        problemSymptoms: editFormData.problemSymptoms || undefined,
+        deviceModel: (editFormData.deviceModel || "").trim() || undefined,
+        serialNumber: (editFormData.serialNumber || "").trim() || undefined,
+        deviceColor: (editFormData.deviceColor || "").trim() || undefined,
+        screenLockCode: (editFormData.screenLockCode || "").trim() || undefined,
+        problemSymptoms: (editFormData.problemSymptoms || "").trim() || undefined,
+        dateOfReport: (editFormData.dateOfReport || "").trim() || undefined,
+        timeOfReport: (editFormData.timeOfReport || "").trim().slice(0, 5) || undefined,
+        receiveDate: receiveDate || undefined,
+        receiveTime: receiveTime || undefined,
+        scheduledPickupTime: scheduledPickupIso,
+        warrantyDays: editFormData.warrantyDays != null ? Number(editFormData.warrantyDays) : undefined,
+        deposit: editFormData.deposit != null && editFormData.deposit !== "" ? Number(editFormData.deposit) : undefined,
+        serviceType: editFormData.serviceType || undefined,
         estimatedPrice: totalPrice > 0 ? totalPrice : editFormData.estimatedPrice,
         repairSummaryPrice: totalPrice > 0 ? totalPrice : editFormData.repairSummaryPrice,
         totalCost: totalPrice > 0 ? totalCost : undefined,
         partsCost: totalPrice > 0 ? subtotal : undefined,
-        additionalParts: editFormData.additionalParts && editFormData.additionalParts.length > 0 
-          ? editFormData.additionalParts 
-          : undefined,
+        additionalParts: editFormData.additionalParts && editFormData.additionalParts.length > 0 ? editFormData.additionalParts : undefined,
       };
 
-      // Update selectedPartIds if selectedParts changed
       if (editFormData.selectedParts && Array.isArray(editFormData.selectedParts) && editFormData.selectedParts.length > 0) {
-        const partIds = editFormData.selectedParts
-          .map((part: any) => part.id)
-          .filter((id: any) => id);
-        if (partIds.length > 0) {
-          updateData.selectedPartIds = partIds;
-        }
+        const partIds = editFormData.selectedParts.map((part: any) => part.id).filter((id: any) => id);
+        if (partIds.length > 0) updateData.selectedPartIds = partIds;
       }
 
       const response = await apiClient.updateRepair(editingRepair.id, updateData);
@@ -493,10 +554,8 @@ const RepairBillManagement = () => {
                                 "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
                                 item.status === "completed" || item.status === "picked-up"
                                   ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : item.status === "in-progress"
+                                  : item.status === "in-progress" || item.status === "pending"
                                   ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                                  : item.status === "pending"
-                                  ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
                                   : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
                               )}
                             >
@@ -504,10 +563,8 @@ const RepairBillManagement = () => {
                                 ? language === "th" ? "เสร็จสิ้น" : "Completed"
                                 : item.status === "picked-up"
                                 ? language === "th" ? "รับเครื่องแล้ว" : "Picked Up"
-                                : item.status === "in-progress"
+                                : item.status === "in-progress" || item.status === "pending"
                                 ? language === "th" ? "กำลังซ่อม" : "In Progress"
-                                : item.status === "pending"
-                                ? language === "th" ? "รอดำเนินการ" : "Pending"
                                 : item.status}
                             </span>
                           </td>
@@ -619,73 +676,184 @@ const RepairBillManagement = () => {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                  {/* Basic Information */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>{language === "th" ? "สี" : "Color"}</Label>
+                <div className="space-y-4 py-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "ชื่อลูกค้า" : "Customer name"}</Label>
                       <Input
-                        value={editFormData.deviceColor || ""}
-                        onChange={(e) =>
-                          setEditFormData({ ...editFormData, deviceColor: e.target.value })
-                        }
-                        placeholder={language === "th" ? "เช่น สีดำ" : "e.g., Black"}
+                        value={editFormData.customerName || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, customerName: e.target.value })}
+                        placeholder={language === "th" ? "ชื่อลูกค้า" : "Name"}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>{language === "th" ? "รหัสล็อคหน้าจอ" : "Screen Lock Code"}</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "เบอร์โทร" : "Phone"}</Label>
+                      <Input
+                        value={editFormData.phone || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                        placeholder="084-xxx-xxxx"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <Label className="text-sm">LINE ID</Label>
+                      <Input
+                        value={editFormData.lineId || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, lineId: e.target.value })}
+                        placeholder="LINE ID"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "รุ่น/อุปกรณ์" : "Model"}</Label>
+                      <Input
+                        value={editFormData.deviceModel || editFormData.deviceType || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, deviceModel: e.target.value })}
+                        placeholder={language === "th" ? "รุ่นเครื่อง" : "Model"}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "IMEI / Serial" : "IMEI / Serial"}</Label>
+                      <Input
+                        value={editFormData.serialNumber || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, serialNumber: e.target.value })}
+                        placeholder="IMEI หรือ Serial"
+                        className="font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "สี" : "Color"}</Label>
+                      <Input
+                        value={editFormData.deviceColor || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, deviceColor: e.target.value })}
+                        placeholder={language === "th" ? "เช่น สีดำ" : "e.g. Black"}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "รหัสล็อคหน้าจอ" : "Screen lock"}</Label>
                       <Input
                         value={editFormData.screenLockCode || ""}
-                        onChange={(e) =>
-                          setEditFormData({ ...editFormData, screenLockCode: e.target.value })
-                        }
-                        placeholder={language === "th" ? "เช่น 1234" : "e.g., 1234"}
+                        onChange={(e) => setEditFormData({ ...editFormData, screenLockCode: e.target.value })}
+                        placeholder="1234"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "วันที่แจ้งซ่อม" : "Report date"}</Label>
+                      <Input
+                        type="date"
+                        value={editFormData.dateOfReport || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, dateOfReport: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "เวลาแจ้งซ่อม" : "Report time"}</Label>
+                      <Input
+                        type="time"
+                        value={editFormData.timeOfReport || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, timeOfReport: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "นัดรับเครื่อง (วันที่)" : "Pickup date"}</Label>
+                      <Input
+                        type="date"
+                        value={editFormData.receiveDate || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, receiveDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "นัดรับเครื่อง (เวลา)" : "Pickup time"}</Label>
+                      <Input
+                        type="time"
+                        value={editFormData.receiveTime || ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, receiveTime: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "รับประกัน (วัน)" : "Warranty (days)"}</Label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                        value={editFormData.warrantyDays ?? 90}
+                        onChange={(e) => setEditFormData({ ...editFormData, warrantyDays: Number(e.target.value) })}
+                      >
+                        <option value={90}>{language === "th" ? "90 วัน (3 เดือน)" : "90 days"}</option>
+                        <option value={180}>{language === "th" ? "180 วัน (6 เดือน)" : "180 days"}</option>
+                        <option value={365}>{language === "th" ? "365 วัน (1 ปี)" : "365 days"}</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "ประเภทบริการ" : "Service type"}</Label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                        value={editFormData.serviceType || "walk_in"}
+                        onChange={(e) => setEditFormData({ ...editFormData, serviceType: e.target.value })}
+                      >
+                        <option value="walk_in">{language === "th" ? "รับหน้าร้าน" : "Walk-in"}</option>
+                        <option value="drop_off">{language === "th" ? "ฝากเครื่อง" : "Drop-off"}</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">{language === "th" ? "มัดจำ (บาท)" : "Deposit"}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editFormData.deposit != null ? editFormData.deposit : ""}
+                        onChange={(e) => setEditFormData({ ...editFormData, deposit: e.target.value === "" ? "" : Number(e.target.value) })}
+                        placeholder="0"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>{language === "th" ? "อาการเสีย" : "Problem Symptoms"}</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">{language === "th" ? "อาการเสีย" : "Problem symptoms"}</Label>
                     <Textarea
                       value={editFormData.problemSymptoms || ""}
-                      onChange={(e) =>
-                        setEditFormData({ ...editFormData, problemSymptoms: e.target.value })
-                      }
-                      rows={3}
+                      onChange={(e) => setEditFormData({ ...editFormData, problemSymptoms: e.target.value })}
+                      rows={2}
                       placeholder={language === "th" ? "อธิบายอาการเสีย..." : "Describe the problem..."}
+                      className="resize-none"
                     />
                   </div>
 
-                  {/* Selected Parts (from inventory) */}
-                  <div className="space-y-2">
-                    <Label>{language === "th" ? "ชิ้นส่วนที่มีในคลังสินค้า" : "Parts from Inventory"}</Label>
-                    <div className="space-y-2 border rounded-lg p-3">
+                  {/* ─── ชิ้นส่วนและอะไหล่ ─── */}
+                  <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      {language === "th" ? "ชิ้นส่วนและอะไหล่" : "Parts & accessories"}
+                    </p>
+
+                    {/* จากคลังสินค้า */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {language === "th" ? "จากคลังสินค้า" : "From inventory"}
+                      </p>
                       {editFormData.selectedParts && editFormData.selectedParts.length > 0 ? (
-                        editFormData.selectedParts.map((part: any, index: number) => (
-                          <div key={part.id || index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
-                            <div className="flex-1">
-                              <p className="font-medium">{part.nameTh || part.name}</p>
-                              {part.partNumber && (
-                                <p className="text-xs text-muted-foreground">{part.partNumber}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">฿{parseFloat(String(part.price || 0)).toLocaleString()}</p>
+                        <ul className="space-y-1.5">
+                          {editFormData.selectedParts.map((part: any, index: number) => (
+                            <li
+                              key={part.id || index}
+                              className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-medium">{part.nameTh || part.name}</span>
+                                {part.partNumber && (
+                                  <span className="ml-2 text-xs text-muted-foreground">({part.partNumber})</span>
+                                )}
+                              </div>
+                              <span className="shrink-0 font-medium tabular-nums">฿{parseFloat(String(part.price || 0)).toLocaleString()}</span>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6"
+                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                                 onClick={() => handleRemovePartFromInventory(part.id)}
+                                aria-label={language === "th" ? "ลบ" : "Remove"}
                               >
                                 <X className="w-4 h-4" />
                               </Button>
-                            </div>
-                          </div>
-                        ))
+                            </li>
+                          ))}
+                        </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground text-center py-2">
-                          {language === "th" ? "ไม่มีชิ้นส่วน" : "No parts selected"}
+                        <p className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/10 px-3 py-2 text-center text-sm text-muted-foreground">
+                          {language === "th" ? "ยังไม่ได้เลือกชิ้นส่วนจากคลัง" : "No parts from inventory"}
                         </p>
                       )}
                       <Button
@@ -693,70 +861,97 @@ const RepairBillManagement = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => setIsPartDialogOpen(true)}
-                        className="w-full"
+                        className="w-full border-dashed"
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        {language === "th" ? "เพิ่มชิ้นส่วนจากคลังสินค้า" : "Add Parts from Inventory"}
+                        {language === "th" ? "เลือกชิ้นส่วนจากคลังสินค้า" : "Select from inventory"}
                       </Button>
                     </div>
-                  </div>
 
-                  {/* Additional Parts (not in inventory) */}
-                  <div className="space-y-2">
-                    <Label>{language === "th" ? "ชิ้นส่วนเพิ่มเติม (ไม่มีในคลังสินค้า)" : "Additional Parts (Not in Inventory)"}</Label>
-                    <div className="space-y-2 border rounded-lg p-3">
-                      {((editFormData.additionalParts as any[]) || []).map((part, index) => (
-                        <div key={index} className="flex gap-2 items-end">
-                          <div className="flex-1">
-                            <Label className="text-xs">{language === "th" ? "ชื่อชิ้นส่วน" : "Part Name"}</Label>
-                            <Input
-                              value={part.name || ""}
-                              onChange={(e) => {
-                                const newParts = [...((editFormData.additionalParts as any[]) || [])];
-                                newParts[index] = { ...newParts[index], name: e.target.value };
-                                setEditFormData({ ...editFormData, additionalParts: newParts });
-                              }}
-                              placeholder={language === "th" ? "เช่น ปุ่มเสีย" : "e.g., Broken button"}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <Label className="text-xs">{language === "th" ? "ชื่อภาษาไทย" : "Name (Thai)"}</Label>
-                            <Input
-                              value={part.nameTh || ""}
-                              onChange={(e) => {
-                                const newParts = [...((editFormData.additionalParts as any[]) || [])];
-                                newParts[index] = { ...newParts[index], nameTh: e.target.value };
-                                setEditFormData({ ...editFormData, additionalParts: newParts });
-                              }}
-                              placeholder={language === "th" ? "เช่น ปุ่มเสีย" : "e.g., ปุ่มเสีย"}
-                            />
-                          </div>
-                          <div className="w-32">
-                            <Label className="text-xs">{language === "th" ? "ราคา" : "Price"}</Label>
-                            <Input
-                              type="number"
-                              value={part.price || 0}
-                              onChange={(e) => {
-                                const newParts = [...((editFormData.additionalParts as any[]) || [])];
-                                newParts[index] = { ...newParts[index], price: parseFloat(e.target.value) || 0 };
-                                setEditFormData({ ...editFormData, additionalParts: newParts });
-                              }}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                              const newParts = [...((editFormData.additionalParts as any[]) || [])];
-                              newParts.splice(index, 1);
-                              setEditFormData({ ...editFormData, additionalParts: newParts });
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                    {/* ชิ้นส่วนเพิ่มเติม (ไม่มีในคลัง) */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {language === "th" ? "ชิ้นส่วนเพิ่มเติม (ไม่มีในคลัง)" : "Additional parts (not in stock)"}
+                      </p>
+                      {((editFormData.additionalParts as any[]) || []).length > 0 ? (
+                        <div className="overflow-hidden rounded-md border border-border">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/40">
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                  {language === "th" ? "ชื่อชิ้นส่วน" : "Part name"}
+                                </th>
+                                <th className="hidden sm:table-cell w-36 px-3 py-2 text-left font-medium text-muted-foreground">
+                                  {language === "th" ? "ชื่อไทย" : "Name (Thai)"}
+                                </th>
+                                <th className="w-24 px-3 py-2 text-right font-medium text-muted-foreground">
+                                  {language === "th" ? "ราคา" : "Price"}
+                                </th>
+                                <th className="w-10 px-2 py-2" />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {((editFormData.additionalParts as any[]) || []).map((part, index) => (
+                                <tr key={index} className="border-b border-border/50 last:border-0">
+                                  <td className="px-3 py-2">
+                                    <Input
+                                      value={part.name || ""}
+                                      onChange={(e) => {
+                                        const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                                        newParts[index] = { ...newParts[index], name: e.target.value };
+                                        setEditFormData({ ...editFormData, additionalParts: newParts });
+                                      }}
+                                      placeholder={language === "th" ? "ชื่อชิ้นส่วน" : "Part name"}
+                                      className="h-8 text-sm"
+                                    />
+                                  </td>
+                                  <td className="hidden sm:table-cell px-3 py-2">
+                                    <Input
+                                      value={part.nameTh || ""}
+                                      onChange={(e) => {
+                                        const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                                        newParts[index] = { ...newParts[index], nameTh: e.target.value };
+                                        setEditFormData({ ...editFormData, additionalParts: newParts });
+                                      }}
+                                      placeholder={language === "th" ? "ชื่อไทย" : "Thai"}
+                                      className="h-8 text-sm"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={part.price || 0}
+                                      onChange={(e) => {
+                                        const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                                        newParts[index] = { ...newParts[index], price: parseFloat(e.target.value) || 0 };
+                                        setEditFormData({ ...editFormData, additionalParts: newParts });
+                                      }}
+                                      className="h-8 text-sm text-right tabular-nums"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => {
+                                        const newParts = [...((editFormData.additionalParts as any[]) || [])];
+                                        newParts.splice(index, 1);
+                                        setEditFormData({ ...editFormData, additionalParts: newParts });
+                                      }}
+                                      aria-label={language === "th" ? "ลบแถว" : "Remove row"}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      ))}
+                      ) : null}
                       <Button
                         type="button"
                         variant="outline"
@@ -766,15 +961,23 @@ const RepairBillManagement = () => {
                           newParts.push({ name: "", nameTh: "", price: 0 });
                           setEditFormData({ ...editFormData, additionalParts: newParts });
                         }}
-                        className="w-full"
+                        className="w-full border-dashed"
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        {language === "th" ? "เพิ่มชิ้นส่วน" : "Add Part"}
+                        {language === "th" ? "เพิ่มชิ้นส่วนใหม่ (ไม่มีในคลัง)" : "Add part (not in stock)"}
                       </Button>
+                    </div>
+
+                    {/* สรุปราคา */}
+                    <div className="flex justify-between border-t border-border pt-3 text-sm">
+                      <span className="font-medium text-muted-foreground">
+                        {language === "th" ? "รวมราคาชิ้นส่วน" : "Total parts"}
+                      </span>
+                      <span className="font-semibold tabular-nums">฿{calculateTotalPrice().toLocaleString()}</span>
                     </div>
                   </div>
 
-                  {/* Price Summary */}
+                  {/* Price Summary (legacy - keep for consistency with rest of form) */}
                   <div className="border-t pt-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="font-medium">{language === "th" ? "รวมราคาชิ้นส่วน" : "Total Parts Price"}</span>

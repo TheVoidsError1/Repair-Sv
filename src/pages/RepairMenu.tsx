@@ -1,8 +1,8 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Link } from "react-router-dom";
-import { Store, Package, List, FileText, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ClipboardList, List, Package, Store } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const RepairMenu = () => {
   const { language } = useLanguage();
@@ -41,17 +41,6 @@ const RepairMenu = () => {
       path: "/repairs",
       iconBg: "bg-purple-500/10",
       iconColor: "text-purple-500",
-    },
-    {
-      id: "bill",
-      titleTh: "ออกบิล",
-      titleEn: "Issue Bill",
-      descriptionTh: "ออกบิลสำหรับงานซ่อม",
-      descriptionEn: "Issue bill for repairs",
-      icon: FileText,
-      path: "/repairs/bill",
-      iconBg: "bg-orange-500/10",
-      iconColor: "text-orange-500",
     },
     {
       id: "bill-management",

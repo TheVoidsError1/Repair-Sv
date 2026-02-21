@@ -13,39 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
-import { Time30Select } from "@/components/ui/time-30-select";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useRepairs } from "@/contexts/RepairsContext";
-import { apiClient } from "@/lib/api";
-import { getPartStockStatus, type Part } from "@/lib/partsData";
-import { cn } from "@/lib/utils";
-import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
-import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, X, Search, User, Phone, History, AlertTriangle, ArrowLeft, Package } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Command,
   CommandEmpty,
@@ -54,6 +21,39 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Time30Select } from "@/components/ui/time-30-select";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useRepairs } from "@/contexts/RepairsContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
+import { getPartStockStatus, type Part } from "@/lib/partsData";
+import { cn } from "@/lib/utils";
+import type { ServiceType } from "@/types/repairOrder";
+import { AlertTriangle, ArrowLeft, Calendar as CalendarIcon, History, Package, Phone, Search, User, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 /** อ่าน type จาก URL: in-store → walk_in, leave-device → drop_off */
 function getServiceTypeFromSearchParams(searchParams: URLSearchParams): ServiceType {
@@ -169,8 +169,7 @@ const RepairNew = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isRepairHistoryDialogOpen, setIsRepairHistoryDialogOpen] = useState(false);
   const [customerRepairHistory, setCustomerRepairHistory] = useState<any[]>([]);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  
+
   // Part selection dialog states
   const [isPartDialogOpen, setIsPartDialogOpen] = useState(false);
   const [partSearchQuery, setPartSearchQuery] = useState("");
@@ -328,13 +327,10 @@ const RepairNew = () => {
       }
     }
 
-    // Open confirmation dialog
-    setIsConfirmDialogOpen(true);
+    doSubmitOrder();
   };
 
-  // Actually submit the order
   const doSubmitOrder = async () => {
-    setIsConfirmDialogOpen(false);
     setIsSubmitting(true);
 
     try {
@@ -406,8 +402,13 @@ const RepairNew = () => {
         setReceiveDate(getTodayIsoDate());
         setReportDateTimeOnOpen();
 
-        // Navigate to repairs list
-        navigate("/repairs");
+        // ไปแสดงหน้าใบแจ้งซ่อม (ใบรับซ่อม) ของงานซ่อมที่สร้างใหม่
+        const newRepairId = response.data.id ?? response.data.repairNumber;
+        if (newRepairId) {
+          navigate("/repairs/bill/order", { state: { repairId: newRepairId } });
+        } else {
+          navigate("/repairs");
+        }
       } else {
         throw new Error(response.message || 'Failed to create repair');
       }
@@ -1031,188 +1032,6 @@ const RepairNew = () => {
             </Button>
           </CardFooter>
         </Card>
-
-        {/* Confirmation Dialog */}
-        <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {language === "th" ? "ยืนยันการสร้างใบแจ้งซ่อม" : "Confirm Repair Order Creation"}
-              </DialogTitle>
-              <DialogDescription>
-                {language === "th"
-                  ? "กรุณาตรวจสอบข้อมูลก่อนยืนยัน"
-                  : "Please review the information before confirming"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {/* Customer Information */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "th" ? "ชื่อลูกค้า" : "Customer Name"}
-                  </p>
-                  <p className="font-medium">{formData.customer || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "th" ? "เบอร์โทรศัพท์" : "Phone Number"}
-                  </p>
-                  <p className="font-medium">{formData.phone || "-"}</p>
-                </div>
-                {formData.lineId && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "Line ID" : "Line ID"}
-                    </p>
-                    <p className="font-medium">{formData.lineId}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Device Information */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "th" ? "IMEI / Serial Number" : "IMEI / Serial Number"}
-                  </p>
-                  <p className="font-medium font-mono text-sm">{formData.serialNumber || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    {language === "th" ? "รุ่น" : "Model"}
-                  </p>
-                  <p className="font-medium">{formData.model || "-"}</p>
-                </div>
-                {formData.color && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "สี" : "Color"}
-                    </p>
-                    <p className="font-medium">{formData.color}</p>
-                  </div>
-                )}
-                {formData.screenLockCode && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "รหัสล็อคหน้าจอ" : "Screen Lock Code"}
-                    </p>
-                    <p className="font-medium font-mono text-sm">{formData.screenLockCode}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Problem Symptoms */}
-              {formData.problemSymptoms && (
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {language === "th" ? "อาการเสีย" : "Problem Symptoms"}
-                  </p>
-                  <p className="text-sm whitespace-pre-wrap">{formData.problemSymptoms}</p>
-                </div>
-              )}
-
-              {/* Selected Parts */}
-              {selectedParts.length > 0 && (
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {language === "th" ? "อะไหล่ที่เลือก" : "Selected Parts"}
-                  </p>
-                  <div className="space-y-2">
-                    {selectedParts.map((part) => (
-                      <div key={part.id} className="flex items-center justify-between text-sm">
-                        <span className="font-medium">
-                          {language === "th" ? part.nameTh : part.name}
-                        </span>
-                        <span className="text-muted-foreground">
-                          ฿{part.sellPrice.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="pt-2 border-t border-border mt-2">
-                      <div className="flex items-center justify-between font-semibold">
-                        <span>{language === "th" ? "รวมราคาอะไหล่" : "Total Parts Price"}</span>
-                        <span className="text-primary">
-                          ฿{selectedParts.reduce((sum, part) => sum + part.sellPrice, 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Pricing */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                {formData.deposit && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "มัดจำ" : "Deposit"}
-                    </p>
-                    <p className="font-medium">฿{Number(formData.deposit).toLocaleString()}</p>
-                  </div>
-                )}
-                {formData.estimatedPrice && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th" ? "ประเมินราคา" : "Estimated Price"}
-                    </p>
-                    <p className="font-medium">฿{Number(formData.estimatedPrice).toLocaleString()}</p>
-                  </div>
-                )}
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground">
-                    {language === "th" ? "สรุปราคาซ่อม (อัตโนมัติ)" : "Repair total (auto)"}
-                  </p>
-                  <p className="font-semibold text-lg text-primary">
-                    ฿{Number(formData.estimatedPrice || selectedParts.reduce((sum, part) => sum + (Number(part.sellPrice) || 0), 0)).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              {/* Pickup Time */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-2">
-                  {language === "th" ? "เวลารับเครื่อง" : "Pickup Time"}
-                </p>
-                <p className="font-medium">
-                  {serviceType === "walk_in"
-                    ? language === "th"
-                      ? `วันนี้ เวลา ${receiveTime}`
-                      : `Today at ${receiveTime}`
-                    : receiveDateAsDate
-                    ? `${receiveDateAsDate.toLocaleDateString(language === "th" ? "th-TH" : "en-GB")} เวลา ${receiveTime}`
-                    : `${receiveDate} ${receiveTime}`}
-                </p>
-              </div>
-
-              {/* Warranty */}
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-2">
-                  {language === "th" ? "ระยะเวลารับประกัน" : "Warranty period"}
-                </p>
-                <p className="font-medium">{warrantyLabel}</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setIsConfirmDialogOpen(false)}
-                disabled={isSubmitting}
-              >
-                {language === "th" ? "ย้อนกลับ" : "Go Back"}
-              </Button>
-              <Button onClick={doSubmitOrder} disabled={isSubmitting}>
-                {isSubmitting
-                  ? language === "th"
-                    ? "กำลังบันทึก..."
-                    : "Saving..."
-                  : language === "th"
-                  ? "ยืนยัน"
-                  : "Confirm"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         <AlertDialog open={duplicateSnWarning} onOpenChange={(open) => !open && setDuplicateSnWarning(false)}>
           <AlertDialogContent>

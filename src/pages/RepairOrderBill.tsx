@@ -172,8 +172,6 @@ export const BillContent = ({ data, formatPrice, copyLabel, language, selectedPa
           </span>
         </div>
         <span>บาท</span>
-        <span className="ml-4">นัดรับซ่อม</span>
-        <div className="w-40 border-b border-gray-400 min-h-[20px]" />
       </div>
 
     </div>
