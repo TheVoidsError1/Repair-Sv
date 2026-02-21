@@ -176,37 +176,6 @@ export const BillContent = ({ data, formatPrice, copyLabel, language, selectedPa
         <div className="w-40 border-b border-gray-400 min-h-[20px]" />
       </div>
 
-      {/* แสดงรายการชิ้นส่วนที่ใช้ */}
-      {((selectedParts && selectedParts.length > 0) || (additionalParts && additionalParts.length > 0)) && (
-        <div className="mt-3 space-y-2">
-          <div className="text-xs font-semibold">รายการชิ้นส่วนที่ใช้:</div>
-          <div className="space-y-1 text-[11px]">
-            {selectedParts && selectedParts.map((part, index) => (
-              <div key={part.id || index} className="flex justify-between items-center border-b border-gray-300 pb-1">
-                <span className="flex-1">
-                  {part.nameTh || part.name || "รายการซ่อม"}
-                  {part.partNumber && (
-                    <span className="text-gray-500 ml-2">({part.partNumber})</span>
-                  )}
-                </span>
-                <span className="w-24 text-right">
-                  {part.price ? formatPrice(String(part.price)) : ""}
-                </span>
-              </div>
-            ))}
-            {additionalParts && additionalParts.map((part, index) => (
-              <div key={`additional-${index}`} className="flex justify-between items-center border-b border-gray-300 pb-1">
-                <span className="flex-1">
-                  {part.nameTh || part.name || "รายการซ่อม"}
-                </span>
-                <span className="w-24 text-right">
-                  {part.price ? formatPrice(String(part.price)) : ""}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
 
     <div className="mt-2 mb-3">
