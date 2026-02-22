@@ -1,46 +1,46 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Time30Select } from "@/components/ui/time-30-select";
@@ -187,7 +187,8 @@ const RepairNew = () => {
   /** วันมารับเครื่อง (YYYY-MM-DD) ใช้เฉพาะ drop_off */
   const [receiveDate, setReceiveDate] = useState(() => getTodayIsoDate());
 
-  const WARRANTY_OPTIONS: Array<{ value: "90" | "180" | "365"; labelTh: string; labelEn: string }> = [
+  const WARRANTY_OPTIONS: Array<{ value: "30" | "90" | "180" | "365"; labelTh: string; labelEn: string }> = [
+    { value: "30", labelTh: "1 เดือน", labelEn: "1 month" },
     { value: "90", labelTh: "3 เดือน", labelEn: "3 months" },
     { value: "180", labelTh: "6 เดือน", labelEn: "6 months" },
     { value: "365", labelTh: "1 ปี", labelEn: "1 year" },
@@ -293,7 +294,7 @@ const RepairNew = () => {
 
     // Validate warrantyDays (must be one of the allowed options)
     if (!WARRANTY_OPTIONS.some((o) => o.value === formData.warrantyDays)) {
-      errors.warrantyDays = language === "th" ? "กรุณาเลือกระยะเวลารับประกัน (3 เดือน / 6 เดือน / 1 ปี)" : "Please select warranty period (3/6/12 months)";
+      errors.warrantyDays = language === "th" ? "กรุณาเลือกระยะเวลารับประกัน (1 เดือน / 3 เดือน / 6 เดือน / 1 ปี)" : "Please select warranty period (1/3/6/12 months)";
     }
 
     // If there are errors, show them and return

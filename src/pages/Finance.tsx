@@ -1,5 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import {
     Select,
     SelectContent,
@@ -8,20 +10,19 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiClient } from "@/lib/api";
 import {
     ArrowDownRight,
     ArrowUpRight,
     Calendar,
     DollarSign,
     Download,
+    Eye,
     TrendingDown,
     TrendingUp,
-    Eye,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     Area,
     AreaChart,
@@ -34,12 +35,11 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
-import { apiClient } from "@/lib/api";
 import * as XLSX from 'xlsx';
 
 const Finance = () => {
   const { t, language } = useLanguage();
-  const [timeRange, setTimeRange] = useState("6m");
+  const [timeRange, setTimeRange] = useState("1d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -113,7 +113,9 @@ const Finance = () => {
       try {
         // Determine which chart API to call based on timeRange
         let chartPromise;
-        if (timeRange === '1w') {
+        if (timeRange === '1d') {
+          chartPromise = apiClient.getDailyIncomeExpenses();
+        } else if (timeRange === '1w') {
           chartPromise = apiClient.getWeeklyIncomeExpenses();
         } else {
           chartPromise = apiClient.getIncomeExpensesChart(timeRange);
@@ -133,8 +135,8 @@ const Finance = () => {
 
         if (chartRes.status === "success" && chartRes.data) {
           let formattedChartData;
-          if (timeRange === '1w') {
-            // For weekly charts
+          if (timeRange === '1d' || timeRange === '1w') {
+            // For daily or weekly charts (same shape: name, nameEn, date?, income, expenses)
             formattedChartData = chartRes.data.map((d: any) => ({
               ...d,
               name: language === "th" ? d.name : (d.nameEn || d.name),
@@ -372,6 +374,7 @@ const Finance = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="1d">{t("daily")}</SelectItem>
                 <SelectItem value="1w">{t("weekly")}</SelectItem>
                 <SelectItem value="1m">{t("lastMonth")}</SelectItem>
                 <SelectItem value="3m">{t("last3Months")}</SelectItem>

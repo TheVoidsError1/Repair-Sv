@@ -16,11 +16,12 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const ALLOWED_WARRANTY_DAYS = [90, 180, 365] as const;
+const ALLOWED_WARRANTY_DAYS = [30, 90, 180, 365] as const;
 
 function formatWarrantyPeriod(warrantyDays: unknown, language: "th" | "en"): string {
   const wd = Number(warrantyDays);
   const normalized = ALLOWED_WARRANTY_DAYS.includes(wd as any) ? wd : 90;
+  if (normalized === 30) return language === "th" ? "1 เดือน" : "1 month";
   if (normalized === 90) return language === "th" ? "3 เดือน" : "3 months";
   if (normalized === 180) return language === "th" ? "6 เดือน" : "6 months";
   return language === "th" ? "1 ปี" : "1 year";

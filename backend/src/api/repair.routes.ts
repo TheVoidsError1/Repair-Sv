@@ -10,7 +10,7 @@ import { getLineNotificationService } from '../services/line-notification.servic
 
 const router = Router();
 
-const ALLOWED_WARRANTY_DAYS = [90, 180, 365] as const;
+const ALLOWED_WARRANTY_DAYS = [30, 90, 180, 365] as const;
 function isAllowedWarrantyDays(v: unknown): v is (typeof ALLOWED_WARRANTY_DAYS)[number] {
   const n = Number(v);
   return Number.isFinite(n) && Number.isInteger(n) && (ALLOWED_WARRANTY_DAYS as readonly number[]).includes(n);
@@ -383,7 +383,7 @@ router.post('/', async (req, res) => {
       if (!isAllowedWarrantyDays(warrantyDays)) {
         return res.status(400).json({
           status: 'error',
-          message: 'Invalid warrantyDays. Must be one of: 90, 180, 365',
+          message: 'Invalid warrantyDays. Must be one of: 30, 90, 180, 365',
         });
       }
     }
@@ -713,7 +713,7 @@ router.put('/:id', async (req, res) => {
       if (!isAllowedWarrantyDays(req.body.warrantyDays)) {
         return res.status(400).json({
           status: 'error',
-          message: 'Invalid warrantyDays. Must be one of: 90, 180, 365',
+          message: 'Invalid warrantyDays. Must be one of: 30, 90, 180, 365',
         });
       }
       req.body.warrantyDays = Number(req.body.warrantyDays);

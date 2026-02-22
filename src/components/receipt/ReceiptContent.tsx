@@ -2,18 +2,118 @@
  * View: ใบเสร็จรับเงิน (RECEIPT)
  * อ้างอิงรูปแบบและข้อมูลจากใบเสร็จรับเงินต้นแบบ 100%
  * เหมาะกับการพิมพ์ A4
+ * โหมดแก้ไข: รูปแบบเดิม แต่คลิกที่ส่วนใดก็แก้ไขได้แบบ Word (contenteditable)
  */
-import type { ReceiptData } from "@/lib/receipt";
+import type { ReceiptData, ReceiptLineItem } from "@/lib/receipt";
 import { formatReceiptNumber } from "@/lib/receipt";
+import { useCallback, useEffect, useRef } from "react";
 
 export interface ReceiptContentProps {
   data: ReceiptData;
+  /** โหมดแก้ไข: คลิกเลือกที่ส่วนใดก็แก้ไขได้เหมือน Word */
+  editable?: boolean;
+  /** callback เมื่อมีการแก้ไข (ใช้เมื่อ editable=true) */
+  onChange?: (updates: Partial<ReceiptData>) => void;
+}
+
+function parseNum(value: string): number {
+  const n = parseFloat(String(value).replace(/,/g, "").trim());
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/** ช่องที่คลิกแล้วแก้ไขได้ แบบ Word — ดูเหมือนข้อความธรรมดา */
+function EditableSpan({
+  value,
+  className,
+  editable,
+  onBlur,
+}: {
+  value: string;
+  className?: string;
+  editable?: boolean;
+  onBlur: (text: string) => void;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const handleBlur = useCallback(() => {
+    const text = ref.current?.innerText?.trim() ?? "";
+    onBlur(text);
+  }, [onBlur]);
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  }, []);
+  useEffect(() => {
+    if (editable && ref.current && document.activeElement !== ref.current) {
+      ref.current.innerText = value ?? "";
+    }
+  }, [editable, value]);
+  if (!editable) {
+    return <span className={className}>{value || "\u00A0"}</span>;
+  }
+  return (
+    <span
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      className={`${className ?? ""} receipt-editable min-h-[1.2em] outline-none focus:ring-1 focus:ring-inset focus:ring-gray-300 rounded cursor-text`}
+      onBlur={handleBlur}
+      onPaste={handlePaste}
+    />
+  );
+}
+
+/** ช่องตัวเลขในตาราง — คลิกแก้ไข แล้ว parse เป็น number ตอน blur */
+function EditableNumber({
+  value,
+  format,
+  className,
+  editable,
+  onBlur,
+  align = "left",
+}: {
+  value: number;
+  format: (n: number) => string;
+  className?: string;
+  editable?: boolean;
+  onBlur: (num: number) => void;
+  align?: "left" | "right" | "center";
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const handleBlur = useCallback(() => {
+    const raw = ref.current?.innerText?.replace(/,/g, "").trim() ?? "";
+    const num = parseNum(raw);
+    onBlur(num);
+  }, [onBlur]);
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault();
+    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+  }, []);
+  const display = value === 0 ? "" : format(value);
+  useEffect(() => {
+    if (editable && ref.current && document.activeElement !== ref.current) {
+      ref.current.innerText = display;
+    }
+  }, [editable, display]);
+  const alignClass = align === "right" ? "text-right" : align === "center" ? "text-center" : "";
+  if (!editable) {
+    return <span className={`${className ?? ""} ${alignClass}`}>{format(value)}</span>;
+  }
+  return (
+    <span
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      className={`${className ?? ""} ${alignClass} receipt-editable min-w-[2ch] outline-none focus:ring-1 focus:ring-inset focus:ring-gray-300 rounded cursor-text`}
+      onBlur={handleBlur}
+      onPaste={handlePaste}
+    />
+  );
 }
 
 /** จำนวนแถวว่างในตารางรายการ (ให้พอเขียนเพิ่ม) */
 const EMPTY_TABLE_ROWS = 7;
 
-export function ReceiptContent({ data }: ReceiptContentProps) {
+export function ReceiptContent({ data, editable, onChange }: ReceiptContentProps) {
   const {
     shop,
     receiptNo,
@@ -31,6 +131,22 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
   } = data;
 
   const displayNo = receiptNo !== "—" && !receiptNo.startsWith("No") ? `No${receiptNo}` : receiptNo;
+
+  const updateItem = (index: number, patch: Partial<ReceiptLineItem>) => {
+    if (!onChange) return;
+    const next = items.map((row, i): ReceiptLineItem => {
+      if (i !== index) return row;
+      const merged = { ...row, ...patch };
+      if (patch.quantity !== undefined || patch.unitPrice !== undefined) {
+        const q = patch.quantity ?? merged.quantity;
+        const u = patch.unitPrice ?? merged.unitPrice;
+        merged.amount = (typeof q === "number" ? q : 1) * (typeof u === "number" ? u : 0);
+      }
+      return merged;
+    });
+    const newSubtotal = next.reduce((sum, i) => sum + i.amount, 0);
+    onChange({ items: next, subtotal: newSubtotal, grandTotal: newSubtotal });
+  };
 
   return (
     <div className="receipt-document bg-white text-gray-900 p-6 max-w-[210mm] mx-auto shadow-sm print:shadow-none print:p-4 text-sm">
@@ -64,7 +180,17 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
         <div className="flex gap-6 flex-wrap">
           <div>
             <p className="text-[10px] text-gray-600">ชื่อลูกค้า</p>
-            <p className="font-medium">{customerName}</p>
+            {editable && onChange ? (
+              <p className="font-medium mt-0.5">
+                <EditableSpan
+                  value={customerName}
+                  editable
+                  onBlur={(v) => onChange({ customerName: v })}
+                />
+              </p>
+            ) : (
+              <p className="font-medium">{customerName}</p>
+            )}
           </div>
           {customerId ? (
             <div>
@@ -85,17 +211,45 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
         <div className="border-r border-gray-700 p-2">
           <p className="text-[10px] text-gray-600">ใบสั่งซื้อเลขที่</p>
           <p className="text-[10px] text-gray-500">PURCHASE ORDER NO.</p>
-          <p className="min-h-[1.2em] text-xs">{purchaseOrderNo || ""}</p>
+          {editable && onChange ? (
+            <p className="min-h-[1.2em] text-xs mt-0.5">
+              <EditableSpan
+                value={purchaseOrderNo || ""}
+                editable
+                onBlur={(v) => onChange({ purchaseOrderNo: v })}
+              />
+            </p>
+          ) : (
+            <p className="min-h-[1.2em] text-xs">{purchaseOrderNo || ""}</p>
+          )}
         </div>
         <div className="border-r border-gray-700 p-2">
           <p className="text-[10px] text-gray-600">ใบส่งของ/ใบแจ้งหนี้</p>
           <p className="text-[10px] text-gray-500">DELIVER ORDER NO.</p>
-          <p className="min-h-[1.2em] text-xs">{deliverOrderNo || ""}</p>
+          {editable && onChange ? (
+            <p className="min-h-[1.2em] text-xs mt-0.5">
+              <EditableSpan
+                value={deliverOrderNo || ""}
+                editable
+                onBlur={(v) => onChange({ deliverOrderNo: v })}
+              />
+            </p>
+          ) : (
+            <p className="min-h-[1.2em] text-xs">{deliverOrderNo || ""}</p>
+          )}
         </div>
         <div className="p-2">
           <p className="text-[10px] text-gray-600">ชื่อพนักงาน / ช่องเซ็นชื่อพนักงาน</p>
           <p className="text-[10px] text-gray-500">STAFF NAME / SIGNATURE</p>
-          {salesmanCode ? (
+          {editable && onChange ? (
+            <p className="min-h-[1.2em] text-xs font-medium mt-0.5">
+              <EditableSpan
+                value={salesmanCode || ""}
+                editable
+                onBlur={(v) => onChange({ salesmanCode: v })}
+              />
+            </p>
+          ) : salesmanCode ? (
             <p className="min-h-[1.2em] text-xs font-medium">{salesmanCode}</p>
           ) : (
             <div className="min-h-[1.8em] border-b border-gray-500 mt-0.5" />
@@ -124,11 +278,57 @@ export function ReceiptContent({ data }: ReceiptContentProps) {
         <tbody>
           {items.map((row, i) => (
             <tr key={i} className="border-b border-gray-500">
-              <td className="border border-gray-500 px-2 py-1.5">{row.itemCode || ""}</td>
-              <td className="border border-gray-500 px-2 py-1.5">{row.description}</td>
-              <td className="border border-gray-500 px-2 py-1.5 text-center">{row.quantity}</td>
-              <td className="border border-gray-500 px-2 py-1.5 text-right">{formatReceiptNumber(row.unitPrice)}</td>
-              <td className="border border-gray-500 px-2 py-1.5 text-right">{formatReceiptNumber(row.amount)}</td>
+              <td className="border border-gray-500 px-2 py-1.5">
+                {editable && onChange ? (
+                  <EditableSpan
+                    value={row.itemCode || ""}
+                    editable
+                    onBlur={(v) => updateItem(i, { itemCode: v })}
+                  />
+                ) : (
+                  row.itemCode || ""
+                )}
+              </td>
+              <td className="border border-gray-500 px-2 py-1.5">
+                {editable && onChange ? (
+                  <EditableSpan
+                    value={row.description}
+                    editable
+                    onBlur={(v) => updateItem(i, { description: v })}
+                  />
+                ) : (
+                  row.description
+                )}
+              </td>
+              <td className="border border-gray-500 px-2 py-1.5 text-center">
+                {editable && onChange ? (
+                  <EditableNumber
+                    value={row.quantity}
+                    format={(n) => String(n)}
+                    editable
+                    align="center"
+                    onBlur={(v) => updateItem(i, { quantity: v >= 1 ? v : 1 })}
+                  />
+                ) : (
+                  row.quantity
+                )}
+              </td>
+              <td className="border border-gray-500 px-2 py-1.5 text-right">
+                {editable && onChange ? (
+                  <EditableNumber
+                    value={row.unitPrice}
+                    format={formatReceiptNumber}
+                    editable
+                    align="right"
+                    onBlur={(v) => updateItem(i, { unitPrice: v })}
+                  />
+                ) : (
+                  formatReceiptNumber(row.unitPrice)
+                )}
+              </td>
+              <td className="border border-gray-500 px-2 py-1.5 text-right">
+                {formatReceiptNumber(row.amount)}
+              </td>
             </tr>
           ))}
           {Array.from({ length: EMPTY_TABLE_ROWS }).map((_, i) => (

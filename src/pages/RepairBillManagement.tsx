@@ -7,30 +7,30 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from "@/components/ui/command";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -774,6 +774,7 @@ const RepairBillManagement = () => {
                         value={editFormData.warrantyDays ?? 90}
                         onChange={(e) => setEditFormData({ ...editFormData, warrantyDays: Number(e.target.value) })}
                       >
+                        <option value={30}>{language === "th" ? "30 วัน (1 เดือน)" : "30 days (1 month)"}</option>
                         <option value={90}>{language === "th" ? "90 วัน (3 เดือน)" : "90 days"}</option>
                         <option value={180}>{language === "th" ? "180 วัน (6 เดือน)" : "180 days"}</option>
                         <option value={365}>{language === "th" ? "365 วัน (1 ปี)" : "365 days"}</option>

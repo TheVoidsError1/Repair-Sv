@@ -24,7 +24,7 @@ export interface RepairOrderData {
   service_type?: ServiceType;
   receive_date?: string;
   receive_time?: string;
-  /** จำนวนวันรับประกัน (จำกัดตามที่ระบบกำหนด เช่น 90/180/365) */
+  /** จำนวนวันรับประกัน (จำกัดตามที่ระบบกำหนด เช่น 30/90/180/365) */
   warrantyDays?: number;
   /** รหัสอะไหล่ที่เลือก (จาก parts table) */
   selectedPartId?: string;

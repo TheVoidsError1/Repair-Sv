@@ -9,6 +9,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
+import type { ReceiptData } from "@/lib/receipt";
 import { mapRepairOrderToReceiptData } from "@/lib/receipt";
 import type { RepairOrderData, ServiceType } from "@/types/repairOrder";
 import {
@@ -66,6 +67,8 @@ const RepairReceipt = () => {
   const [additionalParts, setAdditionalParts] = useState<Array<{ name: string; nameTh?: string; price: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingToLine, setIsSendingToLine] = useState(false);
+  /** ข้อมูลใบเสร็จที่แก้ไขได้ — sync จาก receiptData เมื่อโหลด/เปลี่ยนงานซ่อม */
+  const [editableReceipt, setEditableReceipt] = useState<ReceiptData | null>(null);
 
   // Load repair data from API if repairId is provided
   useEffect(() => {
@@ -254,6 +257,7 @@ const RepairReceipt = () => {
       box-shadow: none !important;
       padding: 0 !important;
     }
+    .receipt-editable { outline: none !important; box-shadow: none !important; }
   </style>
 </head>
 <body>
@@ -444,7 +448,8 @@ const RepairReceipt = () => {
       return;
     }
 
-    if (!receiptData) {
+    const dataToSave = displayReceiptData ?? receiptData;
+    if (!dataToSave) {
       toast({
         title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
         description: language === "th" ? "ไม่พบข้อมูลใบเสร็จ" : "Receipt data not found",
@@ -455,13 +460,12 @@ const RepairReceipt = () => {
 
     setIsSaving(true);
     try {
-      // คำนวณค่าใช้จ่ายจากใบเสร็จ
-      // partsCost = ราคาสินค้า (subtotal)
-      const partsCost = receiptData.subtotal;
+      // คำนวณค่าใช้จ่ายจากใบเสร็จ (ใช้ข้อมูลที่แก้ไขแล้วถ้ามี)
+      const partsCost = dataToSave.subtotal;
       // laborCost = ค่าแรง (ถ้าไม่มีให้ใช้ 0)
       const laborCost = 0; // ถ้าไม่มีค่าแรงแยก ให้ใช้ 0 หรือคำนวณจาก totalCost - partsCost
       // totalCost = ราคารวม (grandTotal)
-      const totalCost = receiptData.grandTotal;
+      const totalCost = dataToSave.grandTotal;
 
       // อัพเดท repair status เป็น completed และบันทึกข้อมูลบิล
       const updateData: any = {
@@ -555,6 +559,35 @@ const RepairReceipt = () => {
       })
     : null;
 
+  // Sync ข้อมูลที่แก้ไขได้จาก receiptData เมื่อเปิดใบเสร็จหรือเปลี่ยนงานซ่อม
+  useEffect(() => {
+    if (receiptData && dataFromNav?.repairId) {
+      setEditableReceipt((prev) => {
+        if (!prev || prev.receiptNo !== receiptData.receiptNo) {
+          return JSON.parse(JSON.stringify(receiptData));
+        }
+        return prev;
+      });
+    } else if (!receiptData) {
+      setEditableReceipt(null);
+    }
+  }, [dataFromNav?.repairId, receiptData?.receiptNo]);
+
+  const displayReceiptData = editableReceipt ?? receiptData;
+
+  const handleReceiptChange = (updates: Partial<ReceiptData>) => {
+    setEditableReceipt((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      if (updates.items) {
+        const subtotal = updates.items.reduce((sum, i) => sum + i.amount, 0);
+        next.subtotal = subtotal;
+        next.grandTotal = subtotal;
+      }
+      return next;
+    });
+  };
+
   if (!dataFromNav) {
     return (
       <MainLayout>
@@ -626,11 +659,17 @@ const RepairReceipt = () => {
         </div>
 
         <div className="receipt-print-wrapper hidden print:block">
-          {receiptData && <ReceiptContent data={receiptData} />}
+          {displayReceiptData && <ReceiptContent data={displayReceiptData} />}
         </div>
 
         <div ref={receiptRef} className="print:hidden flex flex-col w-full max-w-[210mm] mx-auto">
-          {receiptData && <ReceiptContent data={receiptData} />}
+          {displayReceiptData && (
+            <ReceiptContent
+              data={displayReceiptData}
+              editable
+              onChange={handleReceiptChange}
+            />
+          )}
         </div>
         <p className="print:hidden text-center text-sm text-muted-foreground mt-4">
           {language === "th"

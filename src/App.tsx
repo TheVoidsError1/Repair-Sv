@@ -35,7 +35,6 @@ import RichMenu from "./pages/RichMenu";
 import Settings from "./pages/Settings";
 import SystemManagement from "./pages/SystemManagement";
 import Warranty from "./pages/Warranty";
-import WarrantyManage from "./pages/WarrantyManage";
 
 const queryClient = new QueryClient();
 
@@ -103,7 +102,6 @@ const App = () => (
                     <Route path="/repairs/bill/customer" element={<ProtectedRoute><CustomerBills /></ProtectedRoute>} />
                     <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
                     <Route path="/warranty" element={<ProtectedRoute><Warranty /></ProtectedRoute>} />
-                    <Route path="/warranty/manage" element={<RoleProtectedRoute><WarrantyManage /></RoleProtectedRoute>} />
                     <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
                     <Route path="/customers/:id" element={<ProtectedRoute><CustomerDetails /></ProtectedRoute>} />
                     <Route path="/finance" element={<RoleProtectedRoute><Finance /></RoleProtectedRoute>} />

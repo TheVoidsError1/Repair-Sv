@@ -1,9 +1,9 @@
 import { Router } from 'express';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/data-source.js';
-import { Repair, RepairStatus } from '../entities/Repair.js';
 import { Part } from '../entities/Part.js';
+import { Repair, RepairStatus } from '../entities/Repair.js';
 import { Transaction } from '../entities/Transaction.js';
-import { Between, In } from 'typeorm';
 
 const router = Router();
 
@@ -14,7 +14,8 @@ function getDateRange(timeRange: string): { startDate: Date; endDate: Date } {
 
   switch (timeRange) {
     case '1d':
-      startDate.setDate(endDate.getDate() - 1);
+      // รายวัน = วันนี้ตั้งแต่ 00:00 ถึงปัจจุบัน
+      startDate.setHours(0, 0, 0, 0);
       break;
     case '1w':
       startDate.setDate(endDate.getDate() - 7);
