@@ -10,7 +10,6 @@ import { WarrantyProvider } from "@/contexts/WarrantyContext";
 import { canAccessRoute } from "@/lib/roleConfig";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import AccountManagement from "./pages/AccountManagement";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import CustomerBills from "./pages/CustomerBills";
 import CustomerDetails from "./pages/CustomerDetails";
@@ -23,9 +22,7 @@ import Inventory from "./pages/Inventory";
 import LineManagement from "./pages/LineManagement";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import Register from "./pages/Register";
 import RepairBillManagement from "./pages/RepairBillManagement";
-import RepairItemsManagement from "./pages/RepairItemsManagement";
 import RepairMenu from "./pages/RepairMenu";
 import RepairNew from "./pages/RepairNew";
 import RepairOrderBill from "./pages/RepairOrderBill";
@@ -111,9 +108,6 @@ const App = () => (
                     <Route path="/system/line/richmenu" element={<RoleProtectedRoute><RichMenu /></RoleProtectedRoute>} />
                     <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
                     <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
-                    <Route path="/system/register" element={<RoleProtectedRoute><Register /></RoleProtectedRoute>} />
-                    <Route path="/system/account" element={<RoleProtectedRoute><AccountManagement /></RoleProtectedRoute>} />
-                    <Route path="/system/repair-items" element={<RoleProtectedRoute><RepairItemsManagement /></RoleProtectedRoute>} />
                     <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />

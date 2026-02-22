@@ -1,15 +1,16 @@
-import { Link } from "react-router-dom";
-import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs } from "@/contexts/RepairsContext";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 
 const statusStyles: Record<string, string> = {
   pending: "status-pending",
   "in-progress": "status-in-progress",
   completed: "status-completed",
   cancelled: "status-cancelled",
+  "picked-up": "status-completed",
 };
 
 export function RecentRepairs() {
@@ -21,6 +22,7 @@ export function RecentRepairs() {
     "in-progress": t("inProgress"),
     completed: t("completed"),
     cancelled: t("cancelled"),
+    "picked-up": t("pickedUp"),
   };
 
   // เรียงลำดับตามวันที่สร้าง (ล่าสุดก่อน) และจำกัด 5 รายการ

@@ -3,36 +3,52 @@
  * ให้พนักงานสามารถดู แก้ไข และพิมพ์ใบแจ้งซ่อมได้
  */
 import { MainLayout } from "@/components/layout/MainLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRepairs, type RepairItem } from "@/contexts/RepairsContext";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +59,8 @@ import { ArrowLeft, Edit, Eye, FileText, Plus, Receipt, Search, Trash2, X } from
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const PAGE_SIZE_OPTIONS = [1, 5, 10] as const;
+
 const RepairBillManagement = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
@@ -52,7 +70,7 @@ const RepairBillManagement = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const ITEMS_PER_PAGE = 10;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(5);
 
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -67,6 +85,11 @@ const RepairBillManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [partsList, setPartsList] = useState<any[]>([]);
   const [isLoadingParts, setIsLoadingParts] = useState(false);
+
+  // Delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingRepair, setDeletingRepair] = useState<RepairItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Filter repairs by search query
   const filteredRepairs = repairs.filter((repair) => {
@@ -83,10 +106,15 @@ const RepairBillManagement = () => {
   });
   
   // Calculate pagination
-  const totalPages = Math.ceil(filteredRepairs.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const totalPages = Math.max(1, Math.ceil(filteredRepairs.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
   const paginatedRepairs = filteredRepairs.slice(startIndex, endIndex);
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setCurrentPage(1);
+  };
 
   const handleViewBill = (item: RepairItem) => {
     const orderData = repairItemToBillData(item, language);
@@ -114,6 +142,29 @@ const RepairBillManagement = () => {
         returnTo: "/repairs/bill/management", // กลับไปที่จัดการใบแจ้งซ่อม
       } 
     });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingRepair) return;
+    setIsDeleting(true);
+    try {
+      await apiClient.deleteRepair(deletingRepair.id);
+      await refreshRepairs();
+      setDeleteDialogOpen(false);
+      setDeletingRepair(null);
+      toast({
+        title: language === "th" ? "ลบใบแจ้งซ่อมแล้ว" : "Repair bill deleted",
+        description: language === "th" ? `ลบ ${deletingRepair.id} เรียบร้อย` : `${deletingRepair.id} has been deleted.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: language === "th" ? "เกิดข้อผิดพลาด" : "Error",
+        description: err?.message || (language === "th" ? "ลบใบแจ้งซ่อมไม่สำเร็จ" : "Failed to delete repair bill"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const formatDateForInput = (d: Date | string | undefined) => {
@@ -462,12 +513,6 @@ const RepairBillManagement = () => {
                 : "View, edit, and print all repair bills."}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/repairs")} className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              {language === "th" ? "กลับ" : "Back"}
-            </Button>
-          </div>
         </div>
 
         <Card>
@@ -521,7 +566,7 @@ const RepairBillManagement = () => {
                         <th className="text-center p-3 font-medium">
                           {language === "th" ? "สถานะ" : "Status"}
                         </th>
-                        <th className="text-center p-3 font-medium w-48">
+                        <th className="text-center p-3 font-medium w-[10rem]">
                           {language === "th" ? "จัดการ" : "Actions"}
                         </th>
                       </tr>
@@ -569,34 +614,76 @@ const RepairBillManagement = () => {
                             </span>
                           </td>
                           <td className="p-3">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1"
-                                onClick={() => handleViewBill(item)}
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                                {language === "th" ? "ดูใบแจ้งซ่อม" : "View Bill"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1"
-                                onClick={() => handleViewReceipt(item)}
-                              >
-                                <Receipt className="w-3.5 h-3.5" />
-                                {language === "th" ? "ดูใบเสร็จ" : "View Receipt"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1"
-                                onClick={() => handleEditBill(item)}
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                                {language === "th" ? "แก้ไข" : "Edit"}
-                              </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8"
+                                      onClick={() => handleViewBill(item)}
+                                      aria-label={language === "th" ? "ดูใบแจ้งซ่อม" : "View Bill"}
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    {language === "th" ? "ดูใบแจ้งซ่อม" : "View Bill"}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8"
+                                      onClick={() => handleViewReceipt(item)}
+                                      aria-label={language === "th" ? "ดูใบเสร็จ" : "View Receipt"}
+                                    >
+                                      <Receipt className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    {language === "th" ? "ดูใบเสร็จ" : "View Receipt"}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8"
+                                      onClick={() => handleEditBill(item)}
+                                      aria-label={language === "th" ? "แก้ไข" : "Edit"}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    {language === "th" ? "แก้ไข" : "Edit"}
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      onClick={() => {
+                                        setDeletingRepair(item);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      aria-label={language === "th" ? "ลบ" : "Delete"}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    {language === "th" ? "ลบ" : "Delete"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           </td>
                         </tr>
@@ -604,57 +691,76 @@ const RepairBillManagement = () => {
                     </tbody>
                   </table>
                 </div>
-                {/* Pagination */}
-                {filteredRepairs.length > 0 && totalPages > 1 && (
-                  <div className="border-t border-border p-4">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={() => {
-                              if (currentPage > 1) {
-                                setCurrentPage(currentPage - 1);
+                {/* Footer: รายการต่อหน้า + สรุป + Pagination */}
+                {filteredRepairs.length > 0 && (
+                  <div className="border-t border-border p-4 mt-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                          {language === "th" ? "แสดง" : "Show"}
+                        </span>
+                        <select
+                          value={itemsPerPage}
+                          onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                          className="h-8 w-14 rounded-md border border-input bg-transparent px-2 text-sm"
+                        >
+                          {PAGE_SIZE_OPTIONS.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm text-muted-foreground whitespace-nowrap">
+                          {language === "th" ? "รายการต่อหน้า" : "per page"}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {language === "th"
+                          ? `แสดง ${startIndex + 1}-${Math.min(endIndex, filteredRepairs.length)} จาก ${filteredRepairs.length} รายการ`
+                          : `Showing ${startIndex + 1}-${Math.min(endIndex, filteredRepairs.length)} of ${filteredRepairs.length} items`}
+                      </div>
+                    </div>
+                    {totalPages > 1 && (
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => {
+                                if (currentPage > 1) setCurrentPage(currentPage - 1);
+                              }}
+                              className={
+                                currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
                               }
-                            }}
-                            className={
-                              currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
-                            }
-                          />
-                        </PaginationItem>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => setCurrentPage(page)}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
+                            />
                           </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={() => {
-                              if (currentPage < totalPages) {
-                                setCurrentPage(currentPage + 1);
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          ))}
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => {
+                                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                              }}
+                              className={
+                                currentPage === totalPages
+                                  ? "pointer-events-none opacity-50"
+                                  : "cursor-pointer"
                               }
-                            }}
-                            className={
-                              currentPage === totalPages
-                                ? "pointer-events-none opacity-50"
-                                : "cursor-pointer"
-                            }
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    )}
                   </div>
                 )}
-                <div className="text-sm text-muted-foreground text-center mt-4">
-                  {language === "th"
-                    ? `แสดง ${startIndex + 1}-${Math.min(endIndex, filteredRepairs.length)} จาก ${filteredRepairs.length} รายการ`
-                    : `Showing ${startIndex + 1}-${Math.min(endIndex, filteredRepairs.length)} of ${filteredRepairs.length} items`}
-                </div>
               </>
             )}
           </CardContent>
@@ -1168,6 +1274,37 @@ const RepairBillManagement = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {language === "th" ? "ลบใบแจ้งซ่อม" : "Delete repair bill"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {language === "th"
+                  ? `คุณแน่ใจหรือไม่ว่าต้องการลบใบแจ้งซ่อม ${deletingRepair?.id}? การกระทำนี้ไม่สามารถยกเลิกได้`
+                  : `Are you sure you want to delete repair bill ${deletingRepair?.id}? This action cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>
+                {language === "th" ? "ยกเลิก" : "Cancel"}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleConfirmDelete();
+                }}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (language === "th" ? "กำลังลบ..." : "Deleting...") : language === "th" ? "ลบ" : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

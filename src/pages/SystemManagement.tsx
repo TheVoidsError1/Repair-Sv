@@ -1,58 +1,14 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Link } from "react-router-dom";
-import { Home, UserCog, UserPlus, Wrench, Users, MessageSquare, Network, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArrowRight, MessageSquare, UserCircle, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const SystemManagement = () => {
   const { language } = useLanguage();
   const isTh = language === "th";
 
   const menuItems = [
-    {
-      id: "home",
-      titleTh: "เริ่มต้น",
-      titleEn: "Home",
-      descriptionTh: "กลับไปหน้าแดชบอร์ดหลัก",
-      descriptionEn: "Go back to main dashboard",
-      icon: Home,
-      path: "/dashboard",
-      iconBg: "bg-primary/10",
-      iconColor: "text-primary",
-    },
-    {
-      id: "account",
-      titleTh: "จัดการบัญชี",
-      titleEn: "Account Management",
-      descriptionTh: "จัดการข้อมูลบัญชีผู้ใช้",
-      descriptionEn: "Manage user account information",
-      icon: UserCog,
-      path: "/system/account",
-      iconBg: "bg-status-pending/10",
-      iconColor: "text-status-pending",
-    },
-    {
-      id: "register",
-      titleTh: "สมัครสมาชิก",
-      titleEn: "Register",
-      descriptionTh: "สมัครสมาชิกใหม่",
-      descriptionEn: "Register new account",
-      icon: UserPlus,
-      path: "/system/register",
-      iconBg: "bg-status-completed/10",
-      iconColor: "text-status-completed",
-    },
-    {
-      id: "repair-items",
-      titleTh: "จัดการรายการซ่อม",
-      titleEn: "Repair Items Management",
-      descriptionTh: "จัดการ แก้ไข และลบรายการซ่อม",
-      descriptionEn: "Manage, edit, and delete repair items",
-      icon: Wrench,
-      path: "/system/repair-items",
-      iconBg: "bg-blue-500/10",
-      iconColor: "text-blue-500",
-    },
     {
       id: "users",
       titleTh: "จัดการผู้ใช้",
@@ -61,8 +17,12 @@ const SystemManagement = () => {
       descriptionEn: "Manage user information in the system",
       icon: Users,
       path: "/admin/users",
-      iconBg: "bg-purple-500/10",
-      iconColor: "text-purple-500",
+      gradient: "from-violet-500 to-purple-600",
+      iconBg: "bg-white/20",
+      iconColor: "text-white",
+      cardBorder: "hover:border-violet-400/50",
+      cardShadow: "hover:shadow-[0_12px_40px_-8px_rgba(139,92,246,0.25)]",
+      accent: "bg-violet-500",
     },
     {
       id: "line",
@@ -72,19 +32,12 @@ const SystemManagement = () => {
       descriptionEn: "Manage LINE Official Account",
       icon: MessageSquare,
       path: "/system/line",
-      iconBg: "bg-green-500/10",
-      iconColor: "text-green-500",
-    },
-    {
-      id: "network",
-      titleTh: "Network",
-      titleEn: "Network",
-      descriptionTh: "จัดการ Network และ ngrok",
-      descriptionEn: "Manage Network and ngrok",
-      icon: Network,
-      path: "/system/network",
-      iconBg: "bg-orange-500/10",
-      iconColor: "text-orange-500",
+      gradient: "from-emerald-500 to-green-600",
+      iconBg: "bg-white/20",
+      iconColor: "text-white",
+      cardBorder: "hover:border-emerald-400/50",
+      cardShadow: "hover:shadow-[0_12px_40px_-8px_rgba(16,185,129,0.25)]",
+      accent: "bg-emerald-500",
     },
     {
       id: "customers",
@@ -94,8 +47,12 @@ const SystemManagement = () => {
       descriptionEn: "View and search all customer information",
       icon: UserCircle,
       path: "/system/customers",
-      iconBg: "bg-cyan-500/10",
-      iconColor: "text-cyan-500",
+      gradient: "from-cyan-500 to-teal-600",
+      iconBg: "bg-white/20",
+      iconColor: "text-white",
+      cardBorder: "hover:border-cyan-400/50",
+      cardShadow: "hover:shadow-[0_12px_40px_-8px_rgba(6,182,212,0.25)]",
+      accent: "bg-cyan-500",
     },
   ];
 
@@ -119,23 +76,46 @@ const SystemManagement = () => {
             <Link
               key={item.id}
               to={item.path}
-              className="stat-card flex flex-col gap-4 p-6 hover:border-primary/40 transition-all hover:shadow-md"
+              className={cn(
+                "group relative flex flex-col overflow-hidden rounded-2xl border-2 border-border/60 bg-card p-6",
+                "transition-all duration-300 ease-out hover:scale-[1.02] hover:border-opacity-100",
+                "hover:shadow-xl",
+                item.cardBorder,
+                item.cardShadow
+              )}
             >
-              <div className="flex items-start justify-between">
+              {/* Gradient strip at top */}
+              <div
+                className={cn(
+                  "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r",
+                  item.gradient
+                )}
+              />
+              <div className="flex items-start justify-between gap-4">
                 <span
                   className={cn(
-                    "flex items-center justify-center w-14 h-14 rounded-xl flex-shrink-0",
-                    item.iconBg
+                    "flex items-center justify-center w-14 h-14 rounded-2xl flex-shrink-0 transition-transform duration-300 group-hover:scale-110",
+                    "bg-gradient-to-br",
+                    item.gradient
                   )}
                 >
                   <Icon className={cn("w-7 h-7", item.iconColor)} />
                 </span>
+                <span
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0",
+                    item.accent,
+                    item.iconColor
+                  )}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </span>
               </div>
-              <div className="space-y-1">
-                <h3 className="font-semibold text-lg text-foreground">
+              <div className="mt-2 space-y-1.5">
+                <h3 className="font-bold text-lg tracking-tight text-foreground">
                   {isTh ? item.titleTh : item.titleEn}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {isTh ? item.descriptionTh : item.descriptionEn}
                 </p>
               </div>
