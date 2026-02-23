@@ -268,19 +268,6 @@ const Settings = () => {
               </Button>
             </div>
           </div>
-
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              {t("twoFactorAuth")}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              {t("addExtraLayerSecurity")}
-            </p>
-            <Button variant="outline" className="gap-2">
-              <Shield className="w-4 h-4" />
-              {t("enable2FA")}
-            </Button>
-          </div>
         </TabsContent>
       </Tabs>
     </MainLayout>

@@ -31,7 +31,6 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
-  Webhook,
   Copy,
   ExternalLink,
   Link,
@@ -59,13 +58,6 @@ interface CustomerWithLine {
   lineIdRes?: string;
 }
 
-interface RecentWebhookEvent {
-  timestamp: string;
-  type: string;
-  userId: string;
-  message?: string;
-}
-
 const LineManagement = () => {
   const { t, language } = useLanguage();
   const [lineStatus, setLineStatus] = useState<LineStatus>({
@@ -82,10 +74,6 @@ const LineManagement = () => {
       ? "🔔 ทดสอบระบบแจ้งเตือน\n\nหากคุณเห็นข้อความนี้ แสดงว่าระบบทำงานปกติ! ✅"
       : "🔔 Test Notification\n\nIf you see this message, the system is working correctly! ✅"
   );
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [isCopied, setIsCopied] = useState(false);
-  const [recentEvents, setRecentEvents] = useState<RecentWebhookEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(false);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [selectedLineUserId, setSelectedLineUserId] = useState("");
@@ -267,18 +255,6 @@ const LineManagement = () => {
     }
   };
 
-  // คัดลอก Webhook URL
-  const copyWebhookUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
-    setIsCopied(true);
-    toast.success(
-      language === "th"
-        ? "คัดลอก Webhook URL แล้ว!"
-        : "Webhook URL copied!"
-    );
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
   // คัดลอก User ID
   const copyUserId = (userId: string) => {
     navigator.clipboard.writeText(userId);
@@ -290,21 +266,6 @@ const LineManagement = () => {
         duration: 3000,
       }
     );
-  };
-
-  // โหลด Recent Webhook Events
-  const loadRecentEvents = async () => {
-    setLoadingEvents(true);
-    try {
-      const response = await apiClient.getRecentWebhookEvents();
-      if (response.status === "success" && response.data) {
-        setRecentEvents(response.data);
-      }
-    } catch (error) {
-      console.error("Error loading recent events:", error);
-    } finally {
-      setLoadingEvents(false);
-    }
   };
 
   // เชื่อมโยง LINE User ID กับลูกค้า
@@ -338,7 +299,6 @@ const LineManagement = () => {
         setSelectedCustomerId("");
         setSelectedLineUserId("");
         loadCustomers(); // Refresh customer list
-        loadRecentEvents(); // Refresh events
       } else {
         toast.error(
           response.message ||
@@ -375,15 +335,9 @@ const LineManagement = () => {
     }
   };
 
-  // เปิด ngrok Web Interface
-  const openNgrokInterface = () => {
-    window.open("http://127.0.0.1:4040", "_blank");
-  };
-
   useEffect(() => {
     checkLineStatus();
     loadCustomers();
-    loadRecentEvents();
   }, []);
 
   // กรองลูกค้าตามคำค้นหา
@@ -418,7 +372,6 @@ const LineManagement = () => {
             onClick={() => {
               checkLineStatus();
               loadCustomers();
-              loadRecentEvents();
             }}
             className="gap-2"
           >
@@ -429,17 +382,11 @@ const LineManagement = () => {
       </div>
 
       <Tabs defaultValue="status" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[800px]">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
           <TabsTrigger value="status" className="gap-2">
             <Smartphone className="w-4 h-4" />
             <span className="hidden sm:inline">
               {language === "th" ? "สถานะ" : "Status"}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="webhook" className="gap-2">
-            <Webhook className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {language === "th" ? "Webhook" : "Webhook"}
             </span>
           </TabsTrigger>
           <TabsTrigger value="test" className="gap-2">
@@ -590,332 +537,6 @@ const LineManagement = () => {
           </div>
         </TabsContent>
 
-        {/* Webhook Tab */}
-        <TabsContent value="webhook" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-              <Webhook className="w-5 h-5" />
-              {language === "th"
-                ? "ตั้งค่า Webhook URL"
-                : "Webhook URL Configuration"}
-            </h3>
-
-            <div className="space-y-6">
-              {/* คำแนะนำ */}
-              <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">
-                  💡 {language === "th" ? "Webhook URL คืออะไร?" : "What is Webhook URL?"}
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  {language === "th"
-                    ? "Webhook URL คือ URL ที่ LINE Official Account จะส่ง events (เช่น follow, message) มาที่ backend server ของคุณ เพื่อให้ระบบสามารถบันทึก LINE User ID และเชื่อมโยงกับลูกค้าในฐานข้อมูลอัตโนมัติ"
-                    : "Webhook URL is the URL that LINE Official Account will send events (such as follow, message) to your backend server, allowing the system to automatically save LINE User IDs and link them to customers in the database."}
-                </p>
-              </div>
-
-              {/* Backend Endpoint */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">
-                    {language === "th" ? "Backend Endpoint" : "Backend Endpoint"}
-                  </Label>
-                  <span className="text-xs text-muted-foreground">
-                    {language === "th" ? "ไม่ต้องเปลี่ยน" : "Do not change"}
-                  </span>
-                </div>
-                <div className="relative">
-                  <Input
-                    readOnly
-                    value="/api/line/webhook"
-                    className="font-mono text-sm bg-muted"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {language === "th"
-                    ? "Endpoint นี้มีอยู่แล้วในระบบ ไม่ต้องสร้างใหม่"
-                    : "This endpoint already exists in the system, no need to create a new one"}
-                </p>
-              </div>
-
-              {/* Development (ngrok) */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">
-                  {language === "th"
-                    ? "🔧 Development (ทดสอบ) - ใช้ ngrok"
-                    : "🔧 Development (Testing) - Use ngrok"}
-                </Label>
-                
-                <div className="p-4 rounded-lg bg-muted/50 space-y-3">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-muted-foreground">
-                      <p className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">
-                        {language === "th"
-                          ? "localhost ใช้ไม่ได้! LINE ต้องการ public URL"
-                          : "localhost won't work! LINE requires a public URL"}
-                      </p>
-                      <p>
-                        {language === "th"
-                          ? "ใช้ ngrok เพื่อเปิด localhost ให้ LINE เข้าถึงได้"
-                          : "Use ngrok to expose localhost to LINE"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold">
-                      {language === "th" ? "ขั้นตอน:" : "Steps:"}
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground ml-2">
-                      <li>{language === "th" ? "ติดตั้ง ngrok จาก" : "Install ngrok from"} <a href="https://ngrok.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">ngrok.com</a></li>
-                      <li>{language === "th" ? "รัน backend server:" : "Run backend server:"} <code className="bg-muted px-1 py-0.5 rounded text-xs">npm run dev</code></li>
-                      <li>{language === "th" ? "รัน ngrok:" : "Run ngrok:"} <code className="bg-muted px-1 py-0.5 rounded text-xs">ngrok http 3001</code></li>
-                      <li>{language === "th" ? "คัดลอก URL ที่ได้ (เช่น" : "Copy the URL (e.g."} <span className="font-mono">https://abc123.ngrok-free.app</span>)</li>
-                    </ol>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={openNgrokInterface}
-                      className="gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {language === "th" ? "เปิด ngrok Web UI" : "Open ngrok Web UI"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ngrok-url" className="text-sm">
-                    {language === "th"
-                      ? "ngrok URL (ใส่ URL ที่ได้จาก ngrok)"
-                      : "ngrok URL (Paste URL from ngrok)"}
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="ngrok-url"
-                      placeholder="https://abc123.ngrok-free.app"
-                      value={webhookUrl}
-                      onChange={(e) => setWebhookUrl(e.target.value)}
-                      className="font-mono text-sm"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        if (webhookUrl) {
-                          copyWebhookUrl(`${webhookUrl}/api/line/webhook`);
-                        } else {
-                          toast.error(
-                            language === "th"
-                              ? "กรุณาใส่ ngrok URL ก่อน"
-                              : "Please enter ngrok URL first"
-                          );
-                        }
-                      }}
-                      disabled={!webhookUrl}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  {webhookUrl && (
-                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
-                        ✅ {language === "th" ? "Webhook URL ที่ใช้:" : "Webhook URL to use:"}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs bg-green-500/20 px-2 py-1 rounded flex-1 break-all">
-                          {webhookUrl}/api/line/webhook
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyWebhookUrl(`${webhookUrl}/api/line/webhook`)}
-                          className="flex-shrink-0"
-                        >
-                          {isCopied ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Production */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">
-                  {language === "th"
-                    ? "🚀 Production (ใช้งานจริง)"
-                    : "🚀 Production (Live)"}
-                </Label>
-                
-                <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    {language === "th"
-                      ? "สำหรับ Production ต้องใช้ domain จริงที่มี HTTPS:"
-                      : "For Production, you need a real domain with HTTPS:"}
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground ml-2">
-                    <li><code className="bg-muted px-1 py-0.5 rounded">https://your-domain.com/api/line/webhook</code></li>
-                    <li><code className="bg-muted px-1 py-0.5 rounded">https://api.your-domain.com/api/line/webhook</code></li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Recent Webhook Events */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">
-                    {language === "th"
-                      ? "📨 Webhook Events ล่าสุด (10 รายการ)"
-                      : "📨 Recent Webhook Events (Last 10)"}
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={loadRecentEvents}
-                    disabled={loadingEvents}
-                    className="gap-2"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${loadingEvents ? 'animate-spin' : ''}`} />
-                    {language === "th" ? "รีเฟรช" : "Refresh"}
-                  </Button>
-                </div>
-
-                {loadingEvents ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : recentEvents.length === 0 ? (
-                  <div className="p-4 rounded-lg bg-muted/50 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      {language === "th"
-                        ? "ยังไม่มี Webhook Events (ลองส่งข้อความมาหา LINE OA)"
-                        : "No Webhook Events yet (Try sending a message to LINE OA)"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recentEvents.map((event, index) => {
-                      const eventTime = new Date(event.timestamp);
-                      const timeAgo = Math.floor((Date.now() - eventTime.getTime()) / 1000);
-                      let timeDisplay = '';
-                      if (timeAgo < 60) {
-                        timeDisplay = `${timeAgo} ${language === "th" ? "วินาทีที่แล้ว" : "seconds ago"}`;
-                      } else if (timeAgo < 3600) {
-                        timeDisplay = `${Math.floor(timeAgo / 60)} ${language === "th" ? "นาทีที่แล้ว" : "minutes ago"}`;
-                      } else {
-                        timeDisplay = eventTime.toLocaleString(language === "th" ? "th-TH" : "en-US");
-                      }
-
-                      return (
-                        <div
-                          key={index}
-                          className="p-3 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-semibold text-muted-foreground">
-                                  {event.type === 'message' ? '💬' : event.type === 'follow' ? '➕' : '❌'} {event.type}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {timeDisplay}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <code className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-1 rounded font-mono break-all">
-                                  {event.userId}
-                                </code>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyUserId(event.userId)}
-                                  className="h-6 w-6 p-0 flex-shrink-0"
-                                  title={language === "th" ? "คัดลอก User ID" : "Copy User ID"}
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openLinkDialog(event.userId)}
-                                  className="h-6 px-2 flex-shrink-0 gap-1"
-                                  title={language === "th" ? "เชื่อมโยงกับลูกค้า" : "Link to Customer"}
-                                  disabled={linkingUserId === event.userId}
-                                >
-                                  {linkingUserId === event.userId ? (
-                                    <RefreshCw className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Link className="w-3 h-3" />
-                                      <span className="text-xs">{language === "th" ? "เชื่อมโยง" : "Link"}</span>
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                              {event.message && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                                  "{event.message}"
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    💡 <strong>{language === "th" ? "วิธีใช้:" : "How to use:"}</strong>{" "}
-                    {language === "th"
-                      ? "คัดลอก LINE User ID จากด้านบน แล้วไปวางในแท็บ 'ทดสอบ' เพื่อส่งข้อความ"
-                      : "Copy LINE User ID from above and paste it in 'Test' tab to send a message"}
-                  </p>
-                </div>
-              </div>
-
-              {/* ขั้นตอนต่อไป */}
-              <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 mb-2">
-                  📝 {language === "th" ? "ขั้นตอนต่อไป:" : "Next Steps:"}
-                </p>
-                <ol className="list-decimal list-inside space-y-1 text-xs text-yellow-600 dark:text-yellow-400 ml-2">
-                  <li>
-                    {language === "th"
-                      ? "ไปที่ LINE Developers Console: "
-                      : "Go to LINE Developers Console: "}
-                    <a
-                      href="https://developers.line.biz/console/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:no-underline"
-                    >
-                      developers.line.biz/console
-                    </a>
-                  </li>
-                  <li>{language === "th" ? "เลือก Provider → Messaging API Channel" : "Select Provider → Messaging API Channel"}</li>
-                  <li>{language === "th" ? "ไปที่แท็บ 'Messaging API'" : "Go to 'Messaging API' tab"}</li>
-                  <li>{language === "th" ? "หาส่วน 'Webhook settings'" : "Find 'Webhook settings' section"}</li>
-                  <li>{language === "th" ? "วาง Webhook URL (ข้างบน) และคลิก 'Verify'" : "Paste Webhook URL (above) and click 'Verify'"}</li>
-                  <li>{language === "th" ? "เปิดใช้งาน Webhook และเลือก events (follow, message, unfollow)" : "Enable Webhook and select events (follow, message, unfollow)"}</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
         {/* Test Tab */}
         <TabsContent value="test" className="space-y-6">
           <div className="bg-card rounded-xl border border-border p-6">
@@ -1007,10 +628,8 @@ const LineManagement = () => {
                       </ol>
                     </div>
                     <div className="pt-2 border-t border-blue-500/20">
-                      <strong className="text-sm">วิธีที่ 3: ใช้ Webhook (อัตโนมัติ)</strong>
+                      <strong className="text-sm">วิธีที่ 3: ดูจากฐานข้อมูล</strong>
                       <p className="ml-2 mt-1">
-                        เมื่อลูกค้า Add Friend หรือส่งข้อความมา ระบบจะบันทึก LINE User ID อัตโนมัติ
-                        <br />
                         ดูได้ในแท็บ <strong>"ลูกค้า"</strong> ด้านล่าง
                       </p>
                     </div>
