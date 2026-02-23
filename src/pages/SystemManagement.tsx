@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
-import { ArrowRight, MessageSquare, UserCircle, Users } from "lucide-react";
+import { ArrowRight, FileText, MessageSquare, UserCircle, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const SystemManagement = () => {
@@ -38,6 +38,21 @@ const SystemManagement = () => {
       cardBorder: "hover:border-emerald-400/50",
       cardShadow: "hover:shadow-[0_12px_40px_-8px_rgba(16,185,129,0.25)]",
       accent: "bg-emerald-500",
+    },
+    {
+      id: "line-templates",
+      titleTh: "Template ข้อความ LINE",
+      titleEn: "LINE Message Templates",
+      descriptionTh: "จัดการเทมเพลตข้อความแจ้งเตือนสถานะการซ่อม",
+      descriptionEn: "Manage repair status notification message templates",
+      icon: FileText,
+      path: "/system/line/templates",
+      gradient: "from-blue-500 to-indigo-600",
+      iconBg: "bg-white/20",
+      iconColor: "text-white",
+      cardBorder: "hover:border-blue-400/50",
+      cardShadow: "hover:shadow-[0_12px_40px_-8px_rgba(59,130,246,0.25)]",
+      accent: "bg-blue-500",
     },
     {
       id: "customers",

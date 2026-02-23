@@ -53,6 +53,9 @@ async function handleCheckStatus(
       'pending': '⏳ รอดำเนินการ',
       'in-progress': '🔧 กำลังซ่อม',
       'waiting_parts': '⏸️ รออะไหล่',
+      'completed': '✅ ซ่อมเสร็จแล้ว',
+      'cancelled': '❌ ยกเลิกแล้ว',
+      'picked-up': '📦 รับเครื่องแล้ว',
     };
     const statusLabel = statusLabels[latestActiveRepair.status] || latestActiveRepair.status;
 
