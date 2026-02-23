@@ -125,13 +125,6 @@ const SystemManagement = () => {
                 !isDisabled && item.cardShadow
               )}
             >
-              {/* Gradient strip at top */}
-              <div
-                className={cn(
-                  "absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r",
-                  item.gradient
-                )}
-              />
               <div className="flex items-start justify-between gap-4">
                 <span
                   className={cn(
