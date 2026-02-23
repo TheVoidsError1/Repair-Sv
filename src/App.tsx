@@ -31,6 +31,7 @@ import Repairs from "./pages/Repairs";
 import RichMenu from "./pages/RichMenu";
 import Settings from "./pages/Settings";
 import SystemManagement from "./pages/SystemManagement";
+import LineTemplates from "./pages/LineTemplates";
 import Warranty from "./pages/Warranty";
 
 const queryClient = new QueryClient();
@@ -106,6 +107,7 @@ const App = () => (
                     <Route path="/admin/users" element={<RoleProtectedRoute><AdminUsers /></RoleProtectedRoute>} />
                     <Route path="/system/line" element={<RoleProtectedRoute><LineManagement /></RoleProtectedRoute>} />
                     <Route path="/system/line/richmenu" element={<RoleProtectedRoute><RichMenu /></RoleProtectedRoute>} />
+                    <Route path="/system/line/templates" element={<RoleProtectedRoute><LineTemplates /></RoleProtectedRoute>} />
                     <Route path="/admin" element={<RoleProtectedRoute><Navigate to="/system" replace /></RoleProtectedRoute>} />
                     <Route path="/system" element={<RoleProtectedRoute><SystemManagement /></RoleProtectedRoute>} />
                     <Route path="/system/customers" element={<RoleProtectedRoute><CustomerManagement /></RoleProtectedRoute>} />
