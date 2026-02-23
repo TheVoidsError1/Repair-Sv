@@ -24,8 +24,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-    Area,
-    AreaChart,
+    Bar,
+    BarChart,
     CartesianGrid,
     Cell,
     Pie,
@@ -540,17 +540,7 @@ const Finance = () => {
           <div className="h-[300px]">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+                <BarChart data={chartData} barCategoryGap="20%" barGap={8}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 32%, 91%)" />
                 <XAxis
                   dataKey="name"
@@ -589,25 +579,19 @@ const Finance = () => {
                   }}
                   labelFormatter={(label) => label}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="income"
-                  stroke="hsl(142, 71%, 45%)"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorIncome)"
+                  fill="hsl(142, 71%, 45%)"
+                  radius={[4, 4, 0, 0]}
                   name={t("income")}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="expenses"
-                  stroke="hsl(0, 84%, 60%)"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorExpenses)"
+                  fill="hsl(0, 84%, 60%)"
+                  radius={[4, 4, 0, 0]}
                   name={t("expenses")}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">

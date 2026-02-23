@@ -2,6 +2,14 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -11,55 +19,64 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/runtimeConfig";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   ArrowLeft,
   Battery,
+  Box,
   CheckCircle,
   ChevronsUpDown,
   Edit,
-  Filter,
-  Grid3x3,
-  Image as ImageIcon,
-  LayoutList,
   Layers,
   Package,
   Plus,
   PlusCircle,
   Search,
+  Settings2,
   Smartphone,
   Trash2,
   Upload,
   Usb,
   X,
-  XCircle,
+  XCircle
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { apiClient } from "@/lib/api";
-import { getApiBaseUrl } from "@/lib/runtimeConfig";
+
+const CATEGORY_ICON_MAP: Record<CategoryIconName, React.ComponentType<{ className?: string }>> = {
+  Layers,
+  Smartphone,
+  Battery,
+  Usb,
+  Package,
+  Box,
+};
+
+const CATEGORY_COLOR_CLASSES: Record<CategoryColorName, { bg: string; text: string }> = {
+  green: { bg: "bg-green-500/10 group-hover:bg-green-500/20", text: "text-green-500" },
+  blue: { bg: "bg-blue-500/10 group-hover:bg-blue-500/20", text: "text-blue-500" },
+  yellow: { bg: "bg-yellow-500/10 group-hover:bg-yellow-500/20", text: "text-yellow-500" },
+  purple: { bg: "bg-purple-500/10 group-hover:bg-purple-500/20", text: "text-purple-500" },
+  cyan: { bg: "bg-cyan-500/10 group-hover:bg-cyan-500/20", text: "text-cyan-500" },
+  gray: { bg: "bg-gray-500/10 group-hover:bg-gray-500/20", text: "text-gray-500" },
+  orange: { bg: "bg-orange-500/10 group-hover:bg-orange-500/20", text: "text-orange-500" },
+};
 
 // Component for displaying part image in table cell
 const PartImageCell = ({ imageUrl, alt }: { imageUrl?: string; alt: string }) => {
@@ -126,8 +143,49 @@ function getPartType(category: string): "screen" | "battery" | "others" {
   return "others";
 }
 
-const categoriesEn = ["All", "Screens", "Batteries", "Ports", "Glass", "Others"];
-const categoriesTh = ["ทั้งหมด", "หน้าจอ", "แบตเตอรี่", "พอร์ต", "กระจก", "อื่นๆ"];
+/** ชนิดไอคอนที่ใช้กับการ์ดหมวดหมู่ */
+const CATEGORY_ICONS = ["Layers", "Smartphone", "Battery", "Usb", "Package", "Box"] as const;
+/** สีที่ใช้กับการ์ดหมวดหมู่ (prefix สำหรับ bg-xxx-500/10 และ text-xxx-500) */
+const CATEGORY_COLORS = ["green", "blue", "yellow", "purple", "cyan", "gray", "orange"] as const;
+
+export type CategoryIconName = (typeof CATEGORY_ICONS)[number];
+export type CategoryColorName = (typeof CATEGORY_COLORS)[number];
+
+export interface CustomCategory {
+  id: string;
+  nameEn: string;
+  nameTh: string;
+  icon: CategoryIconName;
+  color: CategoryColorName;
+}
+
+const INVENTORY_CATEGORIES_KEY = "inventory-categories";
+
+/** หมวดหมู่เดียว - เก็บใน localStorage ได้ทั้งหมด (เพิ่ม/แก้ไข/ลบได้) */
+const DEFAULT_CATEGORIES_SEED: CustomCategory[] = [
+  { id: "all", nameEn: "All", nameTh: "ทั้งหมด", icon: "Layers", color: "green" },
+  { id: "screen", nameEn: "Screens", nameTh: "หน้าจอ", icon: "Smartphone", color: "blue" },
+  { id: "battery", nameEn: "Batteries", nameTh: "แบตเตอรี่", icon: "Battery", color: "yellow" },
+  { id: "port", nameEn: "Ports", nameTh: "พอร์ต", icon: "Usb", color: "purple" },
+  { id: "glass", nameEn: "Glass", nameTh: "กระจก", icon: "Package", color: "cyan" },
+  { id: "others", nameEn: "Others", nameTh: "อื่นๆ", icon: "Box", color: "gray" },
+];
+
+function loadCategories(): CustomCategory[] {
+  try {
+    const raw = localStorage.getItem(INVENTORY_CATEGORIES_KEY);
+    if (!raw) return [...DEFAULT_CATEGORIES_SEED];
+    const parsed = JSON.parse(raw) as CustomCategory[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [...DEFAULT_CATEGORIES_SEED];
+    return parsed;
+  } catch {
+    return [...DEFAULT_CATEGORIES_SEED];
+  }
+}
+
+function saveCategories(list: CustomCategory[]) {
+  localStorage.setItem(INVENTORY_CATEGORIES_KEY, JSON.stringify(list));
+}
 
 // Type for Part from API (backend format)
 interface PartFromAPI {
@@ -209,9 +267,18 @@ const Inventory = () => {
   const [parts, setParts] = useState<PartFrontend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "screen" | "battery" | "port" | "glass" | "others">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  
+  const [categories, setCategories] = useState<CustomCategory[]>(() => loadCategories());
+  const [isCategoryManageOpen, setIsCategoryManageOpen] = useState(false);
+  const [categoryForm, setCategoryForm] = useState<{ nameEn: string; nameTh: string; icon: CategoryIconName; color: CategoryColorName }>({
+    nameEn: "",
+    nameTh: "",
+    icon: "Box",
+    color: "gray",
+  });
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+
   // Get category from URL parameter
   const categoryParam = searchParams.get("category");
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
@@ -219,7 +286,7 @@ const Inventory = () => {
   const [stockToAdd, setStockToAdd] = useState<string>("");
   const [partSearchOpen, setPartSearchOpen] = useState(false);
   const [partSearchQuery, setPartSearchQuery] = useState("");
-  const [selectedCategoryForStock, setSelectedCategoryForStock] = useState<"all" | "screen" | "battery" | "port" | "glass" | "others">("all");
+  const [selectedCategoryForStock, setSelectedCategoryForStock] = useState<string>("all");
   const stockInputRef = useRef<HTMLInputElement>(null);
   /** รหัสอะไหล่ที่กำลังแก้ไข (null = โหมดเพิ่มใหม่) */
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
@@ -275,11 +342,20 @@ const Inventory = () => {
   // Update filter when category parameter changes
   useEffect(() => {
     if (categoryParam) {
-      setTypeFilter(categoryParam as typeof typeFilter);
+      setTypeFilter(categoryParam);
     } else {
       setTypeFilter("all");
     }
   }, [categoryParam]);
+
+  // รายการหมวดหมู่ (จาก localStorage - เพิ่ม/แก้ไข/ลบได้ทั้งหมด)
+  const allCategoryItems = categories.map((c) => ({
+    slug: c.id,
+    nameEn: c.nameEn,
+    nameTh: c.nameTh,
+    icon: c.icon,
+    color: c.color,
+  }));
 
   // Refresh parts when page becomes visible (user returns to this page)
   useEffect(() => {
@@ -312,71 +388,28 @@ const Inventory = () => {
       part.displayId.toLowerCase().includes(search) ||
       searchCategory.includes(search);
 
-    // Handle category filtering
+    // กรองตามหมวดหมู่ (เทียบจากชื่อหมวดหมู่ nameEn / nameTh)
     if (typeFilter === "all") {
       return matchesSearch;
     }
-    
-    if (typeFilter === "port") {
-      const cat = (part.category || "").toLowerCase();
-      const catTh = (part.categoryTh || "").toLowerCase();
-      return matchesSearch && (cat.includes("port") || catTh.includes("พอร์ต"));
-    }
-    
-    if (typeFilter === "glass") {
-      const cat = (part.category || "").toLowerCase();
-      const catTh = (part.categoryTh || "").toLowerCase();
-      return matchesSearch && (cat.includes("glass") || catTh.includes("กระจก"));
-    }
-    
-    if (typeFilter === "others") {
-      // Others: ไม่ใช่ screen, battery, port, หรือ glass
-      const partType = getPartType(part.category);
-      const cat = (part.category || "").toLowerCase();
-      const catTh = (part.categoryTh || "").toLowerCase();
-      const isPort = cat.includes("port") || catTh.includes("พอร์ต");
-      const isGlass = cat.includes("glass") || catTh.includes("กระจก");
-      const isScreen = partType === "screen";
-      const isBattery = partType === "battery";
-      
-      return matchesSearch && !isScreen && !isBattery && !isPort && !isGlass;
-    }
-    
-    const partType = getPartType(part.category);
-    const matchesType = typeFilter === partType;
-
-    return matchesSearch && matchesType;
+    const cat = categories.find((c) => c.id === typeFilter);
+    if (!cat) return matchesSearch;
+    const matchCat =
+      (part.category || "").trim() === cat.nameEn ||
+      (part.categoryTh || "").trim() === cat.nameTh;
+    return matchesSearch && matchCat;
   });
 
-  // Count parts by category for grid view
-  const getCategoryCount = (categoryType: "screen" | "battery" | "port" | "glass" | "others") => {
-    return parts.filter((part) => {
-      if (categoryType === "port") {
-        // Check if category contains "port" or "พอร์ต"
-        const cat = (part.category || "").toLowerCase();
-        const catTh = (part.categoryTh || "").toLowerCase();
-        return cat.includes("port") || catTh.includes("พอร์ต");
-      }
-      if (categoryType === "glass") {
-        // Check if category contains "glass" or "กระจก"
-        const cat = (part.category || "").toLowerCase();
-        const catTh = (part.categoryTh || "").toLowerCase();
-        return cat.includes("glass") || catTh.includes("กระจก");
-      }
-      const partType = getPartType(part.category);
-      if (categoryType === "others") {
-        // Others: ไม่ใช่ screen, battery, port, หรือ glass
-        const cat = (part.category || "").toLowerCase();
-        const catTh = (part.categoryTh || "").toLowerCase();
-        const isPort = cat.includes("port") || catTh.includes("พอร์ต");
-        const isGlass = cat.includes("glass") || catTh.includes("กระจก");
-        const isScreen = partType === "screen";
-        const isBattery = partType === "battery";
-        
-        return !isScreen && !isBattery && !isPort && !isGlass;
-      }
-      return partType === categoryType;
-    }).length;
+  // นับจำนวนอะไหล่ตามหมวดหมู่ (เทียบจากชื่อ nameEn / nameTh)
+  const getCategoryCountBySlug = (categoryId: string): number => {
+    if (categoryId === "all") return parts.length;
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return 0;
+    return parts.filter(
+      (p) =>
+        (p.category || "").trim() === cat.nameEn ||
+        (p.categoryTh || "").trim() === cat.nameTh
+    ).length;
   };
 
   useEffect(() => {
@@ -389,16 +422,12 @@ const Inventory = () => {
       setImageRemoved(false);
       const catParam = searchParams.get("cat");
       if (catParam) {
-        const idxEn = categoriesEn.indexOf(catParam);
-        const idxTh = categoriesTh.indexOf(catParam);
-        const idx = idxEn !== -1 ? idxEn : idxTh;
-        if (idx > 0) {
-          const catEn = categoriesEn[idx];
-          const catTh = categoriesTh[idx];
+        const item = allCategoryItems.find((c) => c.slug === catParam || c.nameEn === catParam || c.nameTh === catParam);
+        if (item && item.slug !== "all") {
           setNewPart((prev) => ({
             ...prev,
-            category: catEn,
-            categoryTh: catTh,
+            category: item.nameEn,
+            categoryTh: item.nameTh,
           }));
         }
       }
@@ -410,7 +439,7 @@ const Inventory = () => {
       setExistingImageUrl(null);
       setImageRemoved(false);
     }
-  }, [searchParams]);
+  }, [searchParams, categories]);
 
   const openEditDialog = (part: PartFrontend) => {
     setEditingPartId(part.id);
@@ -456,18 +485,14 @@ const Inventory = () => {
   };
 
   const handleCategorySelect = (value: string) => {
-    const idxEn = categoriesEn.indexOf(value);
-    const idxTh = categoriesTh.indexOf(value);
-    let idx = idxEn !== -1 ? idxEn : idxTh;
-    if (idx <= 0) {
+    const item = allCategoryItems.find((c) => c.slug === value || c.nameEn === value || c.nameTh === value);
+    if (!item || item.slug === "all") {
       handleNewPartChange("category", "");
       handleNewPartChange("categoryTh", "");
       return;
     }
-    const catEn = categoriesEn[idx];
-    const catTh = categoriesTh[idx];
-    handleNewPartChange("category", catEn);
-    handleNewPartChange("categoryTh", catTh);
+    handleNewPartChange("category", item.nameEn);
+    handleNewPartChange("categoryTh", item.nameTh);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -837,7 +862,7 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* ค้นหา + กรองประเภท (แสดงเฉพาะเมื่ออยู่ในหน้าประเภทสินค้า) */}
+      {/* ค้นหา + กลับ (แสดงเมื่ออยู่ในหน้าหมวดหมู่) */}
       {categoryParam && (
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <Button
@@ -922,16 +947,11 @@ const Inventory = () => {
                     <SelectValue placeholder={t("selectCategory")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {categoriesEn.slice(1).map((catEn, index) => {
-                      const idx = index + 1;
-                      const catTh = categoriesTh[idx] || catEn;
-                      const label = language === "th" ? catTh : catEn;
-                      return (
-                        <SelectItem key={catEn} value={catEn}>
-                          {label}
-                        </SelectItem>
-                      );
-                    })}
+                    {allCategoryItems.filter((c) => c.slug !== "all").map((c) => (
+                      <SelectItem key={c.slug} value={c.nameEn}>
+                        {language === "th" ? c.nameTh : c.nameEn}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1084,8 +1104,8 @@ const Inventory = () => {
               <Select
                 value={selectedCategoryForStock}
                 onValueChange={(value) => {
-                  setSelectedCategoryForStock(value as typeof selectedCategoryForStock);
-                  setSelectedPartForStock(""); // Reset selected part when category changes
+                  setSelectedCategoryForStock(value);
+                  setSelectedPartForStock("");
                   setPartSearchQuery("");
                 }}
               >
@@ -1093,24 +1113,11 @@ const Inventory = () => {
                   <SelectValue placeholder={language === "th" ? "เลือกหมวดหมู่" : "Select Category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">
-                    {language === "th" ? "ทั้งหมด" : "All"}
-                  </SelectItem>
-                  <SelectItem value="screen">
-                    {language === "th" ? "หน้าจอ" : "Screens"}
-                  </SelectItem>
-                  <SelectItem value="battery">
-                    {language === "th" ? "แบตเตอรี่" : "Batteries"}
-                  </SelectItem>
-                  <SelectItem value="port">
-                    {language === "th" ? "พอร์ต" : "Ports"}
-                  </SelectItem>
-                  <SelectItem value="glass">
-                    {language === "th" ? "กระจก" : "Glass"}
-                  </SelectItem>
-                  <SelectItem value="others">
-                    {language === "th" ? "อื่นๆ" : "Others"}
-                  </SelectItem>
+                  {allCategoryItems.map((c) => (
+                    <SelectItem key={c.slug} value={c.slug}>
+                      {language === "th" ? c.nameTh : c.nameEn}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1176,39 +1183,16 @@ const Inventory = () => {
                       </CommandEmpty>
                       <CommandGroup>
                         {(() => {
-                          // Filter parts by selected category
+                          // Filter parts by selected category (match by category nameEn/nameTh)
                           let filteredPartsByCategory = parts;
-                          
                           if (selectedCategoryForStock !== "all") {
-                            if (selectedCategoryForStock === "port") {
-                              filteredPartsByCategory = parts.filter((part) => {
-                                const cat = (part.category || "").toLowerCase();
-                                const catTh = (part.categoryTh || "").toLowerCase();
-                                return cat.includes("port") || catTh.includes("พอร์ต");
-                              });
-                            } else if (selectedCategoryForStock === "glass") {
-                              filteredPartsByCategory = parts.filter((part) => {
-                                const cat = (part.category || "").toLowerCase();
-                                const catTh = (part.categoryTh || "").toLowerCase();
-                                return cat.includes("glass") || catTh.includes("กระจก");
-                              });
-                            } else if (selectedCategoryForStock === "others") {
-                              filteredPartsByCategory = parts.filter((part) => {
-                                const partType = getPartType(part.category);
-                                const cat = (part.category || "").toLowerCase();
-                                const catTh = (part.categoryTh || "").toLowerCase();
-                                const isPort = cat.includes("port") || catTh.includes("พอร์ต");
-                                const isGlass = cat.includes("glass") || catTh.includes("กระจก");
-                                const isScreen = partType === "screen";
-                                const isBattery = partType === "battery";
-                                return !isScreen && !isBattery && !isPort && !isGlass;
-                              });
-                            } else {
-                              const partType = getPartType(selectedCategoryForStock);
-                              filteredPartsByCategory = parts.filter((part) => {
-                                const type = getPartType(part.category);
-                                return type === partType;
-                              });
+                            const cat = categories.find((c) => c.id === selectedCategoryForStock);
+                            if (cat) {
+                              filteredPartsByCategory = parts.filter(
+                                (p) =>
+                                  (p.category || "").trim() === cat.nameEn ||
+                                  (p.categoryTh || "").trim() === cat.nameTh
+                              );
                             }
                           }
 
@@ -1441,132 +1425,263 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog จัดการหมวดหมู่ - เพิ่ม/แก้ไข/ลบ ได้ทั้งหมด (ยกเว้น "ทั้งหมด" ลบไม่ได้) */}
+      <Dialog open={isCategoryManageOpen} onOpenChange={setIsCategoryManageOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{language === "th" ? "จัดการหมวดหมู่" : "Manage Categories"}</DialogTitle>
+            <DialogDescription>
+              {language === "th"
+                ? "คุณสามารถเพิ่ม แก้ไข หรือลบหมวดหมู่ประเภทสินค้าได้ (หมวด \"ทั้งหมด\" ใช้แสดงสินค้าทั้งหมด ลบไม่ได้)"
+                : "You can add, edit or delete product categories. The \"All\" category cannot be deleted."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>{language === "th" ? "รายการหมวดหมู่" : "Categories"}</Label>
+              <ul className="space-y-2 max-h-48 overflow-y-auto rounded-lg border border-border p-2">
+                {categories.map((c) => {
+                  const IconC = CATEGORY_ICON_MAP[c.icon];
+                  const cc = CATEGORY_COLOR_CLASSES[c.color];
+                  const isAll = c.id === "all";
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn("flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg", cc.bg)}>
+                          <IconC className={cn("h-4 w-4", cc.text)} />
+                        </span>
+                        <span className="truncate font-medium">{language === "th" ? c.nameTh : c.nameEn}</span>
+                        {isAll && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            ({language === "th" ? "ลบไม่ได้" : "cannot delete"})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setEditingCategoryId(c.id);
+                            setCategoryForm({ nameEn: c.nameEn, nameTh: c.nameTh, icon: c.icon, color: c.color });
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          disabled={isAll}
+                          onClick={() => {
+                            if (c.id === "all") return;
+                            const next = categories.filter((x) => x.id !== c.id);
+                            setCategories(next);
+                            saveCategories(next);
+                            if (editingCategoryId === c.id) {
+                              setEditingCategoryId(null);
+                              setCategoryForm({ nameEn: "", nameTh: "", icon: "Box", color: "gray" });
+                            }
+                            toast({
+                              title: language === "th" ? "ลบหมวดหมู่แล้ว" : "Category removed",
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>{editingCategoryId ? (language === "th" ? "แก้ไขหมวดหมู่" : "Edit category") : (language === "th" ? "เพิ่มหมวดหมู่ใหม่" : "Add new category")}</Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="cat-name-th" className="text-xs">{language === "th" ? "ชื่อ (ไทย)" : "Name (Thai)"}</Label>
+                  <Input
+                    id="cat-name-th"
+                    placeholder={language === "th" ? "เช่น สายชาร์จ" : "e.g. Charger cable"}
+                    value={categoryForm.nameTh}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, nameTh: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cat-name-en" className="text-xs">{language === "th" ? "ชื่อ (อังกฤษ)" : "Name (English)"}</Label>
+                  <Input
+                    id="cat-name-en"
+                    placeholder={language === "th" ? "เช่น Charger cable" : "e.g. Charger cable"}
+                    value={categoryForm.nameEn}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, nameEn: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-xs">{language === "th" ? "ไอคอน" : "Icon"}</Label>
+                  <Select
+                    value={categoryForm.icon}
+                    onValueChange={(v) => setCategoryForm((p) => ({ ...p, icon: v as CategoryIconName }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_ICONS.map((icon) => {
+                        const IconC = CATEGORY_ICON_MAP[icon];
+                        return (
+                          <SelectItem key={icon} value={icon}>
+                            <span className="flex items-center gap-2">
+                              <IconC className="h-4 w-4" />
+                              {icon}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">{language === "th" ? "สี" : "Color"}</Label>
+                  <Select
+                    value={categoryForm.color}
+                    onValueChange={(v) => setCategoryForm((p) => ({ ...p, color: v as CategoryColorName }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_COLORS.map((color) => (
+                        <SelectItem key={color} value={color}>
+                          <span className="flex items-center gap-2">
+                            <span className={cn("h-4 w-4 rounded-full", CATEGORY_COLOR_CLASSES[color].bg)} />
+                            {color}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const nameTh = categoryForm.nameTh.trim();
+                    const nameEn = categoryForm.nameEn.trim();
+                    if (!nameTh || !nameEn) {
+                      toast({
+                        title: language === "th" ? "กรุณากรอกชื่อทั้งสองภาษา" : "Please enter names in both languages",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    if (editingCategoryId) {
+                      const next = categories.map((c) =>
+                        c.id === editingCategoryId
+                          ? { ...c, nameEn, nameTh, icon: categoryForm.icon, color: categoryForm.color }
+                          : c
+                      );
+                      setCategories(next);
+                      saveCategories(next);
+                      setEditingCategoryId(null);
+                      setCategoryForm({ nameEn: "", nameTh: "", icon: "Box", color: "gray" });
+                      toast({ title: language === "th" ? "บันทึกการแก้ไขแล้ว" : "Saved" });
+                    } else {
+                      const newCat: CustomCategory = {
+                        id: crypto.randomUUID(),
+                        nameEn,
+                        nameTh,
+                        icon: categoryForm.icon,
+                        color: categoryForm.color,
+                      };
+                      const next = [...categories, newCat];
+                      setCategories(next);
+                      saveCategories(next);
+                      setCategoryForm({ nameEn: "", nameTh: "", icon: "Box", color: "gray" });
+                      toast({ title: language === "th" ? "เพิ่มหมวดหมู่แล้ว" : "Category added" });
+                    }
+                  }}
+                >
+                  {editingCategoryId ? (language === "th" ? "บันทึกการแก้ไข" : "Save changes") : (language === "th" ? "เพิ่มหมวดหมู่" : "Add category")}
+                </Button>
+                {editingCategoryId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingCategoryId(null);
+                      setCategoryForm({ nameEn: "", nameTh: "", icon: "Box", color: "gray" });
+                    }}
+                  >
+                    {language === "th" ? "ยกเลิก" : "Cancel"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* แสดงการ์ดหมวดหมู่ หรือ ตารางอะไหล่ */}
       {!categoryParam ? (
-        <>
-          {/* แสดงการ์ดหมวดหมู่เมื่อไม่มี category parameter - Responsive */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
           {isLoading ? (
             <div className="col-span-full py-12 text-center text-sm text-muted-foreground">
               {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading..."}
             </div>
           ) : (
             <>
-              {/* อะไหล่ทั้งหมด (All) */}
+              {allCategoryItems.map((cat) => {
+                const IconComponent = CATEGORY_ICON_MAP[cat.icon];
+                const colorClasses = CATEGORY_COLOR_CLASSES[cat.color];
+                const isActive = categoryParam === cat.slug;
+                return (
+                  <Card
+                    key={cat.slug}
+                    className={cn(
+                      "cursor-pointer transition-all group",
+                      isActive ? "border-primary ring-2 ring-primary/20 shadow-md" : "hover:border-primary/50 hover:shadow-md"
+                    )}
+                    onClick={() => navigate(`/inventory?category=${cat.slug}`)}
+                  >
+                    <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
+                      <div className={cn("p-4 rounded-xl transition-colors", colorClasses.bg)}>
+                        <IconComponent className={cn("h-8 w-8", colorClasses.text)} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {language === "th" ? cat.nameTh : cat.nameEn}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {getCategoryCountBySlug(cat.slug)} {language === "th" ? "รายการ" : "items"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
               <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=all")}
+                className="cursor-pointer border-dashed border-2 border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30 transition-all group"
+                onClick={() => setIsCategoryManageOpen(true)}
               >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                    <Layers className="h-8 w-8 text-green-500" />
+                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3 min-h-[140px]">
+                  <div className="p-4 rounded-xl bg-muted group-hover:bg-primary/10 transition-colors">
+                    <Settings2 className="h-8 w-8 text-muted-foreground group-hover:text-primary" />
                   </div>
                   <div>
                     <p className="font-semibold text-foreground">
-                      {language === "th" ? "ทั้งหมด" : "All Parts"}
+                      {language === "th" ? "จัดการหมวดหมู่" : "Manage Categories"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {parts.length} {language === "th" ? "รายการ" : "items"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* หน้าจอ (Screens) */}
-              <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=screen")}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-                    <Smartphone className="h-8 w-8 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {language === "th" ? "หน้าจอ" : "Screens"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getCategoryCount("screen")} {language === "th" ? "รายการ" : "items"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* แบตเตอรี่ (Batteries) */}
-              <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=battery")}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
-                    <Battery className="h-8 w-8 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {language === "th" ? "แบตเตอรี่" : "Batteries"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getCategoryCount("battery")} {language === "th" ? "รายการ" : "items"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* พอร์ต (Ports) */}
-              <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=port")}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-                    <Usb className="h-8 w-8 text-purple-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {language === "th" ? "พอร์ต" : "Ports"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getCategoryCount("port")} {language === "th" ? "รายการ" : "items"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* กระจก (Glass) */}
-              <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=glass")}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-cyan-500/10 group-hover:bg-cyan-500/20 transition-colors">
-                    <Package className="h-8 w-8 text-cyan-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {language === "th" ? "กระจก" : "Glass"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getCategoryCount("glass")} {language === "th" ? "รายการ" : "items"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* อื่นๆ (Others) */}
-              <Card
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-                onClick={() => navigate("/inventory?category=others")}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="p-4 rounded-xl bg-gray-500/10 group-hover:bg-gray-500/20 transition-colors">
-                    <Package className="h-8 w-8 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {language === "th" ? "อื่นๆ" : "Others"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {getCategoryCount("others")} {language === "th" ? "รายการ" : "items"}
+                      {language === "th" ? "เพิ่มหรือแก้ไขหมวดหมู่" : "Add or edit categories"}
                     </p>
                   </div>
                 </CardContent>
@@ -1574,11 +1689,8 @@ const Inventory = () => {
             </>
           )}
         </div>
-        </>
       ) : (
-        <>
-          {/* แสดงตารางอะไหล่เมื่อมี category parameter - Desktop & Mobile */}
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto">
             <table className="data-table">
@@ -1824,11 +1936,10 @@ const Inventory = () => {
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
+            })
+          )}
         </div>
-        </>
+      </div>
       )}
     </MainLayout>
   );
