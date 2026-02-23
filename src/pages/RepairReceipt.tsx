@@ -73,32 +73,6 @@ const RepairReceipt = () => {
   // Load repair data from API if repairId is provided
   useEffect(() => {
     const loadRepairData = async () => {
-      // ถ้ามี selectedParts ใน dataFromNav (จาก RepairBill ที่ส่งมา) ให้ใช้เลย
-      if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
-        setSelectedParts(dataFromNav.selectedParts as any);
-      }
-
-      // ถ้ามี additionalParts ใน dataFromNav ให้ใช้เลย (รองรับทั้ง array และ JSON string)
-      if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
-        const raw = dataFromNav.additionalParts;
-        const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
-        setAdditionalParts(Array.isArray(arr) ? arr : []);
-      }
-
-      // ถ้ามี selectedPart ใน dataFromNav (backward compatibility) ให้ใช้เลย
-      if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
-        setSelectedPart(dataFromNav.selectedPart as any);
-        // ถ้ามี selectedParts หรือ additionalParts แล้วไม่ต้อง return
-        if (!dataFromNav.selectedParts && !dataFromNav.additionalParts) {
-          return;
-        }
-      }
-
-      // ถ้ามีข้อมูลครบแล้วไม่ต้องโหลดจาก API
-      if (dataFromNav && (dataFromNav.selectedParts || dataFromNav.additionalParts || dataFromNav.selectedPart)) {
-        return;
-      }
-
       // ถ้าไม่มี repairId แต่มี selectedPartId ใน dataFromNav ให้ดึง part จาก API
       if (!dataFromNav?.repairId && dataFromNav?.selectedPartId) {
         try {
@@ -118,8 +92,23 @@ const RepairReceipt = () => {
         return;
       }
       
-      if (!dataFromNav?.repairId) return;
+      if (!dataFromNav?.repairId) {
+        // ถ้าไม่มี repairId แต่มีข้อมูลอะไหล่ใน dataFromNav ให้ใช้ข้อมูลนั้น
+        if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
+          setSelectedParts(dataFromNav.selectedParts as any);
+        }
+        if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+          const raw = dataFromNav.additionalParts;
+          const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+          setAdditionalParts(Array.isArray(arr) ? arr : []);
+        }
+        if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
+          setSelectedPart(dataFromNav.selectedPart as any);
+        }
+        return;
+      }
       
+      // ถ้ามี repairId ให้โหลดข้อมูลอะไหล่จาก API เสมอเพื่อให้ได้ข้อมูลล่าสุด
       try {
         // ดึงข้อมูล repairs ทั้งหมดและหา repair ที่ตรงกับ repairId (อาจเป็น repairNumber หรือ UUID)
         const response = await apiClient.getRepairs();
@@ -145,23 +134,65 @@ const RepairReceipt = () => {
                 nameTh: repair.selectedPart.nameTh || repair.selectedPart.name,
                 price: repair.selectedPart.price,
               });
+            } else {
+              // ถ้าไม่มี selectedParts ใน API แต่มีใน dataFromNav ให้ใช้ข้อมูลจาก dataFromNav
+              if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
+                setSelectedParts(dataFromNav.selectedParts as any);
+              } else if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
+                setSelectedPart(dataFromNav.selectedPart as any);
+              }
             }
 
             // โหลด additionalParts (ถ้ามี) — รองรับทั้ง array และ JSON string จาก API
             if (repair.additionalParts != null) {
               const raw = repair.additionalParts;
               const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
-              if (Array.isArray(arr) && arr.length > 0) setAdditionalParts(arr);
+              if (Array.isArray(arr) && arr.length > 0) {
+                setAdditionalParts(arr);
+              } else if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+                // ถ้าไม่มีใน API แต่มีใน dataFromNav ให้ใช้ข้อมูลจาก dataFromNav
+                const raw = dataFromNav.additionalParts;
+                const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+                setAdditionalParts(Array.isArray(arr) ? arr : []);
+              }
+            } else if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+              // ถ้าไม่มีใน API แต่มีใน dataFromNav ให้ใช้ข้อมูลจาก dataFromNav
+              const raw = dataFromNav.additionalParts;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+              setAdditionalParts(Array.isArray(arr) ? arr : []);
+            }
+          } else {
+            // ถ้าไม่พบ repair ใน API แต่มีข้อมูลใน dataFromNav ให้ใช้ข้อมูลจาก dataFromNav
+            if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
+              setSelectedParts(dataFromNav.selectedParts as any);
+            } else if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
+              setSelectedPart(dataFromNav.selectedPart as any);
+            }
+            if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+              const raw = dataFromNav.additionalParts;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+              setAdditionalParts(Array.isArray(arr) ? arr : []);
             }
           }
         }
       } catch (error) {
         console.error('Error loading repair data:', error);
+        // ถ้าโหลดจาก API ไม่ได้ แต่มีข้อมูลใน dataFromNav ให้ใช้ข้อมูลจาก dataFromNav
+        if (dataFromNav && 'selectedParts' in dataFromNav && dataFromNav.selectedParts) {
+          setSelectedParts(dataFromNav.selectedParts as any);
+        } else if (dataFromNav && 'selectedPart' in dataFromNav && dataFromNav.selectedPart) {
+          setSelectedPart(dataFromNav.selectedPart as any);
+        }
+        if (dataFromNav && 'additionalParts' in dataFromNav && dataFromNav.additionalParts != null) {
+          const raw = dataFromNav.additionalParts;
+          const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+          setAdditionalParts(Array.isArray(arr) ? arr : []);
+        }
       }
     };
 
     loadRepairData();
-  }, [dataFromNav?.repairId, dataFromNav?.selectedPartId, dataFromNav]);
+  }, [dataFromNav?.repairId, dataFromNav?.selectedPartId]);
 
   useEffect(() => {
     if (!dataFromNav) return;
@@ -559,11 +590,14 @@ const RepairReceipt = () => {
       })
     : null;
 
-  // Sync ข้อมูลที่แก้ไขได้จาก receiptData เมื่อเปิดใบเสร็จหรือเปลี่ยนงานซ่อม
+  // Sync ข้อมูลที่แก้ไขได้จาก receiptData เมื่อเปิดใบเสร็จหรือเปลี่ยนงานซ่อมหรือข้อมูลอะไหล่เปลี่ยน
   useEffect(() => {
     if (receiptData && dataFromNav?.repairId) {
       setEditableReceipt((prev) => {
-        if (!prev || prev.receiptNo !== receiptData.receiptNo) {
+        // อัพเดทเมื่อ receiptNo เปลี่ยน หรือเมื่อ items เปลี่ยน (อะไหล่เปลี่ยน)
+        const receiptDataItemsStr = JSON.stringify(receiptData.items);
+        const prevItemsStr = prev ? JSON.stringify(prev.items) : '';
+        if (!prev || prev.receiptNo !== receiptData.receiptNo || receiptDataItemsStr !== prevItemsStr) {
           return JSON.parse(JSON.stringify(receiptData));
         }
         return prev;
@@ -571,7 +605,7 @@ const RepairReceipt = () => {
     } else if (!receiptData) {
       setEditableReceipt(null);
     }
-  }, [dataFromNav?.repairId, receiptData?.receiptNo]);
+  }, [dataFromNav?.repairId, receiptData]);
 
   const displayReceiptData = editableReceipt ?? receiptData;
 
