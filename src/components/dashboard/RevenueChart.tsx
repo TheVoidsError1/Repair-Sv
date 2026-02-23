@@ -1,6 +1,6 @@
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -69,17 +69,7 @@ export function RevenueChart() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 32%, 91%)" />
               <XAxis
                 dataKey="name"
@@ -124,25 +114,19 @@ export function RevenueChart() {
                   return language === "th" ? "รายจ่าย" : "Expenses";
                 }}
               />
-              <Area
-                type="monotone"
+              <Bar
                 dataKey="income"
                 name="income"
-                stroke="hsl(142, 71%, 45%)"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorIncome)"
+                fill="hsl(142, 71%, 45%)"
+                radius={[4, 4, 0, 0]}
               />
-              <Area
-                type="monotone"
+              <Bar
                 dataKey="expenses"
                 name="expenses"
-                stroke="hsl(0, 84%, 60%)"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorExpenses)"
+                fill="hsl(0, 84%, 60%)"
+                radius={[4, 4, 0, 0]}
               />
-            </AreaChart>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>

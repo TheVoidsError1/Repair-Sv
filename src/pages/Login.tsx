@@ -409,14 +409,14 @@ const Login = () => {
                 htmlFor="email"
                 className="text-sm font-medium text-slate-700 transition-colors group-focus-within:text-indigo-600"
               >
-                {t("email")}
+                {language === "th" ? "อีเมลหรือชื่อผู้ใช้" : "Email or Username"}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 transition-all duration-300 group-focus-within:text-indigo-500 group-focus-within:scale-110" strokeWidth={1.8} />
                 <Input
                   id="email"
-                  type="email"
-                  placeholder={t("enterEmail")}
+                  type="text"
+                  placeholder={language === "th" ? "กรอกอีเมลหรือชื่อผู้ใช้" : "Enter email or username"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-11 h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all duration-300 hover:border-slate-300 hover:bg-slate-50 focus:scale-[1.02] focus:shadow-lg"

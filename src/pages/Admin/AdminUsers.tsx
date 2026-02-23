@@ -32,17 +32,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import type { User, UserRole } from "@/types/user";
-import { Edit, Lock, Mail, Phone, Plus, Shield, Trash2, User as UserIcon, UserCircle, UserPlus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Edit, Lock, Mail, Phone, Plus, Shield, Trash2, User as UserIcon, UserCircle, UserPlus, AlertCircle } from "lucide-react";
+import { useCallback, useState, useEffect } from "react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api";
 
 /** หนัดการผู้ใช้ — เฉพาะเจ้าของ (Admin) */
 const AdminUsers = () => {
   const { t, language } = useLanguage();
-  const { users, addUser, updateUser, deleteUser, formatLastLogin } = useAuth();
+  const { users, addUser, updateUser, deleteUser, formatLastLogin, setUsers, currentUser } = useAuth();
+  const isOwner = currentUser?.role === "owner";
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
     username: "",
@@ -53,6 +56,33 @@ const AdminUsers = () => {
     confirmPassword: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // โหลด users จาก backend เมื่อ component mount
+  useEffect(() => {
+    const loadUsersFromBackend = async () => {
+      try {
+        const response = await apiClient.getPersonnel();
+        if (response.status === 'success' && response.data) {
+          // แปลงข้อมูลจาก backend เป็นรูปแบบ User
+          const backendUsers: User[] = response.data.map((personnel: any) => ({
+            id: personnel.id,
+            username: personnel.username,
+            password: "", // ไม่เก็บ password
+            name: `${personnel.firstName || ''} ${personnel.lastName || ''}`.trim() || personnel.username,
+            email: personnel.email || undefined,
+            phone: personnel.phone || undefined,
+            role: personnel.role === 'admin' ? 'owner' : 'staff',
+            status: personnel.isActive ? 'active' : 'inactive',
+            lastLogin: personnel.lastLogin ? new Date(personnel.lastLogin).toISOString() : null,
+          }));
+          setUsers(backendUsers);
+        }
+      } catch (error) {
+        console.error('Error loading users from backend:', error);
+      }
+    };
+    void loadUsersFromBackend();
+  }, [setUsers]);
 
   const resetForm = useCallback(() => {
     setForm({
@@ -87,7 +117,12 @@ const AdminUsers = () => {
     setIsUserDialogOpen(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
+    if (!isOwner) {
+      toast.error(language === "th" ? "คุณไม่มีสิทธิ์ในการจัดการผู้ใช้" : "You do not have permission to manage users");
+      return;
+    }
+
     const errors: Record<string, string> = {};
 
     if (editingUser) {
@@ -124,6 +159,11 @@ const AdminUsers = () => {
     if (!form.username.trim()) {
       errors.username = language === "th" ? "กรุณากรอกชื่อผู้ใช้" : "Please enter username";
     }
+    if (!form.email.trim()) {
+      errors.email = language === "th" ? "กรุณากรอกอีเมล" : "Please enter email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errors.email = language === "th" ? "รูปแบบอีเมลไม่ถูกต้อง" : "Invalid email format";
+    }
     if (!form.password) {
       errors.password = language === "th" ? "กรุณากรอกรหัสผ่าน" : "Please enter password";
     } else if (form.password.length < 4) {
@@ -140,32 +180,85 @@ const AdminUsers = () => {
       return;
     }
 
-    const result = addUser({
-      username: form.username.trim(),
-      password: form.password,
-      name: form.name.trim(),
-      email: form.email.trim() || undefined,
-      phone: form.phone.trim() || undefined,
-      role: form.role,
-      status: "active",
-    });
-    if (!result.success) {
-      if (result.error === "username_exists") {
-        setFormErrors({ username: t("usernameExists") });
+    setIsLoading(true);
+    try {
+      // แปลง name เป็น firstName และ lastName
+      const nameParts = form.name.trim().split(/\s+/);
+      const firstName = nameParts[0] || form.name.trim();
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // แปลง role: owner -> admin, staff -> staff
+      const backendRole = form.role === 'owner' ? 'admin' : 'staff';
+
+      // สร้างผู้ใช้ผ่าน API
+      const response = await apiClient.createPersonnel({
+        firstName,
+        lastName,
+        username: form.username.trim(),
+        password: form.password,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        role: backendRole,
+        isActive: true,
+      });
+
+      if (response.status === 'success' && response.data) {
+        // เพิ่ม user ใหม่เข้า local state
+        const newUser: User = {
+          id: response.data.id,
+          username: response.data.username,
+          password: "",
+          name: `${response.data.firstName || ''} ${response.data.lastName || ''}`.trim() || response.data.username,
+          email: response.data.email || undefined,
+          phone: response.data.phone || undefined,
+          role: response.data.role === 'admin' ? 'owner' : 'staff',
+          status: response.data.isActive ? 'active' : 'inactive',
+          lastLogin: null,
+        };
+        addUser(newUser);
+        toast.success(language === "th" ? "เพิ่มผู้ใช้แล้ว" : "User added");
+        setIsUserDialogOpen(false);
+        resetForm();
       } else {
-        toast.error(language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong");
+        const errorMessage = response.message || (language === "th" ? "เกิดข้อผิดพลาด" : "Something went wrong");
+        if (errorMessage.includes('Username already exists') || errorMessage.includes('username')) {
+          setFormErrors({ username: t("usernameExists") });
+        } else if (errorMessage.includes('Email already exists') || errorMessage.includes('email')) {
+          setFormErrors({ email: language === "th" ? "อีเมลนี้มีอยู่แล้ว" : "Email already exists" });
+        } else {
+          toast.error(errorMessage);
+        }
       }
-      return;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      toast.error(language === "th" ? "เกิดข้อผิดพลาดในการเพิ่มผู้ใช้" : "Failed to create user");
+    } finally {
+      setIsLoading(false);
     }
-    toast.success(language === "th" ? "เพิ่มผู้ใช้แล้ว" : "User added");
-    setIsUserDialogOpen(false);
-    resetForm();
   };
 
-  const handleDeleteUser = (user: User) => {
-    deleteUser(user.id);
-    setDeleteTarget(null);
-    toast.success(language === "th" ? "ลบผู้ใช้แล้ว" : "User deleted");
+  const handleDeleteUser = async (user: User) => {
+    if (!isOwner) {
+      toast.error(language === "th" ? "คุณไม่มีสิทธิ์ในการลบผู้ใช้" : "You do not have permission to delete users");
+      return;
+    }
+
+    try {
+      // ลบผู้ใช้จาก backend
+      const response = await apiClient.deletePersonnel(user.id);
+      
+      if (response.status === 'success') {
+        // ลบจาก local state
+        deleteUser(user.id);
+        setDeleteTarget(null);
+        toast.success(language === "th" ? "ลบผู้ใช้แล้ว" : "User deleted");
+      } else {
+        toast.error(response.message || (language === "th" ? "เกิดข้อผิดพลาดในการลบผู้ใช้" : "Failed to delete user"));
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error(language === "th" ? "เกิดข้อผิดพลาดในการลบผู้ใช้" : "Failed to delete user");
+    }
   };
 
   return (
@@ -179,6 +272,22 @@ const AdminUsers = () => {
         </div>
       </div>
 
+      {!isOwner && (
+        <div className="mb-6 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-foreground mb-1">
+              {language === "th" ? "ไม่มีสิทธิ์เข้าถึง" : "Access Denied"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {language === "th" 
+                ? "คุณไม่มีสิทธิ์ในการจัดการผู้ใช้ในระบบ กรุณาติดต่อผู้ดูแลระบบ" 
+                : "You do not have permission to manage users. Please contact the system administrator."}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-card rounded-xl border border-border">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div>
@@ -187,7 +296,7 @@ const AdminUsers = () => {
           </div>
           <Dialog open={isUserDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsUserDialogOpen(open); }}>
             <DialogTrigger asChild>
-              <Button className="gap-2" onClick={openAddDialog}>
+              <Button className="gap-2" onClick={openAddDialog} disabled={!isOwner}>
                 <Plus className="w-4 h-4" />
                 {t("addUser")}
               </Button>
@@ -260,7 +369,8 @@ const AdminUsers = () => {
                   <div className="space-y-1.5">
                     <Label htmlFor="admin-email">
                       {language === "th" ? "อีเมล" : "Email"}
-                      <span className="text-muted-foreground text-xs ml-1">({language === "th" ? "ไม่บังคับ" : "Optional"})</span>
+                      <span className="text-destructive">*</span>
+                      <span className="text-muted-foreground text-xs ml-1">({language === "th" ? "ใช้สำหรับเข้าสู่ระบบ" : "Used for login"})</span>
                     </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -269,10 +379,15 @@ const AdminUsers = () => {
                         type="email"
                         placeholder={language === "th" ? "กรอกอีเมล" : "Enter email"}
                         value={form.email}
-                        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        className="pl-10"
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, email: e.target.value }));
+                          if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: "" }));
+                        }}
+                        className={cn("pl-10", formErrors.email ? "border-destructive focus-visible:ring-destructive" : "")}
+                        required
                       />
                     </div>
+                    {formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}
                   </div>
 
                   <div className="space-y-1.5">
@@ -364,9 +479,12 @@ const AdminUsers = () => {
                 <Button variant="outline" onClick={() => { setIsUserDialogOpen(false); resetForm(); }} className="flex-1">
                   {t("cancel")}
                 </Button>
-                <Button onClick={handleSaveUser} className="flex-1 gap-2">
+                <Button onClick={handleSaveUser} className="flex-1 gap-2" disabled={isLoading || !isOwner}>
                   <UserPlus className="w-4 h-4" />
-                  {editingUser ? t("saveChanges") : t("createUser")}
+                  {isLoading 
+                    ? (language === "th" ? "กำลังสร้าง..." : "Creating...")
+                    : (editingUser ? t("saveChanges") : t("createUser"))
+                  }
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -398,7 +516,7 @@ const AdminUsers = () => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-right hidden sm:block">
+                <div className="text-right">
                   <p className="text-sm text-muted-foreground">{t("lastLogin")}</p>
                   <p className="text-sm text-foreground">{formatLastLogin(user.lastLogin)}</p>
                 </div>
@@ -409,7 +527,12 @@ const AdminUsers = () => {
                   )}
                 />
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => openEditDialog(user)}
+                    disabled={!isOwner}
+                  >
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button
@@ -417,6 +540,7 @@ const AdminUsers = () => {
                     size="sm"
                     className="text-destructive hover:text-destructive"
                     onClick={() => setDeleteTarget(user)}
+                    disabled={!isOwner}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

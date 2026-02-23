@@ -14,19 +14,23 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email and password are required',
+        message: 'Email/Username and password are required',
       });
     }
 
     const personnelRepository = AppDataSource.getRepository(Personnel);
+    // รองรับทั้ง email และ username สำหรับ login
     const user = await personnelRepository.findOne({
-      where: { email, isActive: true },
+      where: [
+        { email, isActive: true },
+        { username: email, isActive: true }
+      ],
     });
 
     if (!user) {
       return res.status(401).json({
         status: 'error',
-        message: 'Invalid email or password',
+        message: 'Invalid email/username or password',
       });
     }
 
@@ -77,6 +81,7 @@ router.post('/login', async (req, res) => {
     // Generate new token on login (update existing token)
     const newToken = uuidv4();
     user.token = newToken;
+    user.lastLogin = new Date(); // อัพเดท lastLogin เมื่อ login สำเร็จ
     await personnelRepository.save(user);
 
     // Return user data (without password and token)

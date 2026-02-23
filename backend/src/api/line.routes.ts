@@ -1389,7 +1389,10 @@ router.post('/customers/:id/send-receipt-image', receiptImageUpload.single('imag
 
     // บันทึกไฟล์รูปภาพ
     const ext = req.file.mimetype === 'image/png' ? 'png' : 'jpg';
-    const filename = `receipt-${crypto.randomUUID()}.${ext}`;
+    // สร้างชื่อไฟล์จาก receiptNo โดย sanitize อักขระพิเศษ
+    const sanitizedReceiptNo = receiptNo.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const timestamp = Date.now();
+    const filename = `receipt-${sanitizedReceiptNo}-${timestamp}.${ext}`;
     const filepath = path.join(uploadsDir, filename);
     fs.writeFileSync(filepath, req.file.buffer);
 

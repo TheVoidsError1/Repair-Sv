@@ -44,6 +44,9 @@ export class Personnel {
   @Column({ type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ type: 'timestamp', nullable: true })
+  lastLogin?: Date;
+
   @OneToMany(() => Repair, (repair) => repair.assignedTo)
   repairs!: Repair[];
 

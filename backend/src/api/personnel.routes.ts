@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
   try {
     const personnelRepository = AppDataSource.getRepository(Personnel);
     const personnel = await personnelRepository.find({
-      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'createdAt', 'updatedAt'],
+      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'lastLogin', 'createdAt', 'updatedAt'],
     });
 
     res.json({
@@ -35,7 +35,7 @@ router.get('/:id', async (req, res) => {
     const personnelRepository = AppDataSource.getRepository(Personnel);
     const personnel = await personnelRepository.findOne({
       where: { id },
-      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'createdAt', 'updatedAt'],
+      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'lastLogin', 'createdAt', 'updatedAt'],
     });
 
     if (!personnel) {
@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
     // Fetch the saved personnel without password and token using the username from request
     const savedPersonnel = await personnelRepository.findOne({
       where: { username: req.body.username },
-      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'createdAt', 'updatedAt'],
+      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'lastLogin', 'createdAt', 'updatedAt'],
     });
 
     if (!savedPersonnel) {
@@ -162,7 +162,7 @@ router.put('/:id', async (req, res) => {
     // Fetch updated personnel without password
     const updatedPersonnel = await personnelRepository.findOne({
       where: { id },
-      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'createdAt', 'updatedAt'],
+      select: ['id', 'firstName', 'lastName', 'username', 'email', 'phone', 'role', 'isActive', 'lastLogin', 'createdAt', 'updatedAt'],
     });
 
     res.json({
